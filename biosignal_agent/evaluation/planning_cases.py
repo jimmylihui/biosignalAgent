@@ -246,4 +246,10 @@ DEFAULT_PLANNING_CASES = [
         modality='acc',
         expected_tools=('ACC_assess_quality', 'ACC_summarize_activity', 'ACC_estimate_sleep_wake'),
     ),
+    PlanningCase(
+        case_id='ecg_sleep_apnea_proxy',
+        question='Screen this ECG sleep segment for sleep apnea risk using heart rate variability patterns',
+        modality='ecg',
+        expected_tools=('ECG_assess_quality', 'ECG_detect_r_peaks', 'ECG_compute_hrv', 'ECG_screen_sleep_apnea'),
+    ),
 ]

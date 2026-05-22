@@ -803,5 +803,37 @@
       "method",
       "disclaimer"
     ]
+  },
+  {
+    "name": "ECG_screen_sleep_apnea",
+    "description": "Screen an ECG sleep segment for apnea risk using HRV and RR-interval proxy features. ECG-only proxy, not a clinical apnea detector.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "apnea_risk",
+      "apnea_proxy_score",
+      "apnea_proxy_flags",
+      "heart_rate_bpm",
+      "mean_rr_ms",
+      "sdnn_ms",
+      "rmssd_ms",
+      "rr_cv",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
   }
 ]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from biosignal_agent.tools.abp_tools import ABP_assess_quality, ABP_detect_pulses
 from biosignal_agent.tools.acc_tools import ACC_assess_quality, ACC_estimate_sleep_wake, ACC_summarize_activity
 from biosignal_agent.tools.bcg_tools import BCG_assess_quality, BCG_detect_j_peaks
-from biosignal_agent.tools.ecg_tools import ECG_assess_quality, ECG_compute_hrv, ECG_detect_r_peaks, ECG_screen_arrhythmia
+from biosignal_agent.tools.ecg_tools import ECG_assess_quality, ECG_compute_hrv, ECG_detect_r_peaks, ECG_screen_arrhythmia, ECG_screen_sleep_apnea
 from biosignal_agent.tools.eda_tools import EDA_assess_quality, EDA_summarize
 from biosignal_agent.tools.eeg_tools import EEG_assess_quality, EEG_compute_bandpower, EEG_estimate_sleep_stage_features
 from biosignal_agent.tools.emg_tools import EMG_assess_quality, EMG_summarize_activation
@@ -18,6 +18,7 @@ TOOLS = {
     "ECG_detect_r_peaks": ECG_detect_r_peaks,
     "ECG_compute_hrv": ECG_compute_hrv,
     "ECG_screen_arrhythmia": ECG_screen_arrhythmia,
+    "ECG_screen_sleep_apnea": ECG_screen_sleep_apnea,
     "PPG_assess_quality": PPG_assess_quality,
     "PPG_detect_peaks": PPG_detect_peaks,
     "BCG_assess_quality": BCG_assess_quality,
@@ -47,7 +48,7 @@ TOOLS = {
 }
 
 WORKFLOWS = {
-    "ecg": ["ECG_assess_quality", "ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_arrhythmia"],
+    "ecg": ["ECG_assess_quality", "ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_arrhythmia", "ECG_screen_sleep_apnea"],
     "ppg": ["PPG_assess_quality", "PPG_detect_peaks"],
     "bcg": ["BCG_assess_quality", "BCG_detect_j_peaks"],
     "scg": ["SCG_assess_quality", "SCG_detect_j_peaks"],

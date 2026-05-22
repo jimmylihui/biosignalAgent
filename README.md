@@ -475,11 +475,11 @@ The planning benchmark now includes broader task prompts beyond peak/rate extrac
 - EEG sleep-stage features: delta/theta/alpha/beta ratios and coarse sleep-stage hint.
 - ACC sleep/wake proxy: actigraphy-style rest/activity hint.
 
-The expanded rule-planning set has 39 planning cases. Latest expanded rule evals:
+The expanded rule-planning set has 40 planning cases. Latest expanded rule evals:
 
 ```text
-planning regression: 39 cases, retrieval/planning accuracy 1.0
-real-world + MIT-BIH ECG: 21 records, 76 case-runs, retrieval/planning/execution accuracy 1.0
+planning regression: 40 cases, retrieval/planning accuracy 1.0
+real-world + MIT-BIH ECG: 21 records, 77 case-runs, retrieval/planning/execution accuracy 1.0
 dedicated common datasets: 21 records, 54 case-runs, retrieval/planning/execution accuracy 1.0
 dedicated BCG: 3 records, 12 case-runs, retrieval/planning/execution accuracy 1.0
 tool audit: 44 records, 107 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
@@ -518,6 +518,24 @@ The expanded benchmark report includes this labeled benchmark:
 /data1/jiahui/biosignal-agent/outputs/benchmark_report_expanded_tasks.json
 /data1/jiahui/biosignal-agent/outputs/benchmark_report_expanded_tasks.md
 ```
+
+### Second Labeled Benchmark: Apnea-ECG Minute Labels
+
+A small Apnea-ECG subset is available for ECG-only sleep-apnea proxy benchmarking:
+
+```bash
+python scripts/prepare_apnea_ecg_dataset.py \
+  --records a01 b01 c01 \
+  --max-minutes-per-record 20 \
+  --download
+
+python scripts/evaluate_apnea_ecg.py \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/apnea_ecg_manifest.json \
+  --out-json /data1/jiahui/biosignal-agent/outputs/apnea_ecg_eval.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/apnea_ecg_eval.csv
+```
+
+Current Apnea-ECG subset: 60 one-minute ECG windows, 8 apnea and 52 normal. The ECG-only HRV proxy is intentionally a weak baseline: accuracy 0.533, precision 0.083, recall 0.250, specificity 0.577, and F1 0.125. This gives the framework a concrete negative result and points the next apnea work toward RESP/SpO2/PSG-labeled datasets instead of ECG-only heuristics.
 
 Key outputs:
 

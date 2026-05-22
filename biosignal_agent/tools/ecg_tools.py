@@ -86,3 +86,45 @@ def ECG_screen_arrhythmia(signal_path: str, sampling_rate: float, column: str | 
         "method": "rr_interval_screening",
         "disclaimer": "Screening heuristic only; not a diagnostic rhythm classifier.",
     }
+
+
+
+def ECG_screen_sleep_apnea(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    hrv = ECG_compute_hrv(signal_path, sampling_rate, column)
+    arrhythmia = ECG_screen_arrhythmia(signal_path, sampling_rate, column)
+    if hrv.get("error"):
+        return {"tool": "ECG_screen_sleep_apnea", "error": hrv["error"], "confidence": 0.1}
+    mean_rr = float(hrv.get("mean_rr_ms") or 0.0)
+    rmssd = float(hrv.get("rmssd_ms") or 0.0)
+    sdnn = float(hrv.get("sdnn_ms") or 0.0)
+    rr_cv = arrhythmia.get("rr_cv")
+    heart_rate = arrhythmia.get("heart_rate_bpm")
+    score = 0
+    flags = []
+    if heart_rate is not None and (heart_rate < 55 or heart_rate > 95):
+        score += 1
+        flags.append("sleep_epoch_heart_rate_extreme")
+    if rr_cv is not None and rr_cv > 0.10:
+        score += 1
+        flags.append("elevated_rr_variability")
+    if rmssd > 80 or sdnn > 90:
+        score += 1
+        flags.append("high_short_term_hrv")
+    if mean_rr > 1200:
+        score += 1
+        flags.append("bradycardic_rr_pattern")
+    apnea_risk = "elevated" if score >= 2 else "low"
+    return {
+        "tool": "ECG_screen_sleep_apnea",
+        "apnea_risk": apnea_risk,
+        "apnea_proxy_score": score,
+        "apnea_proxy_flags": flags,
+        "heart_rate_bpm": heart_rate,
+        "mean_rr_ms": mean_rr,
+        "sdnn_ms": sdnn,
+        "rmssd_ms": rmssd,
+        "rr_cv": rr_cv,
+        "confidence": 0.5,
+        "method": "ecg_hrv_sleep_apnea_proxy",
+        "disclaimer": "ECG-only apnea proxy for benchmarking; respiratory effort and SpO2 labels are preferred for clinical apnea detection.",
+    }

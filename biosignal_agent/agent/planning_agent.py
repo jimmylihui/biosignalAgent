@@ -39,6 +39,7 @@ BASIC_ANALYSIS_TOOLS = {
 TASK_TOOL_RULES = {
     "ecg": [
         ({"arrhythmia", "rhythm", "irregular", "afib", "atrial fibrillation", "bradycardia", "tachycardia", "pause"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_arrhythmia"]),
+        ({"apnea", "apnoea", "sleep disordered", "sleep breathing", "sleep apnea"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_sleep_apnea"]),
     ],
     "resp": [
         ({"apnea", "apnoea", "hypopnea", "hypopnoea", "sleep disordered", "cessation"}, ["RESP_estimate_rate", "RESP_detect_apnea"]),
