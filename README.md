@@ -244,6 +244,22 @@ python scripts/evaluate_psg_sleep.py
 python scripts/prepare_pcg_murmur_dataset.py --download --max-per-class 5
 python scripts/evaluate_pcg_murmur.py
 python scripts/evaluate_pcg_murmur_v2.py
+
+python scripts/prepare_ppg_af_dataset.py --download --max-per-class 4 --seconds 60
+python scripts/evaluate_ppg_af.py
+
+python scripts/prepare_acc_activity_dataset.py --download --max-per-class 4
+python scripts/evaluate_acc_activity.py
+
+# Manual raw-data placement currently required for WESAD and UniMiB/SisFall-style fall data.
+python scripts/prepare_wesad_stress_dataset.py
+python scripts/evaluate_wesad_stress.py
+python scripts/prepare_acc_fall_dataset.py
+python scripts/evaluate_acc_fall.py
+
+# CHB-MIT EDF files can be slow to download; the script enforces both seizure and non-seizure windows.
+python scripts/prepare_chbmit_seizure_dataset.py --download --max-seizure-files 1
+python scripts/evaluate_chbmit_seizure.py
 ```
 
 Latest labeled benchmark snapshot:
@@ -253,6 +269,9 @@ Latest labeled benchmark snapshot:
 - UCDDB PSG sleep staging: coarse-stage macro-F1 0.241 on 80 windows.
 - UCDDB PSG respiratory events: F1 0.218 on 80 windows.
 - PhysioNet/CinC 2016 PCG normal/abnormal: proxy F1 0.000 on 10 balanced records; feature+logistic-regression baseline F1 0.750.
+- MIMIC PERform AF PPG AF/non-AF: irregular-pulse proxy F1 0.857 on 8 windows.
+- UCI-HAR ACC activity: random-forest feature baseline macro-F1 0.958 on 48 windows; active/rest F1 1.000.
+- WESAD stress, UniMiB/SisFall fall, and CHB-MIT seizure scripts are implemented; WESAD/fall need local raw files, and CHB-MIT needs complete EDF download before metrics are reported.
 
 These numbers are intentionally baseline-level: they turn major tasks into measurable targets before replacing heuristics with stronger models.
 

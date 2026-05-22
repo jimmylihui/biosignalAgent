@@ -74,9 +74,12 @@ Report artifacts are written under `/data1/jiahui/biosignal-agent/outputs/*major
 | UCDDB PSG sleep windows | Implemented via `scripts/prepare_psg_sleep_dataset.py` | sleep-stage labels plus respiratory-event labels using EEG/Flow/SpO2 | current coarse sleep-stage macro-F1 0.241 and respiratory-event F1 0.218 on 80 windows |
 | Sleep staging | Sleep-EDF, PhysioNet sleep datasets | 30 s sleep stages | epoch accuracy, macro-F1, Cohen kappa |
 | Desaturation detection | PSG datasets with SpO2 and scored respiratory events | desaturation/apnea events | ODI error, event precision/recall |
-| Stress/arousal | WESAD or multimodal EDA/ECG/ACC datasets | stress/arousal labels | balanced accuracy, macro-F1 |
-| Seizure or abnormal EEG screening | CHB-MIT or other EEG event datasets | seizure/event labels | event sensitivity, false positives/hour |
+| Stress/arousal | WESAD parser scaffold via `scripts/prepare_wesad_stress_dataset.py` | baseline/rest vs stress labels | raw WESAD PKLs required; EDA proxy evaluator implemented |
+| Seizure or abnormal EEG screening | CHB-MIT scaffold via `scripts/prepare_chbmit_seizure_dataset.py` | seizure vs non-seizure windows | EDF download can be slow; evaluator implemented, requires complete positive/negative windows |
 | PCG murmur screening | Implemented via `scripts/prepare_pcg_murmur_dataset.py` on PhysioNet/CinC 2016 | normal/abnormal labels | proxy F1 0.000; feature+logistic-regression baseline F1 0.750 on 10 balanced records |
+| ACC activity recognition | Implemented via `scripts/prepare_acc_activity_dataset.py` on UCI HAR | six-class activity labels | current RF baseline macro-F1 0.958 on 48 windows |
+| ACC fall detection | UniMiB/SisFall parser scaffold via `scripts/prepare_acc_fall_dataset.py` | fall vs ADL labels | raw fall arrays required; logistic and impact-proxy evaluator implemented |
+| PPG AF screening | Implemented via `scripts/prepare_ppg_af_dataset.py` on MIMIC PERform AF | AF/non-AF labels | current irregular-pulse proxy F1 0.857 on 8 windows |
 | EMG gesture/fatigue | public EMG gesture/fatigue datasets | gesture/fatigue labels | accuracy, macro-F1 |
 
 ## Existing-Work Wrapper Sources

@@ -232,6 +232,25 @@ def labeled_pcg_murmur_summary(path: str | Path) -> dict[str, Any]:
     }
 
 
+def generic_labeled_summary(name: str, path: str | Path, metrics_key: str = "metrics") -> dict[str, Any]:
+    payload = load_json(path)
+    if payload.get("missing"):
+        return {"name": name, **payload}
+    metrics = payload.get(metrics_key, payload.get("metrics", {}))
+    return {
+        "name": name,
+        "path": str(path),
+        "num_windows": payload.get("num_windows") or payload.get("num_records"),
+        "truth_counts": payload.get("truth_counts", payload.get("label_counts", {})),
+        "prediction_counts": payload.get("prediction_counts", {}),
+        "accuracy": metrics.get("accuracy"),
+        "precision": metrics.get("precision"),
+        "recall_sensitivity": metrics.get("recall_sensitivity"),
+        "specificity": metrics.get("specificity"),
+        "f1": metrics.get("f1", metrics.get("macro_f1")),
+    }
+
+
 def instruction_summary(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     if not path.exists():
@@ -357,6 +376,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             *labeled_psg_sleep_summary(args.psg_sleep_eval),
             labeled_pcg_murmur_summary(args.pcg_murmur_eval),
             labeled_pcg_murmur_summary(args.pcg_murmur_v2_eval) | {"name": "pcg_murmur_feature_logreg"},
+            generic_labeled_summary("ppg_af_irregularity", args.ppg_af_eval),
+            generic_labeled_summary("wesad_stress_eda", args.wesad_stress_eval),
+            generic_labeled_summary("acc_activity_uci_har", args.acc_activity_eval),
+            generic_labeled_summary("acc_fall_unimib", args.acc_fall_eval),
+            generic_labeled_summary("chbmit_seizure_eeg", args.chbmit_seizure_eval),
         ],
         "instruction_data": [
             {"name": "full_sft", **instruction_summary(args.full_sft)},
@@ -382,6 +406,11 @@ def main() -> None:
     parser.add_argument("--psg-sleep-eval", default="/data1/jiahui/biosignal-agent/outputs/psg_sleep_eval.json")
     parser.add_argument("--pcg-murmur-eval", default="/data1/jiahui/biosignal-agent/outputs/pcg_murmur_eval.json")
     parser.add_argument("--pcg-murmur-v2-eval", default="/data1/jiahui/biosignal-agent/outputs/pcg_murmur_v2_eval.json")
+    parser.add_argument("--ppg-af-eval", default="/data1/jiahui/biosignal-agent/outputs/ppg_af_eval.json")
+    parser.add_argument("--wesad-stress-eval", default="/data1/jiahui/biosignal-agent/outputs/wesad_stress_eval.json")
+    parser.add_argument("--acc-activity-eval", default="/data1/jiahui/biosignal-agent/outputs/acc_activity_eval.json")
+    parser.add_argument("--acc-fall-eval", default="/data1/jiahui/biosignal-agent/outputs/acc_fall_eval.json")
+    parser.add_argument("--chbmit-seizure-eval", default="/data1/jiahui/biosignal-agent/outputs/chbmit_seizure_eval.json")
     parser.add_argument("--full-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft.jsonl")
     parser.add_argument("--planning-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft.jsonl")
     parser.add_argument("--out-json", default="/data1/jiahui/biosignal-agent/outputs/benchmark_report_major_tasks.json")

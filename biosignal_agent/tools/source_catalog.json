@@ -175,7 +175,7 @@
         "https://ppg-beats.readthedocs.io/en/latest/datasets/summary/"
       ],
       "wrapper_priority": 3,
-      "next_wrapper": "Add ECG-referenced PPG AF dataset and compare this pulse-interval baseline against ECG rhythm labels."
+      "next_wrapper": "MIMIC PERform AF benchmark added; next expand records and compare against ECG-referenced AF labels with artifact filtering."
     },
     {
       "modality": "PPG",
@@ -380,7 +380,7 @@
         "https://isip.piconepress.com/projects/tuh_eeg/"
       ],
       "wrapper_priority": 4,
-      "next_wrapper": "Add CHB-MIT small benchmark before changing seizure proxy."
+      "next_wrapper": "CHB-MIT small benchmark scaffold added; complete EDF download, then evaluate seizure/non-seizure windows before changing proxy."
     },
     {
       "modality": "EEG",
@@ -558,7 +558,7 @@
         "https://sleepdata.org/datasets/shhs"
       ],
       "wrapper_priority": 4,
-      "next_wrapper": "Add actigraphy sleep/wake benchmark using PSG-labeled MESA/SHHS if accessible."
+      "next_wrapper": "UCI-HAR activity benchmark added; next add actigraphy sleep/wake labels from PSG datasets if accessible."
     },
     {
       "modality": "ACC",
@@ -576,6 +576,7 @@
         "tsfresh"
       ],
       "candidate_datasets": [
+        "UniMiB SHAR",
         "SisFall",
         "MobiFall",
         "UP-Fall",
@@ -586,7 +587,7 @@
         "https://www.sciencedirect.com/science/article/abs/pii/S1350453315001575"
       ],
       "wrapper_priority": 4,
-      "next_wrapper": "Add one public fall dataset before tuning impact thresholds."
+      "next_wrapper": "UniMiB/SisFall parser scaffold added; place public fall arrays under raw dir, then run fall-vs-ADL benchmark before threshold tuning."
     },
     {
       "modality": "EDA",
@@ -644,7 +645,7 @@
         "https://www.mdpi.com/1424-8220/22/22/8886"
       ],
       "wrapper_priority": 3,
-      "next_wrapper": "Create WESAD manifest and benchmark EDA-only versus multimodal stress baselines."
+      "next_wrapper": "WESAD parser scaffold added; place WESAD subject PKLs under raw dir, then benchmark EDA-only stress baseline."
     },
     {
       "modality": "EMG",
