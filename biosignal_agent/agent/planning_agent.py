@@ -10,6 +10,7 @@ MODALITY_KEYWORDS = {
     "ecg": {"ecg", "ekg", "electrocardiogram", "r-peak", "r peak", "qrs", "hrv", "rr"},
     "ppg": {"ppg", "photoplethysmography", "pulse", "spo2", "pleth"},
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak"},
+    "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak"},
 }
 
 
@@ -50,6 +51,9 @@ class PlanningBioSignalAgent:
         elif modality == "bcg":
             if wants_peaks or wants_general:
                 selected.append("BCG_detect_j_peaks")
+        elif modality == "scg":
+            if wants_peaks or wants_general:
+                selected.append("SCG_detect_j_peaks")
 
         needs_analysis = wants_peaks or wants_hrv or wants_general
         if len(selected) == 1 and needs_analysis:

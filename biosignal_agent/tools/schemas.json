@@ -181,5 +181,57 @@
       "heart_rate_bpm",
       "confidence"
     ]
+  },
+  {
+    "name": "SCG_assess_quality",
+    "description": "Assess SCG signal quality from a CSV waveform.",
+    "modality": "SCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
+  },
+  {
+    "name": "SCG_detect_j_peaks",
+    "description": "Detect approximate SCG J peaks using NeuroKit2 ECG Nabian 2018 peak detection after SCG bandpass preprocessing.",
+    "modality": "SCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "j_peak_indices",
+      "num_peaks",
+      "heart_rate_bpm",
+      "confidence",
+      "method"
+    ]
   }
 ]

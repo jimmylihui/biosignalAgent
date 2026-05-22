@@ -84,4 +84,28 @@ DEFAULT_PLANNING_CASES = [
         modality="bcg",
         expected_tools=("BCG_assess_quality", "BCG_detect_j_peaks"),
     ),
+    PlanningCase(
+        case_id="scg_quality",
+        question="Assess SCG signal quality",
+        modality="scg",
+        expected_tools=("SCG_assess_quality",),
+    ),
+    PlanningCase(
+        case_id="scg_j_peaks",
+        question="Detect SCG J peaks and estimate heart rate",
+        modality="scg",
+        expected_tools=("SCG_assess_quality", "SCG_detect_j_peaks"),
+    ),
+    PlanningCase(
+        case_id="scg_hr",
+        question="Estimate heart rate from this seismocardiogram mechanical cardiac signal",
+        modality="scg",
+        expected_tools=("SCG_assess_quality", "SCG_detect_j_peaks"),
+    ),
+    PlanningCase(
+        case_id="scg_summary",
+        question="Analyze this SCG waveform and summarize J-peak based heart rate",
+        modality="scg",
+        expected_tools=("SCG_assess_quality", "SCG_detect_j_peaks"),
+    ),
 ]

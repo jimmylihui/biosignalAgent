@@ -12,6 +12,7 @@ MODALITY_HINTS = {
     "ecg": {"ecg", "ekg", "electrocardiogram", "qrs", "r", "rr", "hrv"},
     "ppg": {"ppg", "photoplethysmography", "pulse", "pleth", "spo2"},
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j", "jk"},
+    "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical", "cardiac", "j", "jk"},
 }
 
 
@@ -56,6 +57,14 @@ class ToolRetriever:
             scores.append((score, schema["name"], schema))
         scores.sort(key=lambda item: (-item[0], item[1]))
         selected = [schema for score, _, schema in scores[:top_k] if score > 0]
+        if modality and len(selected) < min(top_k, len(candidates)):
+            selected_names = {schema["name"] for schema in selected}
+            for _, _, schema in scores:
+                if schema["name"] not in selected_names:
+                    selected.append(schema)
+                    selected_names.add(schema["name"])
+                if len(selected) >= top_k:
+                    break
         return selected or self._fallback_by_modality(modality, top_k)
 
     def _score(self, query_tokens: list[str], doc_tokens: list[str]) -> float:

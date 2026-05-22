@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_MODALITIES = {"ecg", "ppg", "bcg"}
+SUPPORTED_MODALITIES = {"ecg", "ppg", "bcg", "scg"}
 
 
 @dataclass

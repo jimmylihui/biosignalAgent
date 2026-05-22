@@ -59,17 +59,17 @@ def export_record(db: str, record: str, channel_candidates: list[str], modality:
         'seconds': seconds,
         'source_channel': wfdb_record.sig_name[channel_idx],
         'num_samples': int(len(values)),
-        'note': 'CEBSDB SCG channel is used as a BCG-like mechanical cardiac signal proxy.' if db == 'cebsdb' else None,
+        'note': 'CEBSDB SCG channel is used as a real seismocardiogram mechanical cardiac signal.' if db == 'cebsdb' else None,
     }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Export real public PPG and BCG-like mechanical signal CSVs from PhysioNet.')
+    parser = argparse.ArgumentParser(description='Export real public PPG and SCG mechanical signal CSVs from PhysioNet.')
     parser.add_argument('--out-dir', default='/data1/jiahui/biosignal-agent/datasets/processed/real_world')
     parser.add_argument('--manifest', default='/data1/jiahui/biosignal-agent/datasets/processed/real_world_manifest.json')
     parser.add_argument('--seconds', type=float, default=60.0)
     parser.add_argument('--limit', type=int, default=5)
-    parser.add_argument('--bcg-target-fs', type=float, default=250.0, help='Downsample CEBSDB SCG proxy to this sampling rate for faster tool execution.')
+    parser.add_argument('--scg-target-fs', type=float, default=250.0, help='Downsample CEBSDB SCG to this sampling rate for faster tool execution.')
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -79,7 +79,7 @@ def main() -> None:
     for record in bidmc_records:
         manifest.append(export_record('bidmc', record, ['PLETH', 'PPG'], 'ppg', args.seconds, out_dir, target_fs=None))
     for record in cebs_records:
-        manifest.append(export_record('cebsdb', record, ['SCG'], 'bcg', args.seconds, out_dir, target_fs=args.bcg_target_fs))
+        manifest.append(export_record('cebsdb', record, ['SCG'], 'scg', args.seconds, out_dir, target_fs=args.scg_target_fs))
 
     manifest_path = Path(args.manifest)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)

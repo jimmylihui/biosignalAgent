@@ -35,7 +35,7 @@ class OpenRouterBioSignalAgent:
             for schema in schemas
         ]
         system = (
-            'You are BioSignalAgent, a tool-planning assistant for ECG, PPG, and BCG waveforms. '
+            'You are BioSignalAgent, a tool-planning assistant for ECG, PPG, BCG, and SCG waveforms. '
             'Choose only tools from the provided list. Return strict JSON only, with keys modality and tool_calls. '
             'Each tool call must have name and arguments. Include signal_path, sampling_rate, and column in arguments. '
             'Do not make clinical diagnosis.'
@@ -158,7 +158,7 @@ class OpenRouterBioSignalAgent:
         if not normalized:
             raise ValueError('LLM returned no valid tool calls.')
         modality = str(plan.get('modality') or '').lower()
-        quality_tool = f'{modality.upper()}_assess_quality' if modality in {'ecg', 'ppg', 'bcg'} else None
+        quality_tool = f'{modality.upper()}_assess_quality' if modality in {'ecg', 'ppg', 'bcg', 'scg'} else None
         if quality_tool in TOOLS and all(call['name'] != quality_tool for call in normalized):
             normalized.insert(0, {'name': quality_tool, 'arguments': {'signal_path': signal_path, 'sampling_rate': sampling_rate, 'column': column}})
         return {'modality': plan.get('modality'), 'tool_calls': normalized, 'planner': 'openrouter', 'retrieved_tools': retrieved_tools}

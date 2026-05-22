@@ -1,6 +1,6 @@
 # BioSignalAgent
 
-Tool-first prototype for ECG, PPG, and BCG signal reasoning.
+Tool-first prototype for ECG, PPG, BCG, and SCG signal reasoning.
 
 This version keeps signal analysis in explicit Python tools. The agent can use either deterministic rule planning or an OpenRouter LLM planner, with local fallback when LLM output is unavailable or invalid. Tool schemas and execution traces are structured so they can support ToolRAG, tool calling, and future instruction tuning.
 
@@ -9,6 +9,7 @@ This version keeps signal analysis in explicit Python tools. The agent can use e
 - ECG: signal quality, R-peak detection, HRV summary
 - PPG: signal quality, peak detection, heart-rate estimate
 - BCG: signal quality, J-peak detection, heart-rate estimate
+- SCG: signal quality, J-peak detection, heart-rate estimate
 
 ## Run A CSV Report
 
@@ -47,6 +48,7 @@ Observed first sanity-check result on record 100, first 60 seconds, 100 ms toler
 - ECG R-peak detection: NeuroKit2 `pantompkins1985`.
 - PPG peak detection: NeuroKit2 ECG `nabian2018` detector after PPG bandpass preprocessing.
 - BCG J-peak detection: NeuroKit2 ECG `nabian2018` detector after BCG bandpass preprocessing.
+- SCG J-peak detection: NeuroKit2 ECG `nabian2018` detector after SCG bandpass preprocessing.
 
 ## Full MIT-BIH 60s Benchmark
 
@@ -156,7 +158,7 @@ python scripts/evaluate_agent_framework.py \
   --out-csv /data1/jiahui/biosignal-agent/outputs/framework_eval_rule_execute.csv
 ```
 
-Latest rule-planner execution eval: retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0 across the default ECG/PPG/BCG planning cases.
+Latest rule-planner execution eval: retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0 across the default ECG/PPG/BCG/SCG planning cases.
 
 OpenRouter planning eval is also supported, with bounded timeout/retry settings so batch runs do not hang on network/model failures:
 
@@ -208,9 +210,9 @@ run = agent.run_signal(
 
 The same class also runs `BioSignalSession` objects with `run_session(...)`.
 
-## Real PPG/BCG-Like Dataset Expansion
+## Real PPG/SCG Dataset Expansion
 
-Prepare public real-world PPG and mechanical cardiac signal examples from PhysioNet:
+Prepare public real-world PPG and SCG mechanical cardiac signal examples from PhysioNet:
 
 ```bash
 python scripts/prepare_real_ppg_bcg_data.py --limit 5 --seconds 60
@@ -223,7 +225,7 @@ This exports BIDMC PPG records and CEBSDB SCG records to CSV under:
 /data1/jiahui/biosignal-agent/datasets/processed/real_world_manifest.json
 ```
 
-CEBSDB provides seismocardiogram (SCG), not bed/load-cell BCG. In this prototype it is treated as a BCG-like mechanical cardiac waveform so the BCG agent pathway can be evaluated with real mechanical heart-signal data before a dedicated BCG dataset is added.
+CEBSDB provides seismocardiogram (SCG), so these records are now evaluated through the dedicated SCG agent pathway. BCG remains a separate modality for bed/load-cell ballistocardiogram data when a dedicated dataset is added.
 
 Run systematic real-data framework evaluation across the expanded question set:
 
@@ -232,8 +234,8 @@ python scripts/evaluate_real_datasets.py \
   --planner rule \
   --include-ecg \
   --retrieved-tool-count 3 \
-  --out-json /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule.json \
-  --out-csv /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule.csv
+  --out-json /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_scg.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_scg.csv
 ```
 
-Latest real-data rule eval: 11 records, 44 case-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0.
+Latest real-data rule eval: 11 records, 44 ECG/PPG/SCG case-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0. BCG is covered in planning eval and awaits a dedicated real BCG dataset.

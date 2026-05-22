@@ -17,7 +17,7 @@ def main() -> None:
     parser.add_argument('--csv', required=True)
     parser.add_argument('--sampling-rate', required=True, type=float)
     parser.add_argument('--column', default=None)
-    parser.add_argument('--fallback-modality', choices=['ecg', 'ppg', 'bcg'], default=None)
+    parser.add_argument('--fallback-modality', choices=['ecg', 'ppg', 'bcg', 'scg'], default=None)
     parser.add_argument('--model', default=DEFAULT_MODEL)
     parser.add_argument('--llm-report', action='store_true', help='Use OpenRouter for final report generation. Default uses deterministic reporting.')
     parser.add_argument('--retrieved-tool-count', type=int, default=5, help='Number of tool schemas to retrieve for the planner prompt.')
