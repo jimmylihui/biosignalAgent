@@ -37,7 +37,7 @@ class PlanningBioSignalAgent:
 
         wants_hrv = "hrv" in text or "heart rate variability" in text or "rmssd" in text or "sdnn" in text
         wants_peaks = any(term in text for term in ["peak", "peaks", "heart rate", "bpm", "rate", "rr", "pulse"])
-        wants_general = any(term in text for term in ["analyze", "report", "summary", "quality", "what", "estimate"])
+        wants_general = any(term in text for term in ["analyze", "report", "summary", "quality", "what"])
 
         if modality == "ecg":
             if wants_peaks or wants_hrv or wants_general:

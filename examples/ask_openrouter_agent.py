@@ -21,8 +21,18 @@ def main() -> None:
     parser.add_argument('--model', default=DEFAULT_MODEL)
     parser.add_argument('--llm-report', action='store_true', help='Use OpenRouter for final report generation. Default uses deterministic reporting.')
     parser.add_argument('--retrieved-tool-count', type=int, default=5, help='Number of tool schemas to retrieve for the planner prompt.')
+    parser.add_argument('--llm-timeout', type=int, default=120)
+    parser.add_argument('--llm-retry-max', type=int, default=3)
+    parser.add_argument('--llm-retry-delay', type=float, default=8.0)
     args = parser.parse_args()
-    agent = OpenRouterBioSignalAgent(model=args.model, use_llm_report=args.llm_report, retrieved_tool_count=args.retrieved_tool_count)
+    agent = OpenRouterBioSignalAgent(
+        model=args.model,
+        use_llm_report=args.llm_report,
+        retrieved_tool_count=args.retrieved_tool_count,
+        llm_timeout=args.llm_timeout,
+        llm_retry_max=args.llm_retry_max,
+        llm_retry_delay=args.llm_retry_delay,
+    )
     report = agent.run(args.question, args.csv, args.sampling_rate, args.column, args.fallback_modality)
     print(json.dumps(report, indent=2))
 

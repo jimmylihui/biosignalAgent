@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from .openrouter_client import DEFAULT_MODEL, chat_completion
+from .openrouter_client import DEFAULT_MODEL, DEFAULT_TIMEOUT, chat_completion
 from .planning_agent import PlanningBioSignalAgent
 from .tool_retriever import ToolRetriever
 from .tool_registry import TOOLS
@@ -18,6 +18,9 @@ class OpenRouterBioSignalAgent:
     fallback_to_rules: bool = True
     use_llm_report: bool = False
     retrieved_tool_count: int = 5
+    llm_timeout: int = DEFAULT_TIMEOUT
+    llm_retry_max: int = 3
+    llm_retry_delay: float = 8.0
 
     def plan(self, question: str, signal_path: str, sampling_rate: float, column: str | None = None, fallback_modality: str | None = None) -> dict:
         modality_hint = fallback_modality
@@ -50,7 +53,7 @@ class OpenRouterBioSignalAgent:
             text = chat_completion([
                 {'role': 'system', 'content': system},
                 {'role': 'user', 'content': json.dumps(user, ensure_ascii=True)},
-            ], model=self.model, temperature=0.0)
+            ], model=self.model, temperature=0.0, timeout=self.llm_timeout, retry_max=self.llm_retry_max, retry_delay=self.llm_retry_delay)
             plan = parse_json_object(text)
             return self._normalize_plan(plan, signal_path, sampling_rate, column, [schema['name'] for schema in schemas])
         except Exception as exc:
@@ -130,7 +133,7 @@ class OpenRouterBioSignalAgent:
             return chat_completion([
                 {'role': 'system', 'content': system},
                 {'role': 'user', 'content': json.dumps(payload, ensure_ascii=True)},
-            ], model=self.model, temperature=0.2).strip()
+            ], model=self.model, temperature=0.2, timeout=self.llm_timeout, retry_max=self.llm_retry_max, retry_delay=self.llm_retry_delay).strip()
         except Exception as exc:
             lines = [f'Question: {question}', 'Tool findings:']
             for item in tool_results:
