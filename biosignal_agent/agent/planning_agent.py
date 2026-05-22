@@ -12,13 +12,13 @@ MODALITY_KEYWORDS = {
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak"},
     "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak"},
     "resp": {"resp", "respiration", "respiratory", "breath", "breathing"},
-    "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation"},
+    "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation", "hypoxemia", "hypoxaemia"},
     "abp": {"abp", "arterial blood pressure", "blood pressure", "systolic", "diastolic"},
-    "pcg": {"pcg", "phonocardiogram", "heart sound", "heart sounds", "s1", "s2"},
+    "pcg": {"pcg", "phonocardiogram", "heart sound", "heart sounds", "s1", "s2", "murmur", "valve"},
     "acc": {"acc", "accelerometer", "acceleration", "activity", "motion"},
     "eda": {"eda", "gsr", "electrodermal", "skin conductance", "stress"},
-    "eeg": {"eeg", "electroencephalogram", "brain", "alpha", "beta", "theta", "delta", "bandpower"},
-    "emg": {"emg", "electromyography", "muscle", "activation", "rms"},
+    "eeg": {"eeg", "electroencephalogram", "brain", "alpha", "beta", "theta", "delta", "bandpower", "seizure", "spike", "epileptiform"},
+    "emg": {"emg", "electromyography", "muscle", "activation", "rms", "fatigue", "median frequency"},
 }
 
 BASIC_ANALYSIS_TOOLS = {
@@ -37,18 +37,37 @@ BASIC_ANALYSIS_TOOLS = {
 }
 
 TASK_TOOL_RULES = {
+
+    "ppg": [
+        ({"perfusion", "low perfusion", "pulse variability", "pulse amplitude", "vascular"}, ["PPG_detect_peaks", "PPG_assess_perfusion_variability"]),
+    ],
+    "abp": [
+        ({"hypotension", "hypertension", "pressure event", "shock", "high blood pressure", "low blood pressure"}, ["ABP_detect_pulses", "ABP_screen_pressure_events"]),
+    ],
+    "pcg": [
+        ({"murmur", "valve", "abnormal heart sound"}, ["PCG_detect_heart_sounds", "PCG_screen_murmur_proxy"]),
+    ],
+    "eda": [
+        ({"arousal", "sympathetic", "stress event", "skin conductance response", "scr"}, ["EDA_summarize", "EDA_detect_arousal_events"]),
+    ],
+    "emg": [
+        ({"fatigue", "median frequency", "muscle fatigue"}, ["EMG_summarize_activation", "EMG_estimate_fatigue"]),
+    ],
     "ecg": [
         ({"arrhythmia", "rhythm", "irregular", "afib", "atrial fibrillation", "bradycardia", "tachycardia", "pause"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_arrhythmia"]),
         ({"apnea", "apnoea", "sleep disordered", "sleep breathing", "sleep apnea"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_sleep_apnea"]),
     ],
     "resp": [
-        ({"apnea", "apnoea", "hypopnea", "hypopnoea", "sleep disordered", "cessation"}, ["RESP_estimate_rate", "RESP_detect_apnea"]),
+        ({"apnea", "apnoea", "sleep disordered", "cessation"}, ["RESP_estimate_rate", "RESP_detect_apnea"]),
+        ({"hypopnea", "hypopnoea", "shallow breathing", "airflow reduction", "reduced respiration"}, ["RESP_estimate_rate", "RESP_detect_hypopnea"]),
     ],
     "spo2": [
-        ({"desaturation", "desat", "odi", "oxygen drop", "below 90", "hypoxemia", "hypoxaemia", "apnea"}, ["SpO2_summarize", "SpO2_detect_desaturation"]),
+        ({"desaturation", "desat", "odi", "oxygen drop", "below 90", "apnea"}, ["SpO2_summarize", "SpO2_detect_desaturation"]),
+        ({"hypoxemia", "hypoxaemia", "oxygen burden", "below 88", "low oxygen burden"}, ["SpO2_summarize", "SpO2_assess_hypoxemia_burden"]),
     ],
     "eeg": [
         ({"sleep stage", "sleep staging", "n1", "n2", "n3", "rem", "wake", "slow wave"}, ["EEG_compute_bandpower", "EEG_estimate_sleep_stage_features"]),
+        ({"seizure", "epileptiform", "spike", "spikes", "abnormal eeg"}, ["EEG_compute_bandpower", "EEG_screen_seizure_like_activity"]),
     ],
     "acc": [
         ({"sleep", "wake", "actigraphy", "rest", "sleep wake"}, ["ACC_summarize_activity", "ACC_estimate_sleep_wake"]),
@@ -105,6 +124,15 @@ class PlanningBioSignalAgent:
                 "activity",
                 "bandpower",
                 "activation",
+                "perfusion",
+                "hypotension",
+                "hypertension",
+                "murmur",
+                "arousal",
+                "fatigue",
+                "seizure",
+                "hypopnea",
+                "hypoxemia",
             ]
         )
         if modality == "ecg":

@@ -6,18 +6,18 @@ This version keeps signal analysis in explicit Python tools. The agent can use e
 
 ## Current Tools
 
-- ECG: signal quality, R-peak detection, HRV summary
-- PPG: signal quality, peak detection, heart-rate estimate
-- BCG: signal quality, J-peak detection, heart-rate estimate
-- SCG: signal quality, J-peak detection, heart-rate estimate
-- RESP: signal quality, respiratory-rate estimate
-- SpO2: signal quality, oxygen-saturation summary
-- ABP: signal quality, pulse detection, heart-rate and pressure-value summary
-- PCG: signal quality, heart-sound event detection
-- ACC: signal quality, activity summary
-- EDA: signal quality, tonic/phasic summary
-- EEG: signal quality, bandpower summary
-- EMG: signal quality, activation summary
+- ECG: signal quality, R-peak detection, HRV summary, arrhythmia proxy, ECG-only sleep-apnea proxy
+- PPG: signal quality, Nabian-style peak detection, heart-rate estimate, perfusion/variability proxy
+- BCG: signal quality, Nabian-style J-peak detection, heart-rate estimate
+- SCG: signal quality, Nabian-style J-peak detection, heart-rate estimate
+- RESP: signal quality, respiratory-rate estimate, apnea proxy, hypopnea proxy
+- SpO2: signal quality, oxygen-saturation summary, desaturation events, hypoxemia burden
+- ABP: signal quality, pulse detection, heart-rate and pressure-value summary, hypotension/hypertension proxy
+- PCG: signal quality, heart-sound event detection, murmur proxy
+- ACC: signal quality, activity summary, sleep/wake proxy
+- EDA: signal quality, tonic/phasic summary, arousal/SCR event proxy
+- EEG: signal quality, bandpower summary, sleep-stage features, seizure-like spike proxy
+- EMG: signal quality, activation summary, fatigue median-frequency proxy
 
 ## Run A CSV Report
 
@@ -470,19 +470,36 @@ Initial no-fallback LLM baseline: 32 planning cases, 30 true OpenRouter successe
 The planning benchmark now includes broader task prompts beyond peak/rate extraction:
 
 - ECG arrhythmia screening: irregular RR, pauses, bradycardia, tachycardia, ectopy-proxy flags.
-- RESP sleep-apnea screening: low-amplitude breathing-pause events and apnea-like index.
-- SpO2 desaturation burden: ODI-style event count, minimum SpO2, and time below 90 percent.
-- EEG sleep-stage features: delta/theta/alpha/beta ratios and coarse sleep-stage hint.
+- ECG sleep-apnea proxy: HRV/RR-pattern screening for ECG-only apnea baselines.
+- PPG perfusion/variability proxy: pulse amplitude, interval CV, low-perfusion flag.
+- RESP sleep-apnea and hypopnea screening: low-amplitude pauses plus reduced-flow events.
+- SpO2 desaturation and hypoxemia burden: ODI-style event count, minimum SpO2, time below 90/88 percent.
+- ABP pressure-event proxy: approximate hypotension/hypertension flags from pulse values.
+- PCG murmur proxy: high-frequency continuous heart-sound energy.
+- EDA arousal events: phasic skin-conductance-response peaks.
+- EEG sleep-stage features and seizure-like proxy: band ratios plus robust spike/fast-power screen.
+- EMG activation and fatigue proxy: RMS/MAV plus median-frequency fatigue hint.
 - ACC sleep/wake proxy: actigraphy-style rest/activity hint.
 
-The expanded rule-planning set has 40 planning cases. Latest expanded rule evals:
+The expanded rule-planning set has 48 planning cases. Latest expanded rule evals:
 
 ```text
-planning regression: 40 cases, retrieval/planning accuracy 1.0
-real-world + MIT-BIH ECG: 21 records, 77 case-runs, retrieval/planning/execution accuracy 1.0
-dedicated common datasets: 21 records, 54 case-runs, retrieval/planning/execution accuracy 1.0
+planning regression: 48 cases, retrieval/planning accuracy 1.0
+real-world + MIT-BIH ECG: 21 records, 92 case-runs, retrieval/planning/execution accuracy 1.0
+dedicated common datasets: 21 records, 72 case-runs, retrieval/planning/execution accuracy 1.0
 dedicated BCG: 3 records, 12 case-runs, retrieval/planning/execution accuracy 1.0
-tool audit: 44 records, 107 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
+tool audit: 44 records, 140 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
+```
+
+
+Broader task/tool expansion outputs:
+
+```text
+/data1/jiahui/biosignal-agent/outputs/framework_eval_rule_more_tasks.json
+/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_more_tasks.json
+/data1/jiahui/biosignal-agent/outputs/dedicated_common_framework_eval_rule_more_tasks.json
+/data1/jiahui/biosignal-agent/outputs/tool_output_audit_more_tasks.json
+/data1/jiahui/biosignal-agent/outputs/ucddb_resp_spo2_eval_more_tasks.json
 ```
 
 Expanded instruction exports:
@@ -553,7 +570,7 @@ python scripts/evaluate_ucddb_resp_spo2.py \
   --out-csv /data1/jiahui/biosignal-agent/outputs/ucddb_resp_spo2_eval.csv
 ```
 
-Current UCDDB subset: 40 balanced 60-second RESP/SpO2 windows, 20 respiratory-event and 20 normal. The current baseline using `RESP_detect_apnea` plus `SpO2_detect_desaturation` reaches accuracy 0.650, precision 0.750, recall 0.450, specificity 0.850, and F1 0.563. Most misses are hypopnea windows without strong desaturation, so the next improvement should add a dedicated hypopnea detector from respiratory-flow amplitude/flattening instead of only apnea-like low-amplitude events.
+Current UCDDB subset: 40 balanced 60-second RESP/SpO2 windows, 20 respiratory-event and 20 normal. The original baseline using `RESP_detect_apnea` plus `SpO2_detect_desaturation` reached F1 0.563. After adding `RESP_detect_hypopnea`, the expanded baseline reaches accuracy 0.650, precision 0.714, recall 0.500, specificity 0.800, and F1 0.588. This is still a lightweight PSG-screening baseline; further gains should use event-level labels, desaturation/arousal coupling, and better respiratory-flow morphology features.
 
 Key outputs:
 

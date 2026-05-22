@@ -60,3 +60,32 @@ def EEG_estimate_sleep_stage_features(signal_path: str, sampling_rate: float, co
         "method": "single_channel_bandpower_rules",
         "disclaimer": "Feature heuristic only; sleep staging requires labeled epochs and usually EEG/EOG/EMG context.",
     }
+
+
+
+def EEG_screen_seizure_like_activity(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    values = data.values
+    if len(values) < max(8, int(data.sampling_rate * 2)):
+        return {"tool": "EEG_screen_seizure_like_activity", "error": "signal too short", "confidence": 0.0}
+    centered = values - np.nanmedian(values)
+    robust_scale = float(np.nanmedian(np.abs(centered)) * 1.4826 + 1e-8)
+    spike_candidates = np.abs(centered) > robust_scale * 6.0
+    spike_edges = np.flatnonzero(np.diff(spike_candidates.astype(int), prepend=0) == 1)
+    duration_min = len(values) / float(data.sampling_rate) / 60.0 if data.sampling_rate else 0.0
+    spike_rate = float(len(spike_edges) / duration_min) if duration_min > 0 else None
+    bandpower = EEG_compute_bandpower(signal_path, sampling_rate, column)
+    total = float(bandpower.get("total_power") or 0.0)
+    fast_power = float(bandpower.get("beta_power", 0.0) + bandpower.get("gamma_power", 0.0))
+    fast_power_ratio = float(fast_power / total) if total > 0 else 0.0
+    risk = "possible_seizure_like_activity_proxy" if (spike_rate is not None and spike_rate > 12) or fast_power_ratio > 0.45 else "no_seizure_like_activity_proxy"
+    return {
+        "tool": "EEG_screen_seizure_like_activity",
+        "spike_count": int(len(spike_edges)),
+        "spike_rate_per_min": spike_rate,
+        "fast_power_ratio": fast_power_ratio,
+        "seizure_like_risk": risk,
+        "confidence": 0.5,
+        "method": "eeg_robust_spike_fast_power_screening",
+        "disclaimer": "Research heuristic only; seizure detection requires validated EEG montages, artifacts checks, and clinical labels.",
+    }

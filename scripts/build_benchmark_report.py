@@ -254,9 +254,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             {"name": "dedicated_bcg", **manifest_summary(args.bcg_manifest)},
         ],
         "framework_evals": [
-            framework_summary("real_world_optimized", args.real_eval),
-            framework_summary("dedicated_common_optimized", args.dedicated_eval),
-            framework_summary("dedicated_bcg_optimized", args.bcg_eval),
+            framework_summary("real_world_more_tasks", args.real_eval),
+            framework_summary("dedicated_common_more_tasks", args.dedicated_eval),
+            framework_summary("dedicated_bcg_more_tasks", args.bcg_eval),
         ],
         "session_evals": [session_summary("cross_modality_with_bcg_optimized", args.session_eval)],
         "tool_audit": audit_summary(args.tool_audit),
@@ -277,14 +277,14 @@ def main() -> None:
     parser.add_argument("--real-manifest", default="/data1/jiahui/biosignal-agent/datasets/processed/real_world_manifest.json")
     parser.add_argument("--dedicated-manifest", default="/data1/jiahui/biosignal-agent/datasets/processed/dedicated_common_manifest.json")
     parser.add_argument("--bcg-manifest", default="/data1/jiahui/biosignal-agent/datasets/processed/dedicated_bcg_manifest.json")
-    parser.add_argument("--real-eval", default="/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_common_modalities_optimized.json")
-    parser.add_argument("--dedicated-eval", default="/data1/jiahui/biosignal-agent/outputs/dedicated_common_framework_eval_rule_optimized.json")
-    parser.add_argument("--bcg-eval", default="/data1/jiahui/biosignal-agent/outputs/dedicated_bcg_framework_eval_rule_optimized.json")
+    parser.add_argument("--real-eval", default="/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_more_tasks.json")
+    parser.add_argument("--dedicated-eval", default="/data1/jiahui/biosignal-agent/outputs/dedicated_common_framework_eval_rule_more_tasks.json")
+    parser.add_argument("--bcg-eval", default="/data1/jiahui/biosignal-agent/outputs/dedicated_bcg_framework_eval_rule_more_tasks.json")
     parser.add_argument("--session-eval", default="/data1/jiahui/biosignal-agent/outputs/session_eval_rule_with_bcg_optimized.json")
-    parser.add_argument("--tool-audit", default="/data1/jiahui/biosignal-agent/outputs/tool_output_audit_optimized.json")
+    parser.add_argument("--tool-audit", default="/data1/jiahui/biosignal-agent/outputs/tool_output_audit_more_tasks.json")
     parser.add_argument("--arrhythmia-eval", default="/data1/jiahui/biosignal-agent/outputs/labeled_arrhythmia_eval.json")
     parser.add_argument("--apnea-ecg-eval", default="/data1/jiahui/biosignal-agent/outputs/apnea_ecg_eval.json")
-    parser.add_argument("--ucddb-eval", default="/data1/jiahui/biosignal-agent/outputs/ucddb_resp_spo2_eval.json")
+    parser.add_argument("--ucddb-eval", default="/data1/jiahui/biosignal-agent/outputs/ucddb_resp_spo2_eval_more_tasks.json")
     parser.add_argument("--full-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft.jsonl")
     parser.add_argument("--planning-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft.jsonl")
     parser.add_argument("--out-json", default="/data1/jiahui/biosignal-agent/outputs/benchmark_report.json")

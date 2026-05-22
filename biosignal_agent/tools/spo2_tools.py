@@ -95,3 +95,35 @@ def SpO2_detect_desaturation(signal_path: str, sampling_rate: float, column: str
         "method": "three_percent_drop_screening",
         "disclaimer": "Screening heuristic only; ODI should be validated against labeled sleep-study events.",
     }
+
+
+
+def SpO2_assess_hypoxemia_burden(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data, values = _spo2_values(signal_path, sampling_rate, column)
+    if len(values) == 0:
+        return {"tool": "SpO2_assess_hypoxemia_burden", "error": "empty signal", "confidence": 0.0}
+    target = values[(values >= 50) & (values <= 100)]
+    if len(target) == 0:
+        target = values
+    time_below_90_fraction = float(np.mean(target < 90))
+    time_below_88_fraction = float(np.mean(target < 88))
+    nadir = float(np.nanmin(target))
+    mean_spo2 = float(np.nanmean(target))
+    if time_below_88_fraction > 0.05 or nadir < 85:
+        burden = "high_hypoxemia_burden_proxy"
+    elif time_below_90_fraction > 0.05:
+        burden = "moderate_hypoxemia_burden_proxy"
+    else:
+        burden = "low_hypoxemia_burden_proxy"
+    return {
+        "tool": "SpO2_assess_hypoxemia_burden",
+        "mean_spo2_percent": mean_spo2,
+        "min_spo2_percent": nadir,
+        "time_below_90_fraction": time_below_90_fraction,
+        "time_below_88_fraction": time_below_88_fraction,
+        "hypoxemia_burden": burden,
+        "num_samples": int(len(target)),
+        "confidence": 0.75 if len(target) / len(values) > 0.95 else 0.45,
+        "method": "spo2_threshold_burden_screening",
+        "disclaimer": "Screening heuristic only; clinical hypoxemia interpretation requires validated oximetry and clinical context.",
+    }

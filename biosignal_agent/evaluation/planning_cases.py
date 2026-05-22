@@ -11,6 +11,7 @@ class PlanningCase:
     expected_tools: tuple[str, ...]
 
 
+
 DEFAULT_PLANNING_CASES = [
     PlanningCase(
         case_id='ecg_quality',
@@ -251,5 +252,54 @@ DEFAULT_PLANNING_CASES = [
         question='Screen this ECG sleep segment for sleep apnea risk using heart rate variability patterns',
         modality='ecg',
         expected_tools=('ECG_assess_quality', 'ECG_detect_r_peaks', 'ECG_compute_hrv', 'ECG_screen_sleep_apnea'),
+    ),
+
+    PlanningCase(
+        case_id='ppg_perfusion',
+        question='Assess PPG pulse amplitude, perfusion, and pulse variability',
+        modality='ppg',
+        expected_tools=('PPG_assess_quality', 'PPG_detect_peaks', 'PPG_assess_perfusion_variability'),
+    ),
+    PlanningCase(
+        case_id='abp_pressure_events',
+        question='Screen ABP for hypotension or hypertension pressure events',
+        modality='abp',
+        expected_tools=('ABP_assess_quality', 'ABP_detect_pulses', 'ABP_screen_pressure_events'),
+    ),
+    PlanningCase(
+        case_id='pcg_murmur_proxy',
+        question='Screen this phonocardiogram for murmur or abnormal heart sound patterns',
+        modality='pcg',
+        expected_tools=('PCG_assess_quality', 'PCG_detect_heart_sounds', 'PCG_screen_murmur_proxy'),
+    ),
+    PlanningCase(
+        case_id='eda_arousal_events',
+        question='Detect EDA arousal events and skin conductance responses',
+        modality='eda',
+        expected_tools=('EDA_assess_quality', 'EDA_summarize', 'EDA_detect_arousal_events'),
+    ),
+    PlanningCase(
+        case_id='emg_fatigue_proxy',
+        question='Estimate EMG muscle fatigue using median frequency and RMS',
+        modality='emg',
+        expected_tools=('EMG_assess_quality', 'EMG_summarize_activation', 'EMG_estimate_fatigue'),
+    ),
+    PlanningCase(
+        case_id='eeg_seizure_like_proxy',
+        question='Screen EEG for seizure-like spikes or epileptiform abnormal EEG activity',
+        modality='eeg',
+        expected_tools=('EEG_assess_quality', 'EEG_compute_bandpower', 'EEG_screen_seizure_like_activity'),
+    ),
+    PlanningCase(
+        case_id='resp_hypopnea',
+        question='Detect hypopnea-like shallow breathing and reduced respiration events',
+        modality='resp',
+        expected_tools=('RESP_assess_quality', 'RESP_estimate_rate', 'RESP_detect_hypopnea'),
+    ),
+    PlanningCase(
+        case_id='spo2_hypoxemia_burden',
+        question='Assess SpO2 hypoxemia burden including time below 88 percent',
+        modality='spo2',
+        expected_tools=('SpO2_assess_quality', 'SpO2_summarize', 'SpO2_assess_hypoxemia_burden'),
     ),
 ]
