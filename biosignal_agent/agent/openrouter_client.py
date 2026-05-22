@@ -11,6 +11,22 @@ import httpx
 SOURCE_CONFIG = Path('/home/myid/jl57095/TwinMarket/openrouter_caption_with_P_wave.py')
 DEFAULT_MODEL = 'openrouter/owl-alpha'
 DEFAULT_TIMEOUT = 120
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = PROJECT_ROOT / '.env'
+
+
+def _load_dotenv() -> None:
+    if not ENV_FILE.exists():
+        return
+    for raw_line in ENV_FILE.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 class OpenRouterConfigError(RuntimeError):
@@ -65,6 +81,7 @@ def _candidate_keys(primary_key: str | None) -> list[str]:
 
 
 def load_openrouter_settings(model: str | None = None) -> dict:
+    _load_dotenv()
     values = _literal_assignments(SOURCE_CONFIG)
     api_keys = _candidate_keys(values.get('API_KEY'))
     if not api_keys:
