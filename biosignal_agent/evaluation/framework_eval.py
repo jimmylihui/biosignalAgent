@@ -23,8 +23,10 @@ def evaluate_cases(
     llm_timeout: int = 30,
     llm_retry_max: int = 1,
     llm_retry_delay: float = 2.0,
+    llm_fallback_to_rules: bool = True,
     signal_paths: dict[str, str] | None = None,
     sampling_rates: dict[str, float] | None = None,
+    progress: bool = False,
 ) -> dict[str, Any]:
     cases = cases or DEFAULT_PLANNING_CASES
     signal_paths = signal_paths or {}
@@ -37,19 +39,29 @@ def evaluate_cases(
         llm_timeout=llm_timeout,
         llm_retry_max=llm_retry_max,
         llm_retry_delay=llm_retry_delay,
+        fallback_to_rules=llm_fallback_to_rules,
     )
     rows = []
-    for case in cases:
+    for index, case in enumerate(cases, start=1):
+        if progress:
+            print(f"[{index}/{len(cases)}] {planner_name} {case.case_id}", flush=True)
         retrieved = [
             schema["name"]
             for schema in retriever.retrieve(case.question, top_k=retrieved_tool_count, modality=case.modality)
         ]
+        planner_error = None
         if planner_name == "openrouter":
             signal_path = signal_paths.get(case.modality, "placeholder.csv")
             sampling_rate = sampling_rates.get(case.modality, 100.0)
-            plan = llm_agent.plan(case.question, signal_path, sampling_rate, fallback_modality=case.modality)
-            planned_tools = [call["name"] for call in plan["tool_calls"]]
-            actual_planner = plan.get("planner", "openrouter")
+            try:
+                plan = llm_agent.plan(case.question, signal_path, sampling_rate, fallback_modality=case.modality)
+                planned_tools = [call["name"] for call in plan["tool_calls"]]
+                actual_planner = plan.get("planner", "openrouter")
+                planner_error = plan.get("fallback_reason")
+            except Exception as exc:
+                planned_tools = []
+                actual_planner = "openrouter_error"
+                planner_error = str(exc)
         else:
             planned_tools = rule_agent.plan(case.question, case.modality)
             actual_planner = "rule"
@@ -93,6 +105,7 @@ def evaluate_cases(
             "missing_from_plan": missing_from_plan,
             "unexpected_tools": unexpected_tools,
             "execution_errors": execution_errors,
+            "planner_error": planner_error,
         })
     retrieval_passes = sum(1 for row in rows if row["retrieval_pass"])
     planning_passes = sum(1 for row in rows if row["planning_pass"])
@@ -136,6 +149,7 @@ def write_eval_outputs(report: dict[str, Any], output_json: str | Path, output_c
         "missing_from_plan",
         "unexpected_tools",
         "execution_errors",
+        "planner_error",
     ]
     with output_csv.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)

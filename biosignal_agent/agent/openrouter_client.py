@@ -4,6 +4,7 @@ import ast
 import json
 import os
 import time
+from collections.abc import Iterable
 from pathlib import Path
 
 import httpx
@@ -33,6 +34,9 @@ class OpenRouterConfigError(RuntimeError):
     pass
 
 
+OPENROUTER_SETTING_NAMES = {'API_KEY', 'API_KEYS', 'candidate_keys', 'BASE_URL', 'MODEL', 'HTTP_REFERER', 'APP_TITLE'}
+
+
 def _literal_assignments(path: Path) -> dict:
     if not path.exists():
         raise OpenRouterConfigError(f'OpenRouter source config not found: {path}')
@@ -41,7 +45,7 @@ def _literal_assignments(path: Path) -> dict:
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id in {'API_KEY', 'BASE_URL', 'MODEL', 'HTTP_REFERER', 'APP_TITLE'}:
+                if isinstance(target, ast.Name) and target.id in OPENROUTER_SETTING_NAMES:
                     try:
                         values[target.id] = ast.literal_eval(node.value)
                     except Exception:
@@ -57,10 +61,25 @@ def _literal_assignments(path: Path) -> dict:
     return values
 
 
-def _candidate_keys(primary_key: str | None) -> list[str]:
+def _extend_keys(keys: list[str], value) -> None:
+    if value is None:
+        return
+    if isinstance(value, str):
+        keys.append(value)
+        return
+    if isinstance(value, dict):
+        value = value.values()
+    if isinstance(value, Iterable):
+        for item in value:
+            if isinstance(item, str):
+                keys.append(item)
+
+
+def _candidate_keys(values: dict) -> list[str]:
     keys = []
-    if primary_key:
-        keys.append(primary_key)
+    _extend_keys(keys, values.get('API_KEY'))
+    _extend_keys(keys, values.get('API_KEYS'))
+    _extend_keys(keys, values.get('candidate_keys'))
     env_candidates = os.getenv('OPENROUTER_CANDIDATE_KEYS', '')
     if env_candidates:
         keys.extend(key.strip() for key in env_candidates.split(','))
@@ -83,7 +102,7 @@ def _candidate_keys(primary_key: str | None) -> list[str]:
 def load_openrouter_settings(model: str | None = None) -> dict:
     _load_dotenv()
     values = _literal_assignments(SOURCE_CONFIG)
-    api_keys = _candidate_keys(values.get('API_KEY'))
+    api_keys = _candidate_keys(values)
     if not api_keys:
         raise OpenRouterConfigError('No OpenRouter API key found in source config or environment.')
     return {

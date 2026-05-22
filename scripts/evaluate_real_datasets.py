@@ -26,6 +26,8 @@ def main() -> None:
     parser.add_argument('--llm-timeout', type=int, default=20)
     parser.add_argument('--llm-retry-max', type=int, default=1)
     parser.add_argument('--llm-retry-delay', type=float, default=2.0)
+    parser.add_argument('--no-rule-fallback', action='store_true', help='Record OpenRouter failures instead of falling back to the rule planner.')
+    parser.add_argument('--progress', action='store_true', help='Print case progress while evaluating.')
     parser.add_argument('--include-ecg', action='store_true', help='Also include MIT-BIH ECG record 100 as a real ECG execution record.')
     parser.add_argument('--out-json', default='/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval.json')
     parser.add_argument('--out-csv', default='/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval.csv')
@@ -58,8 +60,10 @@ def main() -> None:
             llm_timeout=args.llm_timeout,
             llm_retry_max=args.llm_retry_max,
             llm_retry_delay=args.llm_retry_delay,
+            llm_fallback_to_rules=not args.no_rule_fallback,
             signal_paths={modality: record['path']},
             sampling_rates={modality: float(record['sampling_rate'])},
+            progress=args.progress,
         )
         summaries.append({
             'dataset': record.get('dataset'),

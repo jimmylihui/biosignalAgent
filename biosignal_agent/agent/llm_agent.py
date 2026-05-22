@@ -49,29 +49,40 @@ class OpenRouterBioSignalAgent:
             'available_tools': schema_brief,
             'retrieval': {'top_k': self.retrieved_tool_count, 'tool_names': [schema['name'] for schema in schemas]},
         }
-        try:
-            text = chat_completion([
-                {'role': 'system', 'content': system},
-                {'role': 'user', 'content': json.dumps(user, ensure_ascii=True)},
-            ], model=self.model, temperature=0.0, timeout=self.llm_timeout, retry_max=self.llm_retry_max, retry_delay=self.llm_retry_delay)
-            plan = parse_json_object(text)
-            return self._normalize_plan(plan, signal_path, sampling_rate, column, [schema['name'] for schema in schemas])
-        except Exception as exc:
-            if not self.fallback_to_rules:
-                raise
-            rule_agent = PlanningBioSignalAgent()
-            tool_names = rule_agent.plan(question, fallback_modality)
-            modality = rule_agent.infer_modality(question, fallback_modality)
-            return {
-                'modality': modality,
-                'tool_calls': [
-                    {'name': name, 'arguments': {'signal_path': signal_path, 'sampling_rate': sampling_rate, 'column': column}}
-                    for name in tool_names
-                ],
-                'planner': 'rule_fallback',
-                'fallback_reason': str(exc),
-                'retrieved_tools': [schema['name'] for schema in schemas],
-            }
+        messages = [
+            {'role': 'system', 'content': system},
+            {'role': 'user', 'content': json.dumps(user, ensure_ascii=True)},
+        ]
+        last_error = None
+        for _ in range(max(1, self.llm_retry_max)):
+            try:
+                text = chat_completion(
+                    messages,
+                    model=self.model,
+                    temperature=0.0,
+                    timeout=self.llm_timeout,
+                    retry_max=1,
+                    retry_delay=self.llm_retry_delay,
+                )
+                plan = parse_json_object(text)
+                return self._normalize_plan(plan, signal_path, sampling_rate, column, [schema['name'] for schema in schemas])
+            except Exception as exc:
+                last_error = exc
+        if not self.fallback_to_rules:
+            raise last_error or RuntimeError('OpenRouter planning failed.')
+        rule_agent = PlanningBioSignalAgent()
+        tool_names = rule_agent.plan(question, fallback_modality)
+        modality = rule_agent.infer_modality(question, fallback_modality)
+        return {
+            'modality': modality,
+            'tool_calls': [
+                {'name': name, 'arguments': {'signal_path': signal_path, 'sampling_rate': sampling_rate, 'column': column}}
+                for name in tool_names
+            ],
+            'planner': 'rule_fallback',
+            'fallback_reason': str(last_error),
+            'retrieved_tools': [schema['name'] for schema in schemas],
+        }
 
     def run(self, question: str, signal_path: str, sampling_rate: float, column: str | None = None, fallback_modality: str | None = None, save_trace_path: bool = True) -> dict:
         plan = self.plan(question, signal_path, sampling_rate, column, fallback_modality)

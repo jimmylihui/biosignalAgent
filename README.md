@@ -439,3 +439,38 @@ This writes:
 ```
 
 The report is intended as the stable comparison surface when changing the planner backend, adding datasets, or improving individual signal tools.
+
+## OpenRouter Planner Evaluation
+
+The OpenRouter client loads all available keys from `/home/myid/jl57095/TwinMarket/openrouter_caption_with_P_wave.py`, including `API_KEY`, `API_KEYS`, and `candidate_keys`, plus environment-provided keys. For LLM planner benchmarking, use the checkpointed runner so long jobs can resume case by case:
+
+```bash
+python scripts/run_openrouter_planner_eval.py \
+  --model openrouter/owl-alpha \
+  --retrieved-tool-count 3 \
+  --llm-timeout 30 \
+  --llm-retry-max 2 \
+  --llm-retry-delay 1
+```
+
+Compare the LLM planner against the rule planner:
+
+```bash
+python scripts/compare_planner_evals.py \
+  --rule-json /data1/jiahui/biosignal-agent/outputs/framework_eval_rule_common_modalities.json \
+  --candidate-json /data1/jiahui/biosignal-agent/outputs/framework_eval_openrouter_common_modalities_retry.json \
+  --out-json /data1/jiahui/biosignal-agent/outputs/planner_comparison_openrouter_retry_vs_rule.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/planner_comparison_openrouter_retry_vs_rule.csv
+```
+
+Initial no-fallback LLM baseline: 32 planning cases, 30 true OpenRouter successes, 2 malformed-JSON planner errors, planning accuracy 0.9375. After adding planner-level retry for malformed or invalid JSON responses, the OpenRouter planner reached 32/32 planning accuracy with zero disagreements against the rule planner.
+
+Key outputs:
+
+```text
+/data1/jiahui/biosignal-agent/outputs/framework_eval_openrouter_common_modalities.json
+/data1/jiahui/biosignal-agent/outputs/framework_eval_openrouter_common_modalities.jsonl
+/data1/jiahui/biosignal-agent/outputs/framework_eval_openrouter_common_modalities_retry.json
+/data1/jiahui/biosignal-agent/outputs/planner_comparison_openrouter_vs_rule.json
+/data1/jiahui/biosignal-agent/outputs/planner_comparison_openrouter_retry_vs_rule.json
+```
