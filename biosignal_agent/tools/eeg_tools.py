@@ -89,3 +89,55 @@ def EEG_screen_seizure_like_activity(signal_path: str, sampling_rate: float, col
         "method": "eeg_robust_spike_fast_power_screening",
         "disclaimer": "Research heuristic only; seizure detection requires validated EEG montages, artifacts checks, and clinical labels.",
     }
+
+
+
+def EEG_estimate_drowsiness(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    bandpower = EEG_compute_bandpower(signal_path, sampling_rate, column)
+    if bandpower.get("error"):
+        return {"tool": "EEG_estimate_drowsiness", "error": bandpower["error"], "confidence": 0.0}
+    total = float(bandpower.get("total_power") or 0.0)
+    if total <= 0:
+        return {"tool": "EEG_estimate_drowsiness", "error": "zero EEG power", "confidence": 0.1}
+    theta_alpha_ratio = float(bandpower.get("theta_power", 0.0) / (bandpower.get("alpha_power", 0.0) + 1e-12))
+    slow_power_ratio = float((bandpower.get("theta_power", 0.0) + bandpower.get("delta_power", 0.0)) / total)
+    drowsiness_hint = "possible_drowsiness_proxy" if theta_alpha_ratio > 1.2 or slow_power_ratio > 0.55 else "low_drowsiness_proxy"
+    return {
+        "tool": "EEG_estimate_drowsiness",
+        "theta_alpha_ratio": theta_alpha_ratio,
+        "slow_power_ratio": slow_power_ratio,
+        "drowsiness_hint": drowsiness_hint,
+        "confidence": 0.5,
+        "method": "eeg_theta_alpha_slow_power_proxy",
+        "disclaimer": "Drowsiness proxy only; vigilance assessment requires labeled task context and artifact handling.",
+    }
+
+
+def EEG_detect_artifact_proxy(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    values = data.values
+    if len(values) < max(8, int(data.sampling_rate)):
+        return {"tool": "EEG_detect_artifact_proxy", "error": "signal too short", "confidence": 0.0}
+    centered = values - np.nanmedian(values)
+    robust_scale = float(np.nanmedian(np.abs(centered)) * 1.4826 + 1e-8)
+    extreme_fraction = float(np.mean(np.abs(centered) > robust_scale * 8.0))
+    freqs, psd = scipy_signal.welch(centered, fs=data.sampling_rate, nperseg=min(len(centered), int(data.sampling_rate * 4)))
+    high_mask = (freqs >= 30) & (freqs <= min(45, data.sampling_rate * 0.45))
+    total = float(np.trapz(psd, freqs)) if len(freqs) else 0.0
+    high_ratio = float(np.trapz(psd[high_mask], freqs[high_mask]) / (total + 1e-12)) if np.any(high_mask) else 0.0
+    flags = []
+    if extreme_fraction > 0.01:
+        flags.append("large_amplitude_artifact_proxy")
+    if high_ratio > 0.35:
+        flags.append("muscle_high_frequency_artifact_proxy")
+    artifact_level = "high" if len(flags) >= 2 else "moderate" if flags else "low"
+    return {
+        "tool": "EEG_detect_artifact_proxy",
+        "eeg_artifact_level": artifact_level,
+        "eeg_artifact_flags": flags,
+        "extreme_amplitude_fraction": extreme_fraction,
+        "high_frequency_power_ratio": high_ratio,
+        "confidence": 0.55,
+        "method": "eeg_extreme_amplitude_high_frequency_proxy",
+        "disclaimer": "EEG artifact proxy only; robust EEG QC requires channel montage and labeled artifacts.",
+    }

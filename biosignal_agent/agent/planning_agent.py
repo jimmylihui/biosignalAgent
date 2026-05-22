@@ -8,17 +8,17 @@ from .tool_registry import TOOLS, WORKFLOWS
 
 MODALITY_KEYWORDS = {
     "ecg": {"ecg", "ekg", "electrocardiogram", "r-peak", "r peak", "qrs", "hrv", "rr", "qt", "qtc", "st", "pr interval", "p wave", "t wave"},
-    "ppg": {"ppg", "photoplethysmography", "pulse", "pleth"},
-    "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak"},
-    "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak"},
+    "ppg": {"ppg", "photoplethysmography", "pulse", "pleth", "respiration modulation", "respiratory modulation", "ppg respiration"},
+    "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak", "bcg respiration", "bcg breathing", "bed-based"},
+    "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak", "scg respiration", "scg breathing"},
     "resp": {"resp", "respiration", "respiratory", "breath", "breathing", "tachypnea", "bradypnea", "periodic breathing"},
     "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation", "hypoxemia", "hypoxaemia"},
     "abp": {"abp", "arterial blood pressure", "blood pressure", "systolic", "diastolic"},
-    "pcg": {"pcg", "phonocardiogram", "heart sound", "heart sounds", "s1", "s2", "murmur", "valve"},
-    "acc": {"acc", "accelerometer", "acceleration", "activity", "motion"},
+    "pcg": {"pcg", "phonocardiogram", "heart sound", "heart sounds", "s1", "s2", "murmur", "valve", "segmentation", "systole", "diastole"},
+    "acc": {"acc", "accelerometer", "acceleration", "activity", "motion", "actigraphy", "activity bout", "fall", "impact", "sedentary"},
     "eda": {"eda", "gsr", "electrodermal", "skin conductance", "stress"},
-    "eeg": {"eeg", "electroencephalogram", "brain", "alpha", "beta", "theta", "delta", "bandpower", "seizure", "spike", "epileptiform"},
-    "emg": {"emg", "electromyography", "muscle", "activation", "rms", "fatigue", "median frequency"},
+    "eeg": {"eeg", "electroencephalogram", "brain", "alpha", "beta", "theta", "delta", "bandpower", "seizure", "spike", "epileptiform", "sleep stage", "drowsiness", "vigilance", "eeg artifact", "blink"},
+    "emg": {"emg", "electromyography", "muscle", "activation", "rms", "fatigue", "median frequency", "burst", "onset", "contraction"},
 }
 
 BASIC_ANALYSIS_TOOLS = {
@@ -43,6 +43,14 @@ TASK_TOOL_RULES = {
 
     "ppg": [
         ({"perfusion", "low perfusion", "pulse variability", "pulse amplitude", "vascular"}, ["PPG_detect_peaks", "PPG_assess_perfusion_variability"]),
+        ({"respiration", "respiratory modulation", "ppg respiration", "breathing"}, ["PPG_detect_peaks", "PPG_estimate_respiration_modulation"]),
+    ],
+
+    "bcg": [
+        ({"respiration", "respiratory", "breathing", "breath"}, ["BCG_estimate_respiration"]),
+    ],
+    "scg": [
+        ({"respiration", "respiratory", "breathing", "breath"}, ["SCG_estimate_respiration"]),
     ],
     "abp": [
         ({"hypotension", "hypertension", "pressure event", "shock", "high blood pressure", "low blood pressure"}, ["ABP_detect_pulses", "ABP_screen_pressure_events"]),
@@ -50,12 +58,14 @@ TASK_TOOL_RULES = {
     ],
     "pcg": [
         ({"murmur", "valve", "abnormal heart sound"}, ["PCG_detect_heart_sounds", "PCG_screen_murmur_proxy"]),
+        ({"s1", "s2", "segmentation", "systole", "diastole"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy"]),
     ],
     "eda": [
         ({"arousal", "sympathetic", "stress event", "skin conductance response", "scr"}, ["EDA_summarize", "EDA_detect_arousal_events"]),
     ],
     "emg": [
         ({"fatigue", "median frequency", "muscle fatigue"}, ["EMG_summarize_activation", "EMG_estimate_fatigue"]),
+        ({"burst", "bursts", "onset", "contraction", "muscle contraction"}, ["EMG_summarize_activation", "EMG_detect_bursts"]),
     ],
     "ecg": [
         ({"arrhythmia", "rhythm", "irregular", "afib", "atrial fibrillation", "bradycardia", "tachycardia", "pause"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_arrhythmia"]),
@@ -74,9 +84,13 @@ TASK_TOOL_RULES = {
     "eeg": [
         ({"sleep stage", "sleep staging", "n1", "n2", "n3", "rem", "wake", "slow wave"}, ["EEG_compute_bandpower", "EEG_estimate_sleep_stage_features"]),
         ({"seizure", "epileptiform", "spike", "spikes", "abnormal eeg"}, ["EEG_compute_bandpower", "EEG_screen_seizure_like_activity"]),
+        ({"drowsiness", "vigilance", "alertness", "sleepiness"}, ["EEG_compute_bandpower", "EEG_estimate_drowsiness"]),
+        ({"artifact", "blink", "eye movement", "muscle artifact", "eeg artifact"}, ["Signal_detect_artifacts", "EEG_detect_artifact_proxy"]),
     ],
     "acc": [
         ({"sleep", "wake", "actigraphy", "rest", "sleep wake"}, ["ACC_summarize_activity", "ACC_estimate_sleep_wake"]),
+        ({"activity bout", "activity bouts", "bouts", "sedentary", "active periods"}, ["ACC_summarize_activity", "ACC_detect_activity_bouts"]),
+        ({"fall", "impact", "fall detection", "impact event"}, ["ACC_summarize_activity", "ACC_detect_fall_proxy"]),
     ],
 }
 
@@ -148,6 +162,21 @@ class PlanningBioSignalAgent:
                 "bradypnea",
                 "map",
                 "pulse pressure",
+                "respiration modulation",
+                "breathing",
+                "s1",
+                "s2",
+                "systole",
+                "diastole",
+                "bout",
+                "fall",
+                "impact",
+                "drowsiness",
+                "vigilance",
+                "blink",
+                "burst",
+                "onset",
+                "contraction",
             ]
         )
         if modality == "ecg":
@@ -156,7 +185,9 @@ class PlanningBioSignalAgent:
             if wants_hrv or any(term in text for term in ["variability", "hrv", "summary", "summarize", "analyze"]):
                 selected.append("ECG_compute_hrv")
         elif wants_analysis and not wants_artifact:
-            selected.extend(BASIC_ANALYSIS_TOOLS.get(modality, []))
+            respiration_only = modality in {"bcg", "scg"} and any(term in text for term in ["respiration", "respiratory", "breathing", "breath"])
+            if not respiration_only:
+                selected.extend(BASIC_ANALYSIS_TOOLS.get(modality, []))
 
         for terms, tools in TASK_TOOL_RULES.get(modality, []):
             if any(term in text for term in terms):

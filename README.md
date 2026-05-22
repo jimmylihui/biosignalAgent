@@ -7,17 +7,17 @@ This version keeps signal analysis in explicit Python tools. The agent can use e
 ## Current Tools
 
 - ECG: signal quality, artifact screen, R-peak detection, HRV summary, arrhythmia proxy, ECG-only sleep-apnea proxy, morphology/interval proxy
-- PPG: signal quality, artifact screen, Nabian-style peak detection, heart-rate estimate, perfusion/variability proxy
-- BCG: signal quality, Nabian-style J-peak detection, heart-rate estimate
-- SCG: signal quality, Nabian-style J-peak detection, heart-rate estimate
+- PPG: signal quality, artifact screen, Nabian-style peak detection, heart-rate estimate, perfusion/variability proxy, PPG-derived respiration proxy
+- BCG: signal quality, Nabian-style J-peak detection, heart-rate estimate, BCG-derived respiration proxy
+- SCG: signal quality, Nabian-style J-peak detection, heart-rate estimate, SCG-derived respiration proxy
 - RESP: signal quality, artifact screen, respiratory-rate estimate, apnea proxy, hypopnea proxy, rate/pattern proxy
 - SpO2: signal quality, artifact screen, oxygen-saturation summary, desaturation events, hypoxemia burden
 - ABP: signal quality, artifact screen, pulse detection, heart-rate and pressure-value summary, hypotension/hypertension proxy, MAP/pulse-pressure proxy
-- PCG: signal quality, heart-sound event detection, murmur proxy
-- ACC: signal quality, activity summary, sleep/wake proxy
+- PCG: signal quality, heart-sound event detection, murmur proxy, S1/S2 segmentation proxy
+- ACC: signal quality, activity summary, sleep/wake proxy, activity-bout detection, fall/impact proxy
 - EDA: signal quality, tonic/phasic summary, arousal/SCR event proxy
-- EEG: signal quality, artifact screen, bandpower summary, sleep-stage features, seizure-like spike proxy
-- EMG: signal quality, artifact screen, activation summary, fatigue median-frequency proxy
+- EEG: signal quality, artifact screen, bandpower summary, sleep-stage features, seizure-like spike proxy, drowsiness/vigilance proxy, EEG artifact proxy
+- EMG: signal quality, artifact screen, activation summary, fatigue median-frequency proxy, burst/onset proxy
 
 ## Run A CSV Report
 
@@ -168,6 +168,18 @@ python scripts/evaluate_agent_framework.py \
 
 Latest rule-planner execution eval: retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0 across the default ECG/PPG/BCG/SCG planning cases.
 
+Latest major-task rule-planner eval: 61 planning cases at retrieval/planning accuracy 1.0/1.0; real-world manifest 26 records and 158 case-runs at retrieval/planning/execution accuracy 1.0/1.0/1.0; dedicated common 21 records and 93 runs at 1.0/1.0/1.0; dedicated BCG 3 records and 15 runs at 1.0/1.0/1.0. Tool audit across 49 records and 263 tool-runs has 0 errors and 0 low-confidence outputs.
+
+Major-task outputs:
+
+```text
+/data1/jiahui/biosignal-agent/outputs/framework_eval_rule_major_tasks.json
+/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_major_tasks.json
+/data1/jiahui/biosignal-agent/outputs/dedicated_common_framework_eval_rule_major_tasks.json
+/data1/jiahui/biosignal-agent/outputs/dedicated_bcg_framework_eval_rule_major_tasks.json
+/data1/jiahui/biosignal-agent/outputs/tool_output_audit_major_tasks.json
+```
+
 OpenRouter planning eval is also supported, with bounded timeout/retry settings so batch runs do not hang on network/model failures:
 
 ```bash
@@ -198,7 +210,7 @@ Latest session benchmark with session tools:
 retrieval/planning/execution accuracy: 1.0 / 1.0 / 1.0
 session tool accuracy: 1.0
 PAT benchmark uses synchronized BIDMC bidmc01 ECG+PPG: median PAT 528 ms, IQR 16 ms
-outputs: /data1/jiahui/biosignal-agent/outputs/session_eval_rule_session_tools_top7.json
+outputs: /data1/jiahui/biosignal-agent/outputs/session_eval_rule_major_tasks.json
 ```
 
 ## Trace-To-Training Export

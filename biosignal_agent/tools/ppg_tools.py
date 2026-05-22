@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+from scipy import signal as scipy_signal
 
 from .common import bpm_from_peaks, interval_regularity, load_csv_signal, signal_quality_summary
 from .peak_detectors import neurokit_nabian2018_peaks
@@ -53,4 +54,36 @@ def PPG_assess_perfusion_variability(signal_path: str, sampling_rate: float, col
         "confidence": max(0.5, min(0.65, float(peaks_result.get("confidence", 0.5)))),
         "method": "ppg_peak_amplitude_interval_variability_screening",
         "disclaimer": "Screening heuristic only; low perfusion and vascular interpretations require calibrated PPG and context.",
+    }
+
+
+
+def PPG_estimate_respiration_modulation(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    values = data.values
+    if len(values) < data.sampling_rate * 20:
+        return {"tool": "PPG_estimate_respiration_modulation", "error": "signal too short", "confidence": 0.0}
+    peaks_result = PPG_detect_peaks(signal_path, sampling_rate, column)
+    peaks = np.asarray(peaks_result.get("peak_indices", []), dtype=int)
+    if len(peaks) < 5:
+        return {"tool": "PPG_estimate_respiration_modulation", "error": "not enough PPG peaks", "confidence": 0.1}
+    envelope = np.abs(scipy_signal.hilbert(values - np.nanmedian(values)))
+    high = min(0.7, data.sampling_rate * 0.45)
+    if high <= 0.08:
+        return {"tool": "PPG_estimate_respiration_modulation", "error": "sampling rate too low", "confidence": 0.1}
+    resp_band = scipy_signal.sosfiltfilt(scipy_signal.butter(3, [0.08 / (0.5 * data.sampling_rate), high / (0.5 * data.sampling_rate)], btype="bandpass", output="sos"), envelope)
+    freqs, psd = scipy_signal.welch(resp_band, fs=data.sampling_rate, nperseg=min(len(resp_band), int(data.sampling_rate * 16)))
+    mask = (freqs >= 0.08) & (freqs <= high)
+    resp_rate = None
+    if np.any(mask):
+        resp_rate = float(freqs[mask][np.argmax(psd[mask])] * 60.0)
+    modulation_index = float(np.nanstd(resp_band) / (np.nanstd(values) + 1e-8))
+    return {
+        "tool": "PPG_estimate_respiration_modulation",
+        "respiratory_rate_bpm": resp_rate,
+        "respiratory_modulation_index": modulation_index,
+        "heart_rate_bpm": peaks_result.get("heart_rate_bpm"),
+        "confidence": 0.55 if resp_rate is not None and 5 <= resp_rate <= 40 else 0.5,
+        "method": "ppg_envelope_respiration_bandpower_proxy",
+        "disclaimer": "PPG-derived respiration proxy only; validate against respiratory reference signals.",
     }

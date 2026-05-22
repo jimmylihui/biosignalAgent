@@ -51,3 +51,31 @@ def PCG_screen_murmur_proxy(signal_path: str, sampling_rate: float, column: str 
         "method": "pcg_high_frequency_continuity_screening",
         "disclaimer": "Screening heuristic only; murmur detection requires validated PCG segmentation and labeled clinical data.",
     }
+
+
+
+def PCG_segment_s1_s2_proxy(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    sounds = PCG_detect_heart_sounds(signal_path, sampling_rate, column)
+    peaks = np.asarray(sounds.get("sound_indices", []), dtype=int)
+    if len(peaks) < 4:
+        return {"tool": "PCG_segment_s1_s2_proxy", "error": "not enough heart sounds", "confidence": 0.1}
+    intervals = np.diff(peaks) / float(sampling_rate)
+    short_intervals = intervals[::2]
+    long_intervals = intervals[1::2]
+    systole_duration_s = float(np.nanmedian(short_intervals)) if len(short_intervals) else None
+    diastole_duration_s = float(np.nanmedian(long_intervals)) if len(long_intervals) else None
+    s1_indices = peaks[::2]
+    s2_indices = peaks[1::2]
+    return {
+        "tool": "PCG_segment_s1_s2_proxy",
+        "s1_indices": s1_indices[:20].tolist(),
+        "s2_indices": s2_indices[:20].tolist(),
+        "num_s1": int(len(s1_indices)),
+        "num_s2": int(len(s2_indices)),
+        "systole_duration_s": systole_duration_s,
+        "diastole_duration_s": diastole_duration_s,
+        "heart_rate_bpm": sounds.get("heart_rate_bpm"),
+        "confidence": min(0.5, float(sounds.get("confidence", 0.5))),
+        "method": "alternating_pcg_peak_s1_s2_proxy",
+        "disclaimer": "S1/S2 segmentation proxy only; validated PCG segmentation requires dedicated algorithms and labels.",
+    }

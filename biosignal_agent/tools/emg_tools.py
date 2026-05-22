@@ -48,3 +48,38 @@ def EMG_estimate_fatigue(signal_path: str, sampling_rate: float, column: str | N
         "method": "emg_median_frequency_screening",
         "disclaimer": "Screening heuristic only; muscle fatigue needs task protocol, normalization, and repeated contractions.",
     }
+
+
+
+def EMG_detect_bursts(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    values = data.values
+    if len(values) < max(8, int(data.sampling_rate)):
+        return {"tool": "EMG_detect_bursts", "error": "signal too short", "confidence": 0.0}
+    high = min(250.0, data.sampling_rate * 0.45)
+    filtered = bandpass_filter(values, data.sampling_rate, low_hz=20.0, high_hz=high, order=3) if high > 25 else values
+    window = max(1, int(0.05 * data.sampling_rate))
+    envelope = np.sqrt(np.convolve(filtered ** 2, np.ones(window) / window, mode="same"))
+    threshold = max(float(np.nanmedian(envelope) + 3.0 * np.nanstd(envelope)), 1e-8)
+    active = envelope > threshold
+    min_len = max(1, int(0.05 * data.sampling_rate))
+    bursts = []
+    start = None
+    for idx, flag in enumerate(active):
+        if flag and start is None:
+            start = idx
+        elif not flag and start is not None:
+            if idx - start >= min_len:
+                bursts.append((start, idx))
+            start = None
+    if start is not None and len(active) - start >= min_len:
+        bursts.append((start, len(active)))
+    return {
+        "tool": "EMG_detect_bursts",
+        "burst_count": int(len(bursts)),
+        "burst_intervals_s": [[float(a / data.sampling_rate), float(b / data.sampling_rate)] for a, b in bursts[:20]],
+        "activation_threshold": threshold,
+        "confidence": 0.55,
+        "method": "emg_rms_envelope_burst_detection",
+        "disclaimer": "Burst/onset proxy only; task-specific EMG onset detection requires protocol and labeled contractions.",
+    }

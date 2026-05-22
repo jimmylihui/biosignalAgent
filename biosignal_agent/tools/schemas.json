@@ -1183,5 +1183,247 @@
       "method",
       "disclaimer"
     ]
+  },
+  {
+    "name": "PPG_estimate_respiration_modulation",
+    "description": "Estimate respiration proxy from PPG amplitude modulation and respiratory-band envelope power.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "respiratory_rate_bpm",
+      "respiratory_modulation_index",
+      "heart_rate_bpm",
+      "num_peaks",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "BCG_estimate_respiration",
+    "description": "Estimate respiration proxy from BCG respiratory-band mechanical modulation.",
+    "modality": "BCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "respiratory_rate_bpm",
+      "respiration_power_ratio",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "SCG_estimate_respiration",
+    "description": "Estimate respiration proxy from SCG respiratory-band mechanical modulation.",
+    "modality": "SCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "respiratory_rate_bpm",
+      "respiration_power_ratio",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PCG_segment_s1_s2_proxy",
+    "description": "Segment a phonocardiogram into alternating S1/S2 proxy heart-sound peaks and estimate systole/diastole timing.",
+    "modality": "PCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "num_s1",
+      "num_s2",
+      "systole_duration_s",
+      "diastole_duration_s",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ACC_detect_activity_bouts",
+    "description": "Detect accelerometer activity bouts and estimate active-bout rate.",
+    "modality": "ACC",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "activity_bout_count",
+      "activity_bout_rate_per_min",
+      "activity_level",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ACC_detect_fall_proxy",
+    "description": "Screen accelerometer data for high-impact events as a fall-detection proxy.",
+    "modality": "ACC",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "impact_event_count",
+      "fall_risk",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EEG_estimate_drowsiness",
+    "description": "Estimate EEG drowsiness or vigilance proxy from theta/alpha and slow-frequency power ratios.",
+    "modality": "EEG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "theta_alpha_ratio",
+      "slow_power_ratio",
+      "drowsiness_hint",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EEG_detect_artifact_proxy",
+    "description": "Screen EEG for amplitude and high-frequency artifact proxies such as blink, movement, or muscle contamination.",
+    "modality": "EEG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "eeg_artifact_level",
+      "extreme_amplitude_fraction",
+      "high_frequency_power_ratio",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_detect_bursts",
+    "description": "Detect EMG activation bursts and onset-like periods from an RMS envelope.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "burst_count",
+      "burst_rate_per_min",
+      "mean_burst_duration_s",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
   }
 ]

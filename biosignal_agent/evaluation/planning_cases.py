@@ -326,4 +326,58 @@ DEFAULT_PLANNING_CASES = [
         modality='ppg',
         expected_tools=('PPG_assess_quality', 'Signal_detect_artifacts'),
     ),
+    PlanningCase(
+        case_id='ppg_respiration_modulation',
+        question='Estimate respiration from PPG respiratory modulation during breathing',
+        modality='ppg',
+        expected_tools=('PPG_assess_quality', 'PPG_detect_peaks', 'PPG_estimate_respiration_modulation'),
+    ),
+    PlanningCase(
+        case_id='bcg_respiration',
+        question='Estimate breathing rate from this BCG respiration modulation signal',
+        modality='bcg',
+        expected_tools=('BCG_assess_quality', 'BCG_estimate_respiration'),
+    ),
+    PlanningCase(
+        case_id='scg_respiration',
+        question='Estimate respiratory rate from this SCG breathing modulation waveform',
+        modality='scg',
+        expected_tools=('SCG_assess_quality', 'SCG_estimate_respiration'),
+    ),
+    PlanningCase(
+        case_id='pcg_s1_s2_segmentation',
+        question='Segment PCG S1 and S2 heart sounds and estimate systole and diastole timing',
+        modality='pcg',
+        expected_tools=('PCG_assess_quality', 'PCG_detect_heart_sounds', 'PCG_segment_s1_s2_proxy'),
+    ),
+    PlanningCase(
+        case_id='acc_activity_bouts',
+        question='Detect accelerometer activity bouts active periods and sedentary intervals',
+        modality='acc',
+        expected_tools=('ACC_assess_quality', 'ACC_summarize_activity', 'ACC_detect_activity_bouts'),
+    ),
+    PlanningCase(
+        case_id='acc_fall_proxy',
+        question='Screen accelerometer data for fall detection impact events',
+        modality='acc',
+        expected_tools=('ACC_assess_quality', 'ACC_summarize_activity', 'ACC_detect_fall_proxy'),
+    ),
+    PlanningCase(
+        case_id='eeg_drowsiness',
+        question='Estimate EEG drowsiness vigilance and alertness from theta alpha power',
+        modality='eeg',
+        expected_tools=('EEG_assess_quality', 'EEG_compute_bandpower', 'EEG_estimate_drowsiness'),
+    ),
+    PlanningCase(
+        case_id='eeg_artifact_proxy',
+        question='Check EEG for blink eye movement muscle artifact and high frequency noise',
+        modality='eeg',
+        expected_tools=('EEG_assess_quality', 'Signal_detect_artifacts', 'EEG_detect_artifact_proxy'),
+    ),
+    PlanningCase(
+        case_id='emg_burst_onset',
+        question='Detect EMG bursts onsets and muscle contraction periods',
+        modality='emg',
+        expected_tools=('EMG_assess_quality', 'EMG_summarize_activation', 'EMG_detect_bursts'),
+    ),
 ]

@@ -30,7 +30,28 @@ This catalog separates runnable baseline tasks from future labeled benchmarks. T
 | Stress/arousal proxy | EDA, HRV, ACC | `EDA_summarize`, `EDA_detect_arousal_events`, `ECG_compute_hrv`, `ACC_summarize_activity` | tonic/phasic/SCR/motion features | Needs multimodal session-level task. |
 | Muscle activation | EMG | `EMG_summarize_activation` | RMS/MAV | Baseline activation features. |
 | Muscle fatigue proxy | EMG | `EMG_estimate_fatigue` | median frequency, fatigue hint | Needs task protocol and normalization. |
+| PPG-derived respiration proxy | PPG | `PPG_estimate_respiration_modulation` | respiratory rate, modulation index | Uses PPG envelope respiratory-band modulation; proxy only. |
+| BCG/SCG-derived respiration proxy | BCG, SCG | `BCG_estimate_respiration`, `SCG_estimate_respiration` | respiratory rate, respiration power ratio | Mechanical respiratory modulation heuristic. |
+| PCG S1/S2 segmentation proxy | PCG | `PCG_segment_s1_s2_proxy` | S1/S2 counts, systole/diastole timing | Alternating-peak segmentation baseline; not a validated heart-sound segmenter. |
+| Activity bouts and fall/impact proxy | ACC | `ACC_detect_activity_bouts`, `ACC_detect_fall_proxy` | bout counts, impact events, fall risk proxy | Wearable activity/fall screening baseline; requires device orientation/context for real deployment. |
+| EEG drowsiness and artifact proxy | EEG | `EEG_estimate_drowsiness`, `EEG_detect_artifact_proxy` | theta/alpha, slow power, artifact level | Useful for vigilance and QC planning cases; not a clinical EEG reader. |
+| EMG burst/onset proxy | EMG | `EMG_detect_bursts` | burst count/rate/duration | RMS-envelope burst heuristic. |
 
+
+## Current Major-Task Eval Snapshot
+
+Latest rule-planner major-task outputs:
+
+| Eval | Records/Sessions | Runs | Retrieval | Planning | Execution |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Single-modality planning cases | n/a | 61 cases | 1.000 | 1.000 | n/a |
+| Real-world manifest | 26 records | 158 case runs | 1.000 | 1.000 | 1.000 |
+| Dedicated common manifest | 21 records | 93 case runs | 1.000 | 1.000 | 1.000 |
+| Dedicated BCG manifest | 3 records | 15 case runs | 1.000 | 1.000 | 1.000 |
+| Cross-modality session benchmark | 9 sessions | 26 signal runs | 1.000 | 1.000 | 1.000 |
+| Tool-output audit | 49 records | 263 tool runs | n/a | n/a | 1.000 ok rate, 0 errors, 0 low-confidence |
+
+Report artifacts are written under `/data1/jiahui/biosignal-agent/outputs/*major_tasks*`.
 
 ## Session-Level Tasks
 
