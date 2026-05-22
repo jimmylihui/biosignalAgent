@@ -10,9 +10,17 @@ from .schema_loader import load_tool_schemas
 TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
 MODALITY_HINTS = {
     "ecg": {"ecg", "ekg", "electrocardiogram", "qrs", "r", "rr", "hrv"},
-    "ppg": {"ppg", "photoplethysmography", "pulse", "pleth", "spo2"},
+    "ppg": {"ppg", "photoplethysmography", "pulse", "pleth"},
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j", "jk"},
     "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical", "cardiac", "j", "jk"},
+    "resp": {"resp", "respiration", "respiratory", "breath", "breathing"},
+    "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation"},
+    "abp": {"abp", "arterial", "blood", "pressure", "systolic", "diastolic"},
+    "pcg": {"pcg", "phonocardiogram", "heart", "sound", "sounds", "s1", "s2"},
+    "acc": {"acc", "accelerometer", "acceleration", "activity", "motion"},
+    "eda": {"eda", "gsr", "electrodermal", "skin", "conductance", "stress"},
+    "eeg": {"eeg", "electroencephalogram", "brain", "alpha", "beta", "theta", "delta", "bandpower"},
+    "emg": {"emg", "electromyography", "muscle", "activation", "rms"},
 }
 
 

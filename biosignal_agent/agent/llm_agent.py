@@ -8,7 +8,7 @@ from typing import Any
 from .openrouter_client import DEFAULT_MODEL, DEFAULT_TIMEOUT, chat_completion
 from .planning_agent import PlanningBioSignalAgent
 from .tool_retriever import ToolRetriever
-from .tool_registry import TOOLS
+from .tool_registry import TOOLS, WORKFLOWS
 from biosignal_agent.session.trace_logger import save_trace
 
 
@@ -35,7 +35,7 @@ class OpenRouterBioSignalAgent:
             for schema in schemas
         ]
         system = (
-            'You are BioSignalAgent, a tool-planning assistant for ECG, PPG, BCG, and SCG waveforms. '
+            'You are BioSignalAgent, a tool-planning assistant for ECG, PPG, BCG, SCG, RESP, SpO2, ABP, PCG, ACC, EDA, EEG, and EMG waveforms. '
             'Choose only tools from the provided list. Return strict JSON only, with keys modality and tool_calls. '
             'Each tool call must have name and arguments. Include signal_path, sampling_rate, and column in arguments. '
             'Do not make clinical diagnosis.'
@@ -158,7 +158,8 @@ class OpenRouterBioSignalAgent:
         if not normalized:
             raise ValueError('LLM returned no valid tool calls.')
         modality = str(plan.get('modality') or '').lower()
-        quality_tool = f'{modality.upper()}_assess_quality' if modality in {'ecg', 'ppg', 'bcg', 'scg'} else None
+        workflow = WORKFLOWS.get(modality, [])
+        quality_tool = workflow[0] if workflow else None
         if quality_tool in TOOLS and all(call['name'] != quality_tool for call in normalized):
             normalized.insert(0, {'name': quality_tool, 'arguments': {'signal_path': signal_path, 'sampling_rate': sampling_rate, 'column': column}})
         return {'modality': plan.get('modality'), 'tool_calls': normalized, 'planner': 'openrouter', 'retrieved_tools': retrieved_tools}

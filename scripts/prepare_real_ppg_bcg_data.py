@@ -64,7 +64,7 @@ def export_record(db: str, record: str, channel_candidates: list[str], modality:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Export real public PPG and SCG mechanical signal CSVs from PhysioNet.')
+    parser = argparse.ArgumentParser(description='Export real public PPG, RESP, and SCG mechanical signal CSVs from PhysioNet.')
     parser.add_argument('--out-dir', default='/data1/jiahui/biosignal-agent/datasets/processed/real_world')
     parser.add_argument('--manifest', default='/data1/jiahui/biosignal-agent/datasets/processed/real_world_manifest.json')
     parser.add_argument('--seconds', type=float, default=60.0)
@@ -78,7 +78,9 @@ def main() -> None:
     cebs_records = wfdb.get_record_list('cebsdb')[:args.limit]
     for record in bidmc_records:
         manifest.append(export_record('bidmc', record, ['PLETH', 'PPG'], 'ppg', args.seconds, out_dir, target_fs=None))
+        manifest.append(export_record('bidmc', record, ['RESP'], 'resp', args.seconds, out_dir, target_fs=None))
     for record in cebs_records:
+        manifest.append(export_record('cebsdb', record, ['RESP'], 'resp', args.seconds, out_dir, target_fs=args.scg_target_fs))
         manifest.append(export_record('cebsdb', record, ['SCG'], 'scg', args.seconds, out_dir, target_fs=args.scg_target_fs))
 
     manifest_path = Path(args.manifest)

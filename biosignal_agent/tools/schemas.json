@@ -233,5 +233,419 @@
       "confidence",
       "method"
     ]
+  },
+  {
+    "name": "RESP_assess_quality",
+    "description": "Assess RESP signal quality from a CSV waveform.",
+    "modality": "RESP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
+  },
+  {
+    "name": "RESP_estimate_rate",
+    "description": "Estimate respiratory rate from a respiration waveform.",
+    "modality": "RESP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "breath_indices",
+      "num_breaths",
+      "respiratory_rate_bpm",
+      "confidence",
+      "method"
+    ]
+  },
+  {
+    "name": "SpO2_assess_quality",
+    "description": "Assess SpO2 signal quality from a CSV time series.",
+    "modality": "SpO2",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
+  },
+  {
+    "name": "SpO2_summarize",
+    "description": "Summarize oxygen saturation level and time below 90 percent.",
+    "modality": "SpO2",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "mean_spo2_percent",
+      "min_spo2_percent",
+      "time_below_90_fraction",
+      "confidence"
+    ]
+  },
+  {
+    "name": "ABP_assess_quality",
+    "description": "Assess arterial blood pressure signal quality from a CSV waveform.",
+    "modality": "ABP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
+  },
+  {
+    "name": "ABP_detect_pulses",
+    "description": "Detect ABP pulse peaks and estimate heart rate and approximate pressure values.",
+    "modality": "ABP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "pulse_indices",
+      "num_pulses",
+      "heart_rate_bpm",
+      "median_systolic_value",
+      "approx_diastolic_value",
+      "confidence"
+    ]
+  },
+  {
+    "name": "PCG_assess_quality",
+    "description": "Assess PCG signal quality from a CSV waveform.",
+    "modality": "PCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
+  },
+  {
+    "name": "PCG_detect_heart_sounds",
+    "description": "Detect approximate PCG heart sound events using an envelope peak method.",
+    "modality": "PCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "sound_indices",
+      "num_sounds",
+      "heart_rate_bpm",
+      "confidence",
+      "method"
+    ]
+  },
+  {
+    "name": "ACC_assess_quality",
+    "description": "Assess accelerometer signal quality from a CSV time series.",
+    "modality": "ACC",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
+  },
+  {
+    "name": "ACC_summarize_activity",
+    "description": "Summarize accelerometer activity level from signal variability.",
+    "modality": "ACC",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "activity_std",
+      "dynamic_range",
+      "activity_level",
+      "confidence"
+    ]
+  },
+  {
+    "name": "EDA_assess_quality",
+    "description": "Assess EDA/GSR signal quality from a CSV time series.",
+    "modality": "EDA",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
+  },
+  {
+    "name": "EDA_summarize",
+    "description": "Summarize EDA tonic level and phasic variability.",
+    "modality": "EDA",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "mean_level",
+      "tonic_median",
+      "phasic_std",
+      "confidence"
+    ]
+  },
+  {
+    "name": "EEG_assess_quality",
+    "description": "Assess EEG signal quality from a CSV waveform.",
+    "modality": "EEG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
+  },
+  {
+    "name": "EEG_compute_bandpower",
+    "description": "Compute EEG delta, theta, alpha, beta, and gamma bandpower using Welch PSD.",
+    "modality": "EEG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "delta_power",
+      "theta_power",
+      "alpha_power",
+      "beta_power",
+      "gamma_power",
+      "total_power",
+      "confidence"
+    ]
+  },
+  {
+    "name": "EMG_assess_quality",
+    "description": "Assess EMG signal quality from a CSV waveform.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
+  },
+  {
+    "name": "EMG_summarize_activation",
+    "description": "Summarize EMG activation using bandpassed RMS and mean absolute value.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "rms",
+      "mean_absolute_value",
+      "confidence"
+    ]
   }
 ]

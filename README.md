@@ -1,6 +1,6 @@
 # BioSignalAgent
 
-Tool-first prototype for ECG, PPG, BCG, and SCG signal reasoning.
+Tool-first prototype for common physiological signal reasoning: ECG, PPG, BCG, SCG, RESP, SpO2, ABP, PCG, ACC, EDA, EEG, and EMG.
 
 This version keeps signal analysis in explicit Python tools. The agent can use either deterministic rule planning or an OpenRouter LLM planner, with local fallback when LLM output is unavailable or invalid. Tool schemas and execution traces are structured so they can support ToolRAG, tool calling, and future instruction tuning.
 
@@ -10,6 +10,14 @@ This version keeps signal analysis in explicit Python tools. The agent can use e
 - PPG: signal quality, peak detection, heart-rate estimate
 - BCG: signal quality, J-peak detection, heart-rate estimate
 - SCG: signal quality, J-peak detection, heart-rate estimate
+- RESP: signal quality, respiratory-rate estimate
+- SpO2: signal quality, oxygen-saturation summary
+- ABP: signal quality, pulse detection, heart-rate and pressure-value summary
+- PCG: signal quality, heart-sound event detection
+- ACC: signal quality, activity summary
+- EDA: signal quality, tonic/phasic summary
+- EEG: signal quality, bandpower summary
+- EMG: signal quality, activation summary
 
 ## Run A CSV Report
 
@@ -238,4 +246,26 @@ python scripts/evaluate_real_datasets.py \
   --out-csv /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_scg.csv
 ```
 
-Latest real-data rule eval: 11 records, 44 ECG/PPG/SCG case-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0. BCG is covered in planning eval and awaits a dedicated real BCG dataset.
+Latest real-data rule eval: 21 records, 64 ECG/PPG/RESP/SCG case-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0. BCG, SpO2, ABP, PCG, ACC, EDA, EEG, and EMG are covered in planning/smoke eval and await dedicated real datasets.
+
+## Common Modality Expansion
+
+The framework now includes baseline tools and planning cases for common physiological modalities in this priority order:
+
+```text
+RESP -> SpO2 -> ABP -> PCG -> ACC -> EDA -> EEG -> EMG
+```
+
+Run the expanded planning regression:
+
+```bash
+python scripts/evaluate_agent_framework.py   --planner rule   --retrieved-tool-count 3   --out-json /data1/jiahui/biosignal-agent/outputs/framework_eval_rule_common_modalities.json   --out-csv /data1/jiahui/biosignal-agent/outputs/framework_eval_rule_common_modalities.csv
+```
+
+Latest expanded planning eval: 32 cases, retrieval accuracy 1.0, planning accuracy 1.0.
+
+Run the real-data subset evaluation with BIDMC PPG/RESP, CEBSDB RESP/SCG, and MIT-BIH ECG:
+
+```bash
+python scripts/evaluate_real_datasets.py   --planner rule   --include-ecg   --retrieved-tool-count 3   --out-json /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_common_modalities.json   --out-csv /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_common_modalities.csv
+```
