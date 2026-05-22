@@ -10,6 +10,7 @@ from biosignal_agent.agent.tool_retriever import ToolRetriever
 from biosignal_agent.agent.tool_registry import TOOLS
 from biosignal_agent.session.schema import BioSignalSession, SignalInput
 from biosignal_agent.session.trace_logger import save_trace
+from biosignal_agent.session.tools import SESSION_TOOLS
 
 PlannerName = Literal["rule", "openrouter"]
 
@@ -60,15 +61,32 @@ class BioSignalAgentFramework:
             run = self.run_signal(session.question, signal)
             run["signal_label"] = signal.label
             runs.append(run)
+        session_tool_plan = self._plan_session_tools(session)
+        session_tool_results = []
+        for tool_name in session_tool_plan:
+            result = SESSION_TOOLS[tool_name](session.signals)
+            session_tool_results.append({"tool": tool_name, "result": result})
         trace = {
             "session": session.to_dict(),
             "runs": runs,
+            "session_tool_plan": session_tool_plan,
+            "session_tool_results": session_tool_results,
             "planner": self.config.planner,
             "model": self.config.model if self.config.planner == "openrouter" else None,
         }
         if self.config.save_traces:
             trace["trace_path"] = str(save_trace(trace))
         return trace
+
+    def _plan_session_tools(self, session: BioSignalSession) -> list[str]:
+        text = session.question.lower()
+        modalities = {signal.modality for signal in session.signals}
+        selected = []
+        if {"ecg", "ppg"}.issubset(modalities) and any(term in text for term in ["pulse arrival", "pulse transit", "pat", "ptt", "ecg ppg timing", "arrival time"]):
+            selected.append("Session_compute_ecg_ppg_pulse_arrival")
+        if {"ecg", "resp", "spo2"} & modalities and any(term in text for term in ["sleep apnea", "apnea", "hypopnea", "sleep disordered", "ahi"]):
+            selected.append("Session_screen_sleep_apnea_multimodal")
+        return selected
 
     def _run_rule_signal(self, question: str, signal: SignalInput) -> dict:
         retrieved_tools = [

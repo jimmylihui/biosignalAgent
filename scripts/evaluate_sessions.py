@@ -62,11 +62,29 @@ def evaluate_session_case(case, agent: BioSignalAgentFramework) -> dict[str, Any
             'execution_ok': execution_ok,
             'errors': errors,
         })
+    expected_session_tools = set(getattr(case, 'expected_session_tools', ()))
+    planned_session_tools = set(trace.get('session_tool_plan', []))
+    session_tool_results = trace.get('session_tool_results', [])
+    session_errors = []
+    session_execution_ok = True
+    for item in session_tool_results:
+        result = item.get('result', {})
+        if item.get('tool') not in expected_session_tools or not isinstance(result, dict) or result.get('error'):
+            session_execution_ok = False
+            session_errors.append(f"{item.get('tool')}: {result.get('error', 'unexpected session tool or invalid result')}")
+    if planned_session_tools != expected_session_tools:
+        session_execution_ok = False if expected_session_tools else session_execution_ok
+        if planned_session_tools != expected_session_tools:
+            session_errors.append(f"session tools mismatch: {sorted(planned_session_tools)}")
     return {
         'case_id': case.case_id,
         'question': case.question,
         'trace_path': trace.get('trace_path'),
         'num_signals': len(case.signals),
+        'expected_session_tools': sorted(expected_session_tools),
+        'planned_session_tools': trace.get('session_tool_plan', []),
+        'session_execution_ok': session_execution_ok,
+        'session_errors': session_errors,
         'rows': rows,
     }
 
@@ -117,6 +135,8 @@ def main() -> None:
     retrieval_passes = sum(1 for row in rows if row['retrieval_pass'])
     planning_passes = sum(1 for row in rows if row['planning_pass'])
     execution_passes = sum(1 for row in rows if row['execution_ok'])
+    session_tool_cases = [case for case in evaluated if case.get('expected_session_tools')]
+    session_tool_passes = sum(1 for case in session_tool_cases if case.get('session_execution_ok'))
     report = {
         'planner': args.planner,
         'model': args.model if args.planner == 'openrouter' else None,
@@ -125,6 +145,7 @@ def main() -> None:
         'retrieval_accuracy': retrieval_passes / len(rows) if rows else 0.0,
         'planning_accuracy': planning_passes / len(rows) if rows else 0.0,
         'execution_accuracy': execution_passes / len(rows) if rows else 0.0,
+        'session_tool_accuracy': session_tool_passes / len(session_tool_cases) if session_tool_cases else None,
         'cases': evaluated,
     }
     write_outputs(report, args.out_json, args.out_csv)

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from biosignal_agent.agent.tool_registry import WORKFLOWS
+from biosignal_agent.agent.planning_agent import PlanningBioSignalAgent
 from biosignal_agent.session.schema import BioSignalSession, SignalInput
 
 REAL_MANIFEST = Path('/data1/jiahui/biosignal-agent/datasets/processed/real_world_manifest.json')
@@ -34,6 +34,7 @@ class SessionCase:
     question: str
     signals: tuple[SignalInput, ...]
     expectations: tuple[SessionSignalExpectation, ...]
+    expected_session_tools: tuple[str, ...] = ()
 
 
 def load_records(paths: list[Path] | None = None) -> list[dict[str, Any]]:
@@ -54,6 +55,22 @@ def first_record_by_modality(records: list[dict[str, Any]]) -> dict[str, dict[st
     return by_modality
 
 
+def find_record(records: list[dict[str, Any]], dataset: str, record_name: str, modality: str) -> dict[str, Any] | None:
+    for record in records:
+        if record.get('dataset') == dataset and record.get('record') == record_name and record.get('modality') == modality:
+            return record
+    return None
+
+
+def find_synchronized_pair(records: list[dict[str, Any]], dataset: str, modalities: tuple[str, ...]) -> tuple[dict[str, Any], ...] | None:
+    record_names = sorted({record.get('record') for record in records if record.get('dataset') == dataset})
+    for record_name in record_names:
+        matched = tuple(find_record(records, dataset, record_name, modality) for modality in modalities)
+        if all(item is not None for item in matched):
+            return matched  # type: ignore[return-value]
+    return None
+
+
 def make_signal(record: dict[str, Any], label: str) -> SignalInput:
     return SignalInput(
         modality=record['modality'],
@@ -64,8 +81,9 @@ def make_signal(record: dict[str, Any], label: str) -> SignalInput:
     )
 
 
-def expected(label: str, modality: str) -> SessionSignalExpectation:
-    return SessionSignalExpectation(label=label, modality=modality, expected_tools=tuple(WORKFLOWS[modality]))
+def expected(label: str, modality: str, question: str) -> SessionSignalExpectation:
+    tools = tuple(PlanningBioSignalAgent().plan(question, modality))
+    return SessionSignalExpectation(label=label, modality=modality, expected_tools=tools)
 
 
 def build_default_session_cases(records: list[dict[str, Any]] | None = None) -> list[SessionCase]:
@@ -114,8 +132,33 @@ def build_default_session_cases(records: list[dict[str, Any]] | None = None) -> 
         if missing:
             continue
         signals = tuple(make_signal(by_modality[modality], label) for modality, label in modality_labels)
-        expectations = tuple(expected(label, modality) for modality, label in modality_labels)
+        expectations = tuple(expected(label, modality, question) for modality, label in modality_labels)
         cases.append(SessionCase(case_id=case_id, question=question, signals=signals, expectations=expectations))
+    synchronized_ecg_ppg = find_synchronized_pair(records, 'bidmc', ('ecg', 'ppg'))
+    if synchronized_ecg_ppg is not None:
+        question = 'Compute ECG PPG pulse arrival time and pulse transit timing proxy from synchronized signals.'
+        modality_labels = [('ecg', 'ecg'), ('ppg', 'ppg')]
+        signals = tuple(make_signal(record, label) for record, (_, label) in zip(synchronized_ecg_ppg, modality_labels))
+        expectations = tuple(expected(label, modality, question) for modality, label in modality_labels)
+        cases.append(SessionCase(
+            case_id='ecg_ppg_pulse_arrival_timing',
+            question=question,
+            signals=signals,
+            expectations=expectations,
+            expected_session_tools=('Session_compute_ecg_ppg_pulse_arrival',),
+        ))
+    if {'ecg', 'resp', 'spo2'}.issubset(by_modality):
+        question = 'Screen sleep apnea and hypopnea using ECG HRV, respiration, and SpO2 desaturation evidence.'
+        modality_labels = [('ecg', 'ecg'), ('resp', 'resp'), ('spo2', 'spo2')]
+        signals = tuple(make_signal(by_modality[modality], label) for modality, label in modality_labels)
+        expectations = tuple(expected(label, modality, question) for modality, label in modality_labels)
+        cases.append(SessionCase(
+            case_id='multimodal_sleep_apnea_screening',
+            question=question,
+            signals=signals,
+            expectations=expectations,
+            expected_session_tools=('Session_screen_sleep_apnea_multimodal',),
+        ))
     return cases
 
 

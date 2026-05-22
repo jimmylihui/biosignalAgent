@@ -183,6 +183,24 @@ python scripts/evaluate_agent_framework.py \
 
 The eval summary includes `planner_backend_counts`, so OpenRouter runs can be audited for true LLM plans versus rule fallback.
 
+
+## Session-Level Tools
+
+The framework now supports session tools that consume multiple signals after per-signal planning/execution:
+
+- ECG + PPG pulse-arrival timing: `Session_compute_ecg_ppg_pulse_arrival` estimates ECG R-peak to following PPG pulse delay.
+- ECG + RESP + SpO2 sleep-apnea fusion: `Session_screen_sleep_apnea_multimodal` combines ECG HRV proxy, respiratory apnea/hypopnea, respiratory pattern, and SpO2 desaturation/hypoxemia evidence.
+
+Latest session benchmark with session tools:
+
+```text
+9 sessions, 26 signal-runs
+retrieval/planning/execution accuracy: 1.0 / 1.0 / 1.0
+session tool accuracy: 1.0
+PAT benchmark uses synchronized BIDMC bidmc01 ECG+PPG: median PAT 528 ms, IQR 16 ms
+outputs: /data1/jiahui/biosignal-agent/outputs/session_eval_rule_session_tools_top7.json
+```
+
 ## Trace-To-Training Export
 
 Agent traces can be exported to JSONL samples for later planning/report fine-tuning or prompt evaluation:
@@ -487,10 +505,10 @@ The expanded rule-planning set has 52 planning cases. Latest expanded rule evals
 
 ```text
 planning regression: 52 cases, retrieval/planning accuracy 1.0
-real-world + MIT-BIH ECG: 21 records, 108 case-runs, retrieval/planning/execution accuracy 1.0
+real-world + MIT-BIH ECG: 26 records, 148 case-runs, retrieval/planning/execution accuracy 1.0
 dedicated common datasets: 21 records, 75 case-runs, retrieval/planning/execution accuracy 1.0
 dedicated BCG: 3 records, 12 case-runs, retrieval/planning/execution accuracy 1.0
-tool audit: 44 records, 197 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
+tool audit: 49 records, 232 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
 ```
 
 
@@ -499,10 +517,10 @@ Core task expansion outputs:
 
 ```text
 /data1/jiahui/biosignal-agent/outputs/framework_eval_rule_core_tasks.json
-/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_core_tasks.json
+/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_session_tools.json
 /data1/jiahui/biosignal-agent/outputs/dedicated_common_framework_eval_rule_core_tasks.json
 /data1/jiahui/biosignal-agent/outputs/dedicated_bcg_framework_eval_rule_core_tasks.json
-/data1/jiahui/biosignal-agent/outputs/tool_output_audit_core_tasks.json
+/data1/jiahui/biosignal-agent/outputs/tool_output_audit_session_tools.json
 ```
 
 Broader task/tool expansion outputs:

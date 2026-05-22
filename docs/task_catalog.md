@@ -31,6 +31,14 @@ This catalog separates runnable baseline tasks from future labeled benchmarks. T
 | Muscle activation | EMG | `EMG_summarize_activation` | RMS/MAV | Baseline activation features. |
 | Muscle fatigue proxy | EMG | `EMG_estimate_fatigue` | median frequency, fatigue hint | Needs task protocol and normalization. |
 
+
+## Session-Level Tasks
+
+| Task | Modalities | Current Tools | Output Type | Notes |
+| --- | --- | --- | --- | --- |
+| Pulse arrival timing | ECG + PPG | `Session_compute_ecg_ppg_pulse_arrival` | median PAT, IQR, paired pulses | Uses synchronized BIDMC ECG+PPG in the session benchmark; proxy for timing research, not BP estimation. |
+| Multimodal sleep-apnea screening | ECG + RESP + SpO2 | `Session_screen_sleep_apnea_multimodal` | fused risk, flags, component evidence | Research proxy combining ECG HRV, RESP events/pattern, and SpO2 burden. |
+
 ## High-Value Labeled Benchmarks To Add Next
 
 | Benchmark Goal | Suggested Public Data Direction | Needed Labels | Target Metrics |
