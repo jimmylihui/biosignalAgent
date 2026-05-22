@@ -28,6 +28,7 @@ This catalog separates runnable baseline tasks from future labeled benchmarks. T
 | MIT-BIH arrhythmia windows | Implemented via `scripts/prepare_labeled_arrhythmia_dataset.py` | annotation-derived normal/abnormal window labels | current RR-screen baseline: F1 0.680 on 240 windows |
 | Sleep apnea detection | Apnea-ECG, Sleep-EDF/SHHS-style PSG resources where accessible | apnea/hypopnea events or AHI | event F1, AHI MAE, subject-level severity accuracy |
 | Apnea-ECG minute labels | Implemented via `scripts/prepare_apnea_ecg_dataset.py` | minute-level apnea/normal ECG labels | current ECG-only proxy: F1 0.125 on 60 windows |
+| UCDDB RESP/SpO2 windows | Implemented via `scripts/prepare_ucddb_resp_spo2_dataset.py` | PSG respiratory-event labels with Flow and SpO2 channels | current RESP/SpO2 baseline: F1 0.563 on 40 windows |
 | Sleep staging | Sleep-EDF, PhysioNet sleep datasets | 30 s sleep stages | epoch accuracy, macro-F1, Cohen kappa |
 | Desaturation detection | PSG datasets with SpO2 and scored respiratory events | desaturation/apnea events | ODI error, event precision/recall |
 | Stress/arousal | WESAD or multimodal EDA/ECG/ACC datasets | stress/arousal labels | balanced accuracy, macro-F1 |

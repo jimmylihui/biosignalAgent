@@ -537,6 +537,24 @@ python scripts/evaluate_apnea_ecg.py \
 
 Current Apnea-ECG subset: 60 one-minute ECG windows, 8 apnea and 52 normal. The ECG-only HRV proxy is intentionally a weak baseline: accuracy 0.533, precision 0.083, recall 0.250, specificity 0.577, and F1 0.125. This gives the framework a concrete negative result and points the next apnea work toward RESP/SpO2/PSG-labeled datasets instead of ECG-only heuristics.
 
+### RESP/SpO2 PSG Benchmark: UCDDB
+
+UCDDB provides PSG respiratory-event labels plus `Flow` and `SpO2` channels in the `.rec` EDF-like file. The connector includes a lightweight EDF reader, so no extra EDF package is required:
+
+```bash
+python scripts/prepare_ucddb_resp_spo2_dataset.py \
+  --records ucddb002 \
+  --max-windows-per-record 40 \
+  --download
+
+python scripts/evaluate_ucddb_resp_spo2.py \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/ucddb_resp_spo2_manifest.json \
+  --out-json /data1/jiahui/biosignal-agent/outputs/ucddb_resp_spo2_eval.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/ucddb_resp_spo2_eval.csv
+```
+
+Current UCDDB subset: 40 balanced 60-second RESP/SpO2 windows, 20 respiratory-event and 20 normal. The current baseline using `RESP_detect_apnea` plus `SpO2_detect_desaturation` reaches accuracy 0.650, precision 0.750, recall 0.450, specificity 0.850, and F1 0.563. Most misses are hypopnea windows without strong desaturation, so the next improvement should add a dedicated hypopnea detector from respiratory-flow amplitude/flattening instead of only apnea-like low-amplitude events.
+
 Key outputs:
 
 ```text

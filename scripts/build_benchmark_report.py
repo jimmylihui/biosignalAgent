@@ -124,6 +124,25 @@ def labeled_apnea_ecg_summary(path: str | Path) -> dict[str, Any]:
     }
 
 
+def labeled_ucddb_summary(path: str | Path) -> dict[str, Any]:
+    payload = load_json(path)
+    if payload.get("missing"):
+        return {"name": "ucddb_resp_spo2_windows", **payload}
+    metrics = payload.get("metrics", {})
+    return {
+        "name": "ucddb_resp_spo2_windows",
+        "path": str(path),
+        "num_windows": payload.get("num_windows"),
+        "truth_counts": payload.get("truth_counts", {}),
+        "prediction_counts": payload.get("prediction_counts", {}),
+        "accuracy": metrics.get("accuracy"),
+        "precision": metrics.get("precision"),
+        "recall_sensitivity": metrics.get("recall_sensitivity"),
+        "specificity": metrics.get("specificity"),
+        "f1": metrics.get("f1"),
+    }
+
+
 def instruction_summary(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     if not path.exists():
@@ -244,6 +263,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "labeled_benchmarks": [
             labeled_arrhythmia_summary(args.arrhythmia_eval),
             labeled_apnea_ecg_summary(args.apnea_ecg_eval),
+            labeled_ucddb_summary(args.ucddb_eval),
         ],
         "instruction_data": [
             {"name": "full_sft", **instruction_summary(args.full_sft)},
@@ -264,6 +284,7 @@ def main() -> None:
     parser.add_argument("--tool-audit", default="/data1/jiahui/biosignal-agent/outputs/tool_output_audit_optimized.json")
     parser.add_argument("--arrhythmia-eval", default="/data1/jiahui/biosignal-agent/outputs/labeled_arrhythmia_eval.json")
     parser.add_argument("--apnea-ecg-eval", default="/data1/jiahui/biosignal-agent/outputs/apnea_ecg_eval.json")
+    parser.add_argument("--ucddb-eval", default="/data1/jiahui/biosignal-agent/outputs/ucddb_resp_spo2_eval.json")
     parser.add_argument("--full-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft.jsonl")
     parser.add_argument("--planning-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft.jsonl")
     parser.add_argument("--out-json", default="/data1/jiahui/biosignal-agent/outputs/benchmark_report.json")
