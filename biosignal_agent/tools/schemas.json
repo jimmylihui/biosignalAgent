@@ -4,76 +4,182 @@
     "description": "Assess ECG signal quality from a CSV waveform.",
     "modality": "ECG",
     "parameters": {
-      "signal_path": {"type": "string", "description": "Path to a CSV file containing ECG samples."},
-      "sampling_rate": {"type": "number", "description": "Sampling rate in Hz."},
-      "column": {"type": ["string", "null"], "description": "Optional CSV column name; defaults to signal or first numeric column."}
+      "signal_path": {
+        "type": "string",
+        "description": "Path to a CSV file containing ECG samples."
+      },
+      "sampling_rate": {
+        "type": "number",
+        "description": "Sampling rate in Hz."
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Optional CSV column name; defaults to signal or first numeric column."
+      }
     },
-    "returns": ["quality", "finite_ratio", "dynamic_range", "clipped_ratio", "confidence"]
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
   },
   {
     "name": "ECG_detect_r_peaks",
-    "description": "Detect ECG R peaks using NeuroKit2 with scipy fallback, and estimate heart rate.",
+    "description": "Detect ECG R peaks using the Pan-Tompkins 1985 method via NeuroKit2, with Nabian 2018 fallback, and estimate heart rate.",
     "modality": "ECG",
     "parameters": {
-      "signal_path": {"type": "string"},
-      "sampling_rate": {"type": "number"},
-      "column": {"type": ["string", "null"]}
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     },
-    "returns": ["r_peak_indices", "num_peaks", "heart_rate_bpm", "confidence", "method"]
+    "returns": [
+      "r_peak_indices",
+      "num_peaks",
+      "heart_rate_bpm",
+      "confidence",
+      "method"
+    ]
   },
   {
     "name": "ECG_compute_hrv",
     "description": "Compute simple time-domain HRV metrics from detected ECG R peaks.",
     "modality": "ECG",
     "parameters": {
-      "signal_path": {"type": "string"},
-      "sampling_rate": {"type": "number"},
-      "column": {"type": ["string", "null"]}
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     },
-    "returns": ["mean_rr_ms", "sdnn_ms", "rmssd_ms", "confidence"]
+    "returns": [
+      "mean_rr_ms",
+      "sdnn_ms",
+      "rmssd_ms",
+      "confidence"
+    ]
   },
   {
     "name": "PPG_assess_quality",
     "description": "Assess PPG signal quality from a CSV waveform.",
     "modality": "PPG",
     "parameters": {
-      "signal_path": {"type": "string"},
-      "sampling_rate": {"type": "number"},
-      "column": {"type": ["string", "null"]}
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     },
-    "returns": ["quality", "finite_ratio", "dynamic_range", "clipped_ratio", "confidence"]
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
   },
   {
     "name": "PPG_detect_peaks",
-    "description": "Detect PPG pulse peaks using NeuroKit2 Elgendi method with scipy fallback, and estimate heart rate.",
+    "description": "Detect PPG pulse peaks using NeuroKit2 ECG Nabian 2018 peak detection after PPG bandpass preprocessing.",
     "modality": "PPG",
     "parameters": {
-      "signal_path": {"type": "string"},
-      "sampling_rate": {"type": "number"},
-      "column": {"type": ["string", "null"]}
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     },
-    "returns": ["peak_indices", "num_peaks", "heart_rate_bpm", "confidence", "method"]
+    "returns": [
+      "peak_indices",
+      "num_peaks",
+      "heart_rate_bpm",
+      "confidence",
+      "method"
+    ]
   },
   {
     "name": "BCG_assess_quality",
     "description": "Assess BCG signal quality from a CSV waveform.",
     "modality": "BCG",
     "parameters": {
-      "signal_path": {"type": "string"},
-      "sampling_rate": {"type": "number"},
-      "column": {"type": ["string", "null"]}
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     },
-    "returns": ["quality", "finite_ratio", "dynamic_range", "clipped_ratio", "confidence"]
+    "returns": [
+      "quality",
+      "finite_ratio",
+      "dynamic_range",
+      "clipped_ratio",
+      "confidence"
+    ]
   },
   {
     "name": "BCG_detect_j_peaks",
-    "description": "Detect approximate BCG J peaks with bandpass filtering and scipy peak detection.",
+    "description": "Detect approximate BCG J peaks using NeuroKit2 ECG Nabian 2018 peak detection after BCG bandpass preprocessing.",
     "modality": "BCG",
     "parameters": {
-      "signal_path": {"type": "string"},
-      "sampling_rate": {"type": "number"},
-      "column": {"type": ["string", "null"]}
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     },
-    "returns": ["j_peak_indices", "num_peaks", "heart_rate_bpm", "confidence"]
+    "returns": [
+      "j_peak_indices",
+      "num_peaks",
+      "heart_rate_bpm",
+      "confidence"
+    ]
   }
 ]

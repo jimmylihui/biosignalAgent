@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import numpy as np
-from scipy import signal as scipy_signal
-
-from .common import bandpass_filter, bpm_from_peaks, load_csv_signal, signal_quality_summary
+from .common import bpm_from_peaks, load_csv_signal, signal_quality_summary
+from .peak_detectors import neurokit_nabian2018_peaks
 
 
 def BCG_assess_quality(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
@@ -13,9 +11,9 @@ def BCG_assess_quality(signal_path: str, sampling_rate: float, column: str | Non
 
 def BCG_detect_j_peaks(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
     data = load_csv_signal(signal_path, sampling_rate, column)
-    filtered = bandpass_filter(data.values, data.sampling_rate, low_hz=0.8, high_hz=12.0)
-    distance = max(1, int(0.3 * data.sampling_rate))
-    prominence = max(float(np.std(filtered)) * 0.35, 1e-8)
-    peaks, properties = scipy_signal.find_peaks(filtered, distance=distance, prominence=prominence)
+    peaks, details = neurokit_nabian2018_peaks(data.values, data.sampling_rate, low_hz=0.8, high_hz=12.0, fallback_threshold_scale=0.30)
     heart_rate = bpm_from_peaks(peaks, data.sampling_rate)
-    return {"tool": "BCG_detect_j_peaks", "j_peak_indices": peaks.tolist(), "num_peaks": int(len(peaks)), "heart_rate_bpm": heart_rate, "median_prominence": float(np.median(properties.get("prominences", [0]))), "confidence": 0.55 if heart_rate is not None and 35 <= heart_rate <= 220 else 0.25}
+    confidence = 0.55 if details["method"] == "nabian2018" else 0.45
+    if heart_rate is None or not 35 <= heart_rate <= 220:
+        confidence = 0.25
+    return {"tool": "BCG_detect_j_peaks", "j_peak_indices": peaks.tolist(), "num_peaks": int(len(peaks)), "heart_rate_bpm": heart_rate, "confidence": confidence, **details}
