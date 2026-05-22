@@ -128,7 +128,9 @@
       "num_peaks",
       "heart_rate_bpm",
       "confidence",
-      "method"
+      "method",
+      "interval_cv",
+      "regularity_confidence"
     ]
   },
   {
@@ -179,7 +181,9 @@
       "j_peak_indices",
       "num_peaks",
       "heart_rate_bpm",
-      "confidence"
+      "confidence",
+      "interval_cv",
+      "regularity_confidence"
     ]
   },
   {
@@ -231,7 +235,9 @@
       "num_peaks",
       "heart_rate_bpm",
       "confidence",
-      "method"
+      "method",
+      "interval_cv",
+      "regularity_confidence"
     ]
   },
   {
@@ -308,7 +314,8 @@
       "quality",
       "finite_ratio",
       "dynamic_range",
-      "clipped_ratio",
+      "plausible_ratio",
+      "jump_fraction",
       "confidence"
     ]
   },
@@ -387,7 +394,9 @@
       "heart_rate_bpm",
       "median_systolic_value",
       "approx_diastolic_value",
-      "confidence"
+      "confidence",
+      "interval_cv",
+      "regularity_confidence"
     ]
   },
   {
@@ -439,7 +448,9 @@
       "num_sounds",
       "heart_rate_bpm",
       "confidence",
-      "method"
+      "method",
+      "interval_cv",
+      "regularity_confidence"
     ]
   },
   {

@@ -396,3 +396,29 @@ python scripts/evaluate_sessions.py \
 ```
 
 Latest session eval with BCG: 7 sessions, 21 signal-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0.
+
+## Tool Output Audit And First Quality Pass
+
+Audit every local tool over the real-world, dedicated common, and dedicated BCG manifests:
+
+```bash
+python scripts/audit_tool_outputs.py \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/real_world_manifest.json \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/dedicated_common_manifest.json \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/dedicated_bcg_manifest.json \
+  --out-json /data1/jiahui/biosignal-agent/outputs/tool_output_audit_optimized.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/tool_output_audit_optimized.csv
+```
+
+The first quality pass adds interval-regularity confidence to PPG, BCG, SCG, ABP, and PCG beat detectors, uses a BCG-focused 3-12 Hz preprocessing band, and replaces generic SpO2 signal quality with SpO2-specific plausibility/range/jump checks. Tool schemas expose the new audit fields.
+
+Latest optimized tool audit: 44 records, 88 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs. Optimized regression outputs are also available at:
+
+```text
+/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_common_modalities_optimized.json
+/data1/jiahui/biosignal-agent/outputs/dedicated_common_framework_eval_rule_optimized.json
+/data1/jiahui/biosignal-agent/outputs/dedicated_bcg_framework_eval_rule_optimized.json
+/data1/jiahui/biosignal-agent/outputs/session_eval_rule_with_bcg_optimized.json
+```
+
+All optimized framework evals retained retrieval accuracy 1.0, planning accuracy 1.0, and execution accuracy 1.0.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import signal as scipy_signal
 
-from .common import bandpass_filter, bpm_from_peaks, load_csv_signal, signal_quality_summary
+from .common import bandpass_filter, bpm_from_peaks, interval_regularity, load_csv_signal, signal_quality_summary
 
 
 def PCG_assess_quality(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
@@ -17,6 +17,8 @@ def PCG_detect_heart_sounds(signal_path: str, sampling_rate: float, column: str 
     envelope = np.abs(scipy_signal.hilbert(filtered))
     min_distance = max(1, int(0.25 * data.sampling_rate))
     peaks, _ = scipy_signal.find_peaks(envelope, distance=min_distance, prominence=max(float(np.std(envelope)) * 0.3, 1e-8))
-    heart_rate = bpm_from_peaks(peaks[::2] if len(peaks) >= 4 else peaks, data.sampling_rate)
-    confidence = 0.55 if heart_rate is not None and 35 <= heart_rate <= 220 else 0.25
-    return {"tool": "PCG_detect_heart_sounds", "sound_indices": peaks.tolist(), "num_sounds": int(len(peaks)), "heart_rate_bpm": heart_rate, "confidence": confidence, "method": "hilbert_envelope_find_peaks"}
+    beat_peaks = peaks[::2] if len(peaks) >= 4 else peaks
+    heart_rate = bpm_from_peaks(beat_peaks, data.sampling_rate)
+    regularity = interval_regularity(beat_peaks, data.sampling_rate)
+    confidence = min(0.6, regularity["regularity_confidence"]) if heart_rate is not None and 35 <= heart_rate <= 220 else 0.25
+    return {"tool": "PCG_detect_heart_sounds", "sound_indices": peaks.tolist(), "num_sounds": int(len(peaks)), "heart_rate_bpm": heart_rate, "confidence": confidence, **regularity, "method": "hilbert_envelope_find_peaks"}

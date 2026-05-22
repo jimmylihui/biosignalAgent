@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import signal as scipy_signal
 
-from .common import bpm_from_peaks, load_csv_signal, signal_quality_summary
+from .common import bpm_from_peaks, interval_regularity, load_csv_signal, signal_quality_summary
 
 
 def ABP_assess_quality(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
@@ -18,7 +18,8 @@ def ABP_detect_pulses(signal_path: str, sampling_rate: float, column: str | None
     prominence = max(float(np.nanstd(values)) * 0.25, 1e-8)
     peaks, _ = scipy_signal.find_peaks(values, distance=min_distance, prominence=prominence)
     heart_rate = bpm_from_peaks(peaks, data.sampling_rate)
-    confidence = 0.75 if heart_rate is not None and 35 <= heart_rate <= 220 else 0.3
+    regularity = interval_regularity(peaks, data.sampling_rate)
+    confidence = min(0.75, regularity["regularity_confidence"]) if heart_rate is not None and 35 <= heart_rate <= 220 else 0.3
     systolic = float(np.nanmedian(values[peaks])) if len(peaks) else None
     diastolic = float(np.nanpercentile(values, 10)) if len(values) else None
     return {
@@ -29,5 +30,6 @@ def ABP_detect_pulses(signal_path: str, sampling_rate: float, column: str | None
         "median_systolic_value": systolic,
         "approx_diastolic_value": diastolic,
         "confidence": confidence,
+        **regularity,
         "method": "find_peaks",
     }

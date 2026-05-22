@@ -55,3 +55,24 @@ def bpm_from_peaks(peaks: np.ndarray, sampling_rate: float) -> float | None:
     if len(intervals) == 0:
         return None
     return float(60.0 / np.median(intervals))
+
+
+def interval_regularity(peaks: np.ndarray, sampling_rate: float) -> dict:
+    if len(peaks) < 3:
+        return {"interval_cv": None, "regularity_confidence": 0.3}
+    intervals = np.diff(peaks) / sampling_rate
+    intervals = intervals[intervals > 0]
+    if len(intervals) < 2:
+        return {"interval_cv": None, "regularity_confidence": 0.3}
+    cv = float(np.std(intervals) / np.mean(intervals)) if np.mean(intervals) > 0 else None
+    if cv is None:
+        confidence = 0.3
+    elif cv <= 0.12:
+        confidence = 0.9
+    elif cv <= 0.25:
+        confidence = 0.75
+    elif cv <= 0.45:
+        confidence = 0.55
+    else:
+        confidence = 0.35
+    return {"interval_cv": cv, "regularity_confidence": confidence}
