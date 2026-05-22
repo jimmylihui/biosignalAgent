@@ -7,11 +7,11 @@ from .tool_registry import TOOLS, WORKFLOWS
 
 
 MODALITY_KEYWORDS = {
-    "ecg": {"ecg", "ekg", "electrocardiogram", "r-peak", "r peak", "qrs", "hrv", "rr"},
+    "ecg": {"ecg", "ekg", "electrocardiogram", "r-peak", "r peak", "qrs", "hrv", "rr", "qt", "qtc", "st", "pr interval", "p wave", "t wave"},
     "ppg": {"ppg", "photoplethysmography", "pulse", "pleth"},
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak"},
     "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak"},
-    "resp": {"resp", "respiration", "respiratory", "breath", "breathing"},
+    "resp": {"resp", "respiration", "respiratory", "breath", "breathing", "tachypnea", "bradypnea", "periodic breathing"},
     "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation", "hypoxemia", "hypoxaemia"},
     "abp": {"abp", "arterial blood pressure", "blood pressure", "systolic", "diastolic"},
     "pcg": {"pcg", "phonocardiogram", "heart sound", "heart sounds", "s1", "s2", "murmur", "valve"},
@@ -37,12 +37,16 @@ BASIC_ANALYSIS_TOOLS = {
 }
 
 TASK_TOOL_RULES = {
+    "artifact": [
+        ({"artifact", "noise", "noisy", "motion artifact", "clipping", "flatline", "signal dropout", "dropout"}, ["Signal_detect_artifacts"]),
+    ],
 
     "ppg": [
         ({"perfusion", "low perfusion", "pulse variability", "pulse amplitude", "vascular"}, ["PPG_detect_peaks", "PPG_assess_perfusion_variability"]),
     ],
     "abp": [
         ({"hypotension", "hypertension", "pressure event", "shock", "high blood pressure", "low blood pressure"}, ["ABP_detect_pulses", "ABP_screen_pressure_events"]),
+        ({"map", "mean arterial pressure", "pulse pressure", "hemodynamic", "haemodynamic", "perfusion pressure"}, ["ABP_detect_pulses", "ABP_compute_hemodynamics"]),
     ],
     "pcg": [
         ({"murmur", "valve", "abnormal heart sound"}, ["PCG_detect_heart_sounds", "PCG_screen_murmur_proxy"]),
@@ -56,10 +60,12 @@ TASK_TOOL_RULES = {
     "ecg": [
         ({"arrhythmia", "rhythm", "irregular", "afib", "atrial fibrillation", "bradycardia", "tachycardia", "pause"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_arrhythmia"]),
         ({"apnea", "apnoea", "sleep disordered", "sleep breathing", "sleep apnea"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_sleep_apnea"]),
+        ({"morphology", "interval", "intervals", "qrs", "qt", "qtc", "st elevation", "st depression", "pr interval", "p wave", "t wave"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals"]),
     ],
     "resp": [
         ({"apnea", "apnoea", "sleep disordered", "cessation"}, ["RESP_estimate_rate", "RESP_detect_apnea"]),
         ({"hypopnea", "hypopnoea", "shallow breathing", "airflow reduction", "reduced respiration"}, ["RESP_estimate_rate", "RESP_detect_hypopnea"]),
+        ({"tachypnea", "bradypnea", "periodic breathing", "irregular breathing", "respiratory pattern", "breathing pattern"}, ["RESP_estimate_rate", "RESP_screen_rate_pattern"]),
     ],
     "spo2": [
         ({"desaturation", "desat", "odi", "oxygen drop", "below 90", "apnea"}, ["SpO2_summarize", "SpO2_detect_desaturation"]),
@@ -100,6 +106,7 @@ class PlanningBioSignalAgent:
             selected.append(workflow[0])
 
         wants_hrv = any(term in text for term in ["hrv", "heart rate variability", "rmssd", "sdnn"])
+        wants_artifact = any(term in text for term in ["artifact", "noise", "noisy", "motion artifact", "clipping", "flatline", "signal dropout", "dropout"])
         wants_analysis = any(
             term in text
             for term in [
@@ -133,6 +140,14 @@ class PlanningBioSignalAgent:
                 "seizure",
                 "hypopnea",
                 "hypoxemia",
+                "artifact",
+                "noise",
+                "morphology",
+                "qtc",
+                "tachypnea",
+                "bradypnea",
+                "map",
+                "pulse pressure",
             ]
         )
         if modality == "ecg":
@@ -140,10 +155,13 @@ class PlanningBioSignalAgent:
                 selected.append("ECG_detect_r_peaks")
             if wants_hrv or any(term in text for term in ["variability", "hrv", "summary", "summarize", "analyze"]):
                 selected.append("ECG_compute_hrv")
-        elif wants_analysis:
+        elif wants_analysis and not wants_artifact:
             selected.extend(BASIC_ANALYSIS_TOOLS.get(modality, []))
 
         for terms, tools in TASK_TOOL_RULES.get(modality, []):
+            if any(term in text for term in terms):
+                selected.extend(tools)
+        for terms, tools in TASK_TOOL_RULES.get("artifact", []):
             if any(term in text for term in terms):
                 selected.extend(tools)
 

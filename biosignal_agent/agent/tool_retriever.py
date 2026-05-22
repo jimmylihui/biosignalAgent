@@ -55,7 +55,7 @@ class ToolRetriever:
             candidates = [
                 (schema, tokens)
                 for schema, tokens in candidates
-                if schema.get("modality", "").lower() == modality_lower
+                if schema.get("modality", "").lower() in {modality_lower, "any"}
             ] or candidates
         scores = []
         for schema, tokens in candidates:
@@ -100,4 +100,4 @@ class ToolRetriever:
     def _fallback_by_modality(self, modality: str | None, top_k: int) -> list[dict]:
         if modality is None:
             return self.schemas[:top_k]
-        return [schema for schema in self.schemas if schema.get("modality", "").lower() == modality.lower()][:top_k]
+        return [schema for schema in self.schemas if schema.get("modality", "").lower() in {modality.lower(), "any"}][:top_k]

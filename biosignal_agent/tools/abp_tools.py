@@ -68,3 +68,38 @@ def ABP_screen_pressure_events(signal_path: str, sampling_rate: float, column: s
         "method": "abp_peak_percentile_threshold_screening",
         "disclaimer": "Screening heuristic only; ABP calibration and clinical context are required for blood-pressure interpretation.",
     }
+
+
+
+def ABP_compute_hemodynamics(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    pulses = ABP_detect_pulses(signal_path, sampling_rate, column)
+    if len(data.values) == 0:
+        return {"tool": "ABP_compute_hemodynamics", "error": "empty signal", "confidence": 0.0}
+    systolic = pulses.get("median_systolic_value")
+    diastolic = pulses.get("approx_diastolic_value")
+    mean_pressure = float(np.nanmean(data.values))
+    pulse_pressure = float(systolic - diastolic) if systolic is not None and diastolic is not None else None
+    map_formula = float(diastolic + (pulse_pressure / 3.0)) if pulse_pressure is not None and diastolic is not None else mean_pressure
+    flags = []
+    if map_formula < 65:
+        flags.append("low_map_proxy")
+    if pulse_pressure is not None and pulse_pressure < 25:
+        flags.append("narrow_pulse_pressure_proxy")
+    if pulse_pressure is not None and pulse_pressure > 80:
+        flags.append("wide_pulse_pressure_proxy")
+    hemodynamic_risk = "elevated" if flags else "low"
+    return {
+        "tool": "ABP_compute_hemodynamics",
+        "mean_arterial_pressure_proxy": map_formula,
+        "mean_pressure_value": mean_pressure,
+        "pulse_pressure_proxy": pulse_pressure,
+        "median_systolic_value": systolic,
+        "approx_diastolic_value": diastolic,
+        "heart_rate_bpm": pulses.get("heart_rate_bpm"),
+        "hemodynamic_flags": flags,
+        "hemodynamic_risk": hemodynamic_risk,
+        "confidence": max(0.5, min(0.7, float(pulses.get("confidence", 0.5)))),
+        "method": "abp_map_pulse_pressure_proxy",
+        "disclaimer": "Screening heuristic only; ABP units and calibration are required for clinical hemodynamic interpretation.",
+    }

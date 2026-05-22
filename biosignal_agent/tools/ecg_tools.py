@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+from scipy import signal as scipy_signal
 
 from .common import bpm_from_peaks, load_csv_signal, signal_quality_summary
 from .peak_detectors import neurokit_nabian2018_peaks
@@ -128,3 +129,85 @@ def ECG_screen_sleep_apnea(signal_path: str, sampling_rate: float, column: str |
         "method": "ecg_hrv_sleep_apnea_proxy",
         "disclaimer": "ECG-only apnea proxy for benchmarking; respiratory effort and SpO2 labels are preferred for clinical apnea detection.",
     }
+
+
+
+def ECG_measure_morphology_intervals(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    peak_result = ECG_detect_r_peaks(signal_path, sampling_rate, column)
+    peaks = np.asarray(peak_result.get("r_peak_indices", []), dtype=int)
+    if len(peaks) < 3:
+        return {"tool": "ECG_measure_morphology_intervals", "error": "not enough R peaks", "confidence": 0.1}
+    values = data.values
+    result = {
+        "tool": "ECG_measure_morphology_intervals",
+        "heart_rate_bpm": peak_result.get("heart_rate_bpm"),
+        "confidence": min(0.55, float(peak_result.get("confidence", 0.5))),
+        "method": "ecg_delineation_interval_screening",
+        "disclaimer": "Screening heuristic only; ECG intervals require validated delineation and lead-specific clinical review.",
+    }
+    try:
+        if nk is None:
+            raise RuntimeError("neurokit2 is not installed")
+        cleaned = nk.ecg_clean(values, sampling_rate=data.sampling_rate, method="pantompkins1985")
+        _, waves = nk.ecg_delineate(cleaned, rpeaks=peaks, sampling_rate=data.sampling_rate, method="dwt", show=False, show_type="all")
+        def valid(name: str) -> np.ndarray:
+            arr = np.asarray(waves.get(name, []), dtype=float)
+            return arr[np.isfinite(arr)]
+        q = valid("ECG_Q_Peaks")
+        s_peaks = valid("ECG_S_Peaks")
+        p_on = valid("ECG_P_Onsets")
+        qrs_on = valid("ECG_R_Onsets")
+        qrs_off = valid("ECG_R_Offsets")
+        t_off = valid("ECG_T_Offsets")
+        qrs_ms = None
+        if len(qrs_on) and len(qrs_off):
+            n = min(len(qrs_on), len(qrs_off))
+            qrs_ms = float(np.nanmedian((qrs_off[:n] - qrs_on[:n]) / data.sampling_rate * 1000.0))
+        elif len(q) and len(s_peaks):
+            n = min(len(q), len(s_peaks))
+            qrs_ms = float(np.nanmedian((s_peaks[:n] - q[:n]) / data.sampling_rate * 1000.0))
+        pr_ms = None
+        if len(p_on) and len(qrs_on):
+            n = min(len(p_on), len(qrs_on))
+            pr_ms = float(np.nanmedian((qrs_on[:n] - p_on[:n]) / data.sampling_rate * 1000.0))
+        qt_ms = None
+        if len(qrs_on) and len(t_off):
+            n = min(len(qrs_on), len(t_off))
+            qt_ms = float(np.nanmedian((t_off[:n] - qrs_on[:n]) / data.sampling_rate * 1000.0))
+    except Exception as exc:
+        qrs_ms = None
+        pr_ms = None
+        qt_ms = None
+        result["fallback_reason"] = str(exc)
+    rr_s = np.diff(peaks) / data.sampling_rate
+    rr_s = rr_s[(rr_s >= 0.3) & (rr_s <= 2.5)]
+    qtc_ms = float(qt_ms / np.sqrt(np.nanmedian(rr_s))) if qt_ms is not None and len(rr_s) else None
+    st_values = []
+    offset = int(0.08 * data.sampling_rate)
+    baseline_offset = int(0.04 * data.sampling_rate)
+    for peak in peaks:
+        st_idx = peak + offset
+        base_idx = peak - baseline_offset
+        if 0 <= st_idx < len(values) and 0 <= base_idx < len(values):
+            st_values.append(values[st_idx] - values[base_idx])
+    st_deviation_proxy = float(np.nanmedian(st_values)) if st_values else None
+    flags = []
+    if qrs_ms is not None and qrs_ms > 120:
+        flags.append("wide_qrs_proxy")
+    if qtc_ms is not None and qtc_ms > 470:
+        flags.append("long_qtc_proxy")
+    if pr_ms is not None and pr_ms > 220:
+        flags.append("prolonged_pr_proxy")
+    if st_deviation_proxy is not None and abs(st_deviation_proxy) > max(np.nanstd(values) * 0.25, 1e-8):
+        flags.append("st_deviation_proxy")
+    result.update({
+        "pr_interval_ms": pr_ms,
+        "qrs_duration_ms": qrs_ms,
+        "qt_interval_ms": qt_ms,
+        "qtc_interval_ms": qtc_ms,
+        "st_deviation_proxy": st_deviation_proxy,
+        "morphology_flags": flags,
+        "morphology_risk": "elevated" if flags else "low",
+    })
+    return result

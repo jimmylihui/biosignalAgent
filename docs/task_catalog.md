@@ -7,11 +7,14 @@ This catalog separates runnable baseline tasks from future labeled benchmarks. T
 | Task | Modalities | Current Tools | Output Type | Notes |
 | --- | --- | --- | --- | --- |
 | Signal quality triage | ECG, PPG, BCG, SCG, RESP, SpO2, ABP, PCG, ACC, EDA, EEG, EMG | `*_assess_quality` | quality/confidence | First tool in every workflow. |
+| Generic artifact gate | all single-signal modalities | `Signal_detect_artifacts` | clipping/flatline/jump/noise flags | Useful before downstream tools, especially wearable signals. |
 | Heart or pulse rate | ECG, PPG, BCG, SCG, ABP, PCG | peak/pulse/sound detectors | rate and event indices | ECG uses Pan-Tompkins; PPG/BCG/SCG use Nabian-style peak screening. |
 | PPG perfusion/variability proxy | PPG | `PPG_assess_perfusion_variability` | amplitude proxy, interval CV, low-perfusion flag | Needs calibrated PPG for true perfusion interpretation. |
 | HRV/autonomic features | ECG | `ECG_compute_hrv` | RR, SDNN, RMSSD | Feature extraction, not disease classification. |
 | Arrhythmia screening | ECG | `ECG_screen_arrhythmia` | brady/tachy/irregular/pause flags | RR-interval heuristic only; next step is labeled rhythm data. |
+| ECG morphology intervals | ECG | `ECG_measure_morphology_intervals` | PR/QRS/QT/QTc/ST proxies | Delineation heuristic; useful for morphology-aware planning cases. |
 | Respiratory rate | RESP | `RESP_estimate_rate` | breaths/min | Baseline peak method. |
+| Respiratory pattern screen | RESP | `RESP_screen_rate_pattern` | tachypnea/bradypnea/irregular/periodic flags | Pattern heuristic for respiratory workflow routing. |
 | Sleep apnea breathing pauses | RESP | `RESP_detect_apnea` | apnea-like event count/index | Envelope-drop heuristic; needs apnea labels for true AHI validation. |
 | Hypopnea-like reduced breathing | RESP | `RESP_detect_hypopnea` | hypopnea-like event count/index | Reduced-envelope heuristic; useful for PSG respiratory-event benchmarks. |
 | Oxygen desaturation burden | SpO2 | `SpO2_detect_desaturation` | ODI, time below 90%, desat events | Useful for sleep-apnea support tasks. |
@@ -21,6 +24,7 @@ This catalog separates runnable baseline tasks from future labeled benchmarks. T
 | Sleep/wake actigraphy proxy | ACC | `ACC_estimate_sleep_wake` | rest/activity hint | Coarse proxy, useful as a second signal in sleep sessions. |
 | Blood-pressure pulse summary | ABP | `ABP_detect_pulses` | pulse HR, approximate systolic/diastolic values | Baseline ABP pulse features. |
 | Pressure-event proxy | ABP | `ABP_screen_pressure_events` | hypotension/hypertension proxy flags | Needs calibrated ABP and clinical context. |
+| Hemodynamic summary | ABP | `ABP_compute_hemodynamics` | MAP and pulse-pressure proxies | Requires calibrated ABP units for clinical meaning. |
 | Heart-sound timing | PCG | `PCG_detect_heart_sounds` | sound events and HR | Baseline PCG timing. |
 | Murmur proxy | PCG | `PCG_screen_murmur_proxy` | high-frequency ratio, murmur risk proxy | Needs validated PCG segmentation and labels. |
 | Stress/arousal proxy | EDA, HRV, ACC | `EDA_summarize`, `EDA_detect_arousal_events`, `ECG_compute_hrv`, `ACC_summarize_activity` | tonic/phasic/SCR/motion features | Needs multimodal session-level task. |

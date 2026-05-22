@@ -1062,5 +1062,126 @@
       "method",
       "disclaimer"
     ]
+  },
+  {
+    "name": "Signal_detect_artifacts",
+    "description": "Generic signal artifact screen for clipping, flatline, abrupt jumps, and high-frequency noise.",
+    "modality": "Any",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "artifact_level",
+      "artifact_flags",
+      "dynamic_range",
+      "clipped_fraction",
+      "jump_fraction",
+      "high_frequency_noise_ratio",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ECG_measure_morphology_intervals",
+    "description": "Estimate ECG morphology interval proxies including PR, QRS, QT/QTc, and ST deviation from R-peak anchored delineation.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "pr_interval_ms",
+      "qrs_duration_ms",
+      "qt_interval_ms",
+      "qtc_interval_ms",
+      "st_deviation_proxy",
+      "morphology_flags",
+      "morphology_risk",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ABP_compute_hemodynamics",
+    "description": "Compute ABP hemodynamic proxy features including MAP and pulse pressure.",
+    "modality": "ABP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "mean_arterial_pressure_proxy",
+      "mean_pressure_value",
+      "pulse_pressure_proxy",
+      "median_systolic_value",
+      "approx_diastolic_value",
+      "hemodynamic_flags",
+      "hemodynamic_risk",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "RESP_screen_rate_pattern",
+    "description": "Screen respiration for tachypnea, bradypnea, irregular breathing, and periodic/variable breathing proxies.",
+    "modality": "RESP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "respiratory_rate_bpm",
+      "breath_interval_cv",
+      "breath_amplitude_cv",
+      "respiratory_pattern_flags",
+      "respiratory_pattern_risk",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
   }
 ]

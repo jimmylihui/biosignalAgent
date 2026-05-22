@@ -6,18 +6,18 @@ This version keeps signal analysis in explicit Python tools. The agent can use e
 
 ## Current Tools
 
-- ECG: signal quality, R-peak detection, HRV summary, arrhythmia proxy, ECG-only sleep-apnea proxy
-- PPG: signal quality, Nabian-style peak detection, heart-rate estimate, perfusion/variability proxy
+- ECG: signal quality, artifact screen, R-peak detection, HRV summary, arrhythmia proxy, ECG-only sleep-apnea proxy, morphology/interval proxy
+- PPG: signal quality, artifact screen, Nabian-style peak detection, heart-rate estimate, perfusion/variability proxy
 - BCG: signal quality, Nabian-style J-peak detection, heart-rate estimate
 - SCG: signal quality, Nabian-style J-peak detection, heart-rate estimate
-- RESP: signal quality, respiratory-rate estimate, apnea proxy, hypopnea proxy
-- SpO2: signal quality, oxygen-saturation summary, desaturation events, hypoxemia burden
-- ABP: signal quality, pulse detection, heart-rate and pressure-value summary, hypotension/hypertension proxy
+- RESP: signal quality, artifact screen, respiratory-rate estimate, apnea proxy, hypopnea proxy, rate/pattern proxy
+- SpO2: signal quality, artifact screen, oxygen-saturation summary, desaturation events, hypoxemia burden
+- ABP: signal quality, artifact screen, pulse detection, heart-rate and pressure-value summary, hypotension/hypertension proxy, MAP/pulse-pressure proxy
 - PCG: signal quality, heart-sound event detection, murmur proxy
 - ACC: signal quality, activity summary, sleep/wake proxy
 - EDA: signal quality, tonic/phasic summary, arousal/SCR event proxy
-- EEG: signal quality, bandpower summary, sleep-stage features, seizure-like spike proxy
-- EMG: signal quality, activation summary, fatigue median-frequency proxy
+- EEG: signal quality, artifact screen, bandpower summary, sleep-stage features, seizure-like spike proxy
+- EMG: signal quality, artifact screen, activation summary, fatigue median-frequency proxy
 
 ## Run A CSV Report
 
@@ -469,28 +469,41 @@ Initial no-fallback LLM baseline: 32 planning cases, 30 true OpenRouter successe
 
 The planning benchmark now includes broader task prompts beyond peak/rate extraction:
 
+- Generic artifact screening: clipping, flatline/dropout, abrupt jumps, and high-frequency noise.
 - ECG arrhythmia screening: irregular RR, pauses, bradycardia, tachycardia, ectopy-proxy flags.
+- ECG morphology/interval screening: PR/QRS/QT/QTc and ST-deviation proxies.
 - ECG sleep-apnea proxy: HRV/RR-pattern screening for ECG-only apnea baselines.
 - PPG perfusion/variability proxy: pulse amplitude, interval CV, low-perfusion flag.
-- RESP sleep-apnea and hypopnea screening: low-amplitude pauses plus reduced-flow events.
+- RESP sleep-apnea, hypopnea, and rate-pattern screening: low-amplitude pauses, reduced-flow events, tachypnea/bradypnea/periodic breathing proxies.
 - SpO2 desaturation and hypoxemia burden: ODI-style event count, minimum SpO2, time below 90/88 percent.
-- ABP pressure-event proxy: approximate hypotension/hypertension flags from pulse values.
+- ABP pressure-event and hemodynamic proxy: approximate hypotension/hypertension flags, MAP, and pulse pressure.
 - PCG murmur proxy: high-frequency continuous heart-sound energy.
 - EDA arousal events: phasic skin-conductance-response peaks.
 - EEG sleep-stage features and seizure-like proxy: band ratios plus robust spike/fast-power screen.
 - EMG activation and fatigue proxy: RMS/MAV plus median-frequency fatigue hint.
 - ACC sleep/wake proxy: actigraphy-style rest/activity hint.
 
-The expanded rule-planning set has 48 planning cases. Latest expanded rule evals:
+The expanded rule-planning set has 52 planning cases. Latest expanded rule evals:
 
 ```text
-planning regression: 48 cases, retrieval/planning accuracy 1.0
-real-world + MIT-BIH ECG: 21 records, 92 case-runs, retrieval/planning/execution accuracy 1.0
-dedicated common datasets: 21 records, 72 case-runs, retrieval/planning/execution accuracy 1.0
+planning regression: 52 cases, retrieval/planning accuracy 1.0
+real-world + MIT-BIH ECG: 21 records, 108 case-runs, retrieval/planning/execution accuracy 1.0
+dedicated common datasets: 21 records, 75 case-runs, retrieval/planning/execution accuracy 1.0
 dedicated BCG: 3 records, 12 case-runs, retrieval/planning/execution accuracy 1.0
-tool audit: 44 records, 140 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
+tool audit: 44 records, 197 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
 ```
 
+
+
+Core task expansion outputs:
+
+```text
+/data1/jiahui/biosignal-agent/outputs/framework_eval_rule_core_tasks.json
+/data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_core_tasks.json
+/data1/jiahui/biosignal-agent/outputs/dedicated_common_framework_eval_rule_core_tasks.json
+/data1/jiahui/biosignal-agent/outputs/dedicated_bcg_framework_eval_rule_core_tasks.json
+/data1/jiahui/biosignal-agent/outputs/tool_output_audit_core_tasks.json
+```
 
 Broader task/tool expansion outputs:
 

@@ -116,3 +116,46 @@ def RESP_detect_hypopnea(signal_path: str, sampling_rate: float, column: str | N
         "method": "respiration_envelope_reduction_screening",
         "disclaimer": "Screening heuristic only; hypopnea scoring also needs desaturation/arousal context and validated PSG labels.",
     }
+
+
+
+def RESP_screen_rate_pattern(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    values = data.values
+    if len(values) < data.sampling_rate * 20:
+        return {"tool": "RESP_screen_rate_pattern", "error": "signal too short for respiratory pattern screening", "confidence": 0.0}
+    filtered = bandpass_filter(values, data.sampling_rate, low_hz=0.05, high_hz=0.7, order=3)
+    min_distance = max(1, int(1.5 * data.sampling_rate))
+    prominence = max(float(np.nanstd(filtered)) * 0.2, 1e-8)
+    peaks, _ = scipy_signal.find_peaks(filtered, distance=min_distance, prominence=prominence)
+    if len(peaks) < 3:
+        return {"tool": "RESP_screen_rate_pattern", "error": "not enough breaths", "confidence": 0.1}
+    intervals = np.diff(peaks) / data.sampling_rate
+    intervals = intervals[(intervals >= 1.0) & (intervals <= 15.0)]
+    if len(intervals) < 2:
+        return {"tool": "RESP_screen_rate_pattern", "error": "not enough valid breath intervals", "confidence": 0.1}
+    rate = float(60.0 / np.nanmedian(intervals))
+    interval_cv = float(np.nanstd(intervals) / np.nanmean(intervals)) if np.nanmean(intervals) > 0 else None
+    amps = filtered[peaks]
+    amplitude_cv = float(np.nanstd(amps) / (np.nanmean(np.abs(amps)) + 1e-8)) if len(amps) else None
+    flags = []
+    if rate < 8:
+        flags.append("bradypnea_proxy")
+    if rate > 24:
+        flags.append("tachypnea_proxy")
+    if interval_cv is not None and interval_cv > 0.35:
+        flags.append("irregular_breathing_proxy")
+    if amplitude_cv is not None and amplitude_cv > 0.8:
+        flags.append("periodic_or_variable_breathing_proxy")
+    pattern_risk = "elevated" if flags else "low"
+    return {
+        "tool": "RESP_screen_rate_pattern",
+        "respiratory_rate_bpm": rate,
+        "breath_interval_cv": interval_cv,
+        "breath_amplitude_cv": amplitude_cv,
+        "respiratory_pattern_flags": flags,
+        "respiratory_pattern_risk": pattern_risk,
+        "confidence": 0.6,
+        "method": "resp_rate_variability_pattern_screening",
+        "disclaimer": "Screening heuristic only; respiratory pattern diagnosis requires validated airflow/effort signals and labels.",
+    }

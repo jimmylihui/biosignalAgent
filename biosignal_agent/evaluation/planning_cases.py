@@ -302,4 +302,28 @@ DEFAULT_PLANNING_CASES = [
         modality='spo2',
         expected_tools=('SpO2_assess_quality', 'SpO2_summarize', 'SpO2_assess_hypoxemia_burden'),
     ),
+    PlanningCase(
+        case_id='ecg_morphology_intervals',
+        question='Measure ECG PR QRS QT QTc intervals and screen for ST morphology abnormalities',
+        modality='ecg',
+        expected_tools=('ECG_assess_quality', 'ECG_detect_r_peaks', 'ECG_measure_morphology_intervals'),
+    ),
+    PlanningCase(
+        case_id='abp_hemodynamics',
+        question='Compute ABP mean arterial pressure MAP and pulse pressure hemodynamic features',
+        modality='abp',
+        expected_tools=('ABP_assess_quality', 'ABP_detect_pulses', 'ABP_compute_hemodynamics'),
+    ),
+    PlanningCase(
+        case_id='resp_rate_pattern',
+        question='Screen respiration for tachypnea bradypnea irregular breathing and periodic breathing pattern',
+        modality='resp',
+        expected_tools=('RESP_assess_quality', 'RESP_estimate_rate', 'RESP_screen_rate_pattern'),
+    ),
+    PlanningCase(
+        case_id='ppg_artifact_screen',
+        question='Check this PPG signal for noise motion artifact clipping saturation or signal dropout',
+        modality='ppg',
+        expected_tools=('PPG_assess_quality', 'Signal_detect_artifacts'),
+    ),
 ]
