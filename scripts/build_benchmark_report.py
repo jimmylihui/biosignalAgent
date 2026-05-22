@@ -86,6 +86,25 @@ def audit_summary(path: str | Path) -> dict[str, Any]:
     }
 
 
+def labeled_arrhythmia_summary(path: str | Path) -> dict[str, Any]:
+    payload = load_json(path)
+    if payload.get("missing"):
+        return {"name": "mitdb_arrhythmia_windows", **payload}
+    metrics = payload.get("metrics", {})
+    return {
+        "name": "mitdb_arrhythmia_windows",
+        "path": str(path),
+        "num_windows": payload.get("num_windows"),
+        "truth_counts": payload.get("truth_counts", {}),
+        "prediction_counts": payload.get("prediction_counts", {}),
+        "accuracy": metrics.get("accuracy"),
+        "precision": metrics.get("precision"),
+        "recall_sensitivity": metrics.get("recall_sensitivity"),
+        "specificity": metrics.get("specificity"),
+        "f1": metrics.get("f1"),
+    }
+
+
 def instruction_summary(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     if not path.exists():
@@ -160,6 +179,21 @@ def markdown_report(report: dict[str, Any]) -> str:
             f"{stats.get('errors')} | {stats.get('low_confidence')} |"
         )
 
+
+    lines.extend([
+        "",
+        "## Labeled Benchmarks",
+        "",
+        "| Benchmark | Windows | Accuracy | Precision | Recall | Specificity | F1 |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ])
+    for item in report.get("labeled_benchmarks", []):
+        lines.append(
+            f"| {item['name']} | {fmt_metric(item.get('num_windows'))} | {fmt_metric(item.get('accuracy'))} | "
+            f"{fmt_metric(item.get('precision'))} | {fmt_metric(item.get('recall_sensitivity'))} | "
+            f"{fmt_metric(item.get('specificity'))} | {fmt_metric(item.get('f1'))} |"
+        )
+
     lines.extend([
         "",
         "## Instruction Data",
@@ -188,6 +222,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         ],
         "session_evals": [session_summary("cross_modality_with_bcg_optimized", args.session_eval)],
         "tool_audit": audit_summary(args.tool_audit),
+        "labeled_benchmarks": [labeled_arrhythmia_summary(args.arrhythmia_eval)],
         "instruction_data": [
             {"name": "full_sft", **instruction_summary(args.full_sft)},
             {"name": "planning_sft", **instruction_summary(args.planning_sft)},
@@ -205,6 +240,7 @@ def main() -> None:
     parser.add_argument("--bcg-eval", default="/data1/jiahui/biosignal-agent/outputs/dedicated_bcg_framework_eval_rule_optimized.json")
     parser.add_argument("--session-eval", default="/data1/jiahui/biosignal-agent/outputs/session_eval_rule_with_bcg_optimized.json")
     parser.add_argument("--tool-audit", default="/data1/jiahui/biosignal-agent/outputs/tool_output_audit_optimized.json")
+    parser.add_argument("--arrhythmia-eval", default="/data1/jiahui/biosignal-agent/outputs/labeled_arrhythmia_eval.json")
     parser.add_argument("--full-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft.jsonl")
     parser.add_argument("--planning-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft.jsonl")
     parser.add_argument("--out-json", default="/data1/jiahui/biosignal-agent/outputs/benchmark_report.json")

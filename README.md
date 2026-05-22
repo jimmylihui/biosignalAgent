@@ -494,6 +494,31 @@ Expanded instruction exports:
 
 See `docs/task_catalog.md` for the runnable task map and the next labeled benchmarks to connect.
 
+### First Labeled Benchmark: MIT-BIH Arrhythmia Windows
+
+MIT-BIH annotation windows provide the first labeled task benchmark for the expanded framework:
+
+```bash
+python scripts/prepare_labeled_arrhythmia_dataset.py \
+  --seconds 60 \
+  --stride-seconds 60 \
+  --max-windows-per-record 5
+
+python scripts/evaluate_labeled_arrhythmia.py \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/labeled_arrhythmia_manifest.json \
+  --out-json /data1/jiahui/biosignal-agent/outputs/labeled_arrhythmia_eval.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/labeled_arrhythmia_eval.csv
+```
+
+Current label benchmark: 240 MIT-BIH 60-second ECG windows, 141 abnormal and 99 normal by annotation-derived beat labels. The baseline RR-heuristic arrhythmia screen reaches accuracy 0.675, precision 0.806, recall 0.589, specificity 0.798, and F1 0.680. Many false negatives are morphology-only or paced/fusion windows with regular RR, which is expected for this first screening heuristic and motivates a true rhythm/morphology classifier.
+
+The expanded benchmark report includes this labeled benchmark:
+
+```text
+/data1/jiahui/biosignal-agent/outputs/benchmark_report_expanded_tasks.json
+/data1/jiahui/biosignal-agent/outputs/benchmark_report_expanded_tasks.md
+```
+
 Key outputs:
 
 ```text
