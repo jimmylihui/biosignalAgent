@@ -269,3 +269,36 @@ Run the real-data subset evaluation with BIDMC PPG/RESP, CEBSDB RESP/SCG, and MI
 ```bash
 python scripts/evaluate_real_datasets.py   --planner rule   --include-ecg   --retrieved-tool-count 3   --out-json /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_common_modalities.json   --out-csv /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule_common_modalities.csv
 ```
+
+## Dedicated Public Dataset Connectors
+
+Dedicated public-data export is available for the modalities that did not yet have real execution records in the core manifest:
+
+```bash
+python scripts/prepare_dedicated_common_datasets.py --limit 3 --seconds 60
+```
+
+This writes:
+
+```text
+/data1/jiahui/biosignal-agent/datasets/processed/dedicated_common/
+/data1/jiahui/biosignal-agent/datasets/processed/dedicated_common_manifest.json
+```
+
+Current dedicated sources:
+
+- SpO2: PhysioNet Non-EEG Dataset, `Subject*_SpO2HR`, SpO2 channel
+- ACC: PhysioNet Non-EEG Dataset, `Subject*_AccTempEDA`, acceleration magnitude
+- EDA: PhysioNet Non-EEG Dataset, `Subject*_AccTempEDA`, EDA channel
+- ABP: MIT-BIH Polysomnographic Database, BP channel
+- PCG: PhysioNet/CinC Challenge 2016 heart sound WAV records
+- EEG: EEG Motor Movement/Imagery Dataset EDF records, first EEG channel
+- EMG: Examples of Electromyograms, EMG channel
+
+Run the dedicated-data evaluation:
+
+```bash
+python scripts/evaluate_real_datasets.py   --manifest /data1/jiahui/biosignal-agent/datasets/processed/dedicated_common_manifest.json   --planner rule   --retrieved-tool-count 3   --out-json /data1/jiahui/biosignal-agent/outputs/dedicated_common_framework_eval_rule.json   --out-csv /data1/jiahui/biosignal-agent/outputs/dedicated_common_framework_eval_rule.csv
+```
+
+Latest dedicated-data eval: 21 records, 42 case-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0.
