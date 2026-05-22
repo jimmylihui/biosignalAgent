@@ -302,3 +302,25 @@ python scripts/evaluate_real_datasets.py   --manifest /data1/jiahui/biosignal-ag
 ```
 
 Latest dedicated-data eval: 21 records, 42 case-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0.
+## Cross-Modality Session Benchmark
+
+Evaluate TxAgent-style multi-signal sessions where one question is routed across several physiological signals:
+
+```bash
+python scripts/evaluate_sessions.py \
+  --planner rule \
+  --retrieved-tool-count 3 \
+  --out-json /data1/jiahui/biosignal-agent/outputs/session_eval_rule.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/session_eval_rule.csv
+```
+
+Default sessions cover:
+
+- ECG + PPG + RESP + SpO2
+- ECG + ABP + SpO2
+- PPG + ACC + EDA
+- EEG + EMG + ACC
+- SCG + RESP
+- PCG + ABP + ECG
+
+Latest session eval: 6 sessions, 18 signal-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0. Each session saves a trace under `/data1/jiahui/biosignal-agent/outputs/traces/`.
