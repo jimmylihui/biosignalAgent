@@ -85,3 +85,14 @@ Run the first planner agent, which selects tools from the question text:
 ```bash
 python examples/ask_signal_agent.py   --question "Estimate ECG heart rate and HRV from this signal"   --csv /data1/jiahui/biosignal-agent/datasets/processed/mitdb_100_mlii_60s.csv   --sampling-rate 360
 ```
+
+## OpenRouter LLM Agent
+
+The LLM-backed agent uses OpenRouter chat completions with default model `openrouter/owl-alpha`.
+It reads API settings from `/home/myid/jl57095/TwinMarket/openrouter_caption_with_P_wave.py` without copying keys into this repository.
+
+```bash
+python examples/ask_openrouter_agent.py   --question "Estimate ECG heart rate and HRV from this signal"   --csv /data1/jiahui/biosignal-agent/datasets/processed/mitdb_100_mlii_60s.csv   --sampling-rate 360   --model openrouter/owl-alpha
+```
+
+The OpenRouter planner returns JSON tool calls, the executor runs local signal tools, and the reporter asks the same model to summarize results. If OpenRouter fails or rate-limits, the framework falls back to the rule planner or deterministic tool-result report.
