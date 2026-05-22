@@ -465,6 +465,35 @@ python scripts/compare_planner_evals.py \
 
 Initial no-fallback LLM baseline: 32 planning cases, 30 true OpenRouter successes, 2 malformed-JSON planner errors, planning accuracy 0.9375. After adding planner-level retry for malformed or invalid JSON responses, the OpenRouter planner reached 32/32 planning accuracy with zero disagreements against the rule planner.
 
+## Expanded Clinical And Physiological Tasks
+
+The planning benchmark now includes broader task prompts beyond peak/rate extraction:
+
+- ECG arrhythmia screening: irregular RR, pauses, bradycardia, tachycardia, ectopy-proxy flags.
+- RESP sleep-apnea screening: low-amplitude breathing-pause events and apnea-like index.
+- SpO2 desaturation burden: ODI-style event count, minimum SpO2, and time below 90 percent.
+- EEG sleep-stage features: delta/theta/alpha/beta ratios and coarse sleep-stage hint.
+- ACC sleep/wake proxy: actigraphy-style rest/activity hint.
+
+The expanded rule-planning set has 39 planning cases. Latest expanded rule evals:
+
+```text
+planning regression: 39 cases, retrieval/planning accuracy 1.0
+real-world + MIT-BIH ECG: 21 records, 76 case-runs, retrieval/planning/execution accuracy 1.0
+dedicated common datasets: 21 records, 54 case-runs, retrieval/planning/execution accuracy 1.0
+dedicated BCG: 3 records, 12 case-runs, retrieval/planning/execution accuracy 1.0
+tool audit: 44 records, 107 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
+```
+
+Expanded instruction exports:
+
+```text
+/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft_expanded_tasks.jsonl              # 342 samples, 0 validation errors
+/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft_expanded_tasks.jsonl     # 116 samples, 0 validation errors
+```
+
+See `docs/task_catalog.md` for the runnable task map and the next labeled benchmarks to connect.
+
 Key outputs:
 
 ```text

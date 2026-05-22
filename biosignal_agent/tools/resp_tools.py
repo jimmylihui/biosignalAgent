@@ -34,3 +34,45 @@ def RESP_estimate_rate(signal_path: str, sampling_rate: float, column: str | Non
         "confidence": confidence,
         "method": "bandpass_find_peaks",
     }
+
+
+
+def RESP_detect_apnea(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    values = data.values
+    if len(values) < data.sampling_rate * 20:
+        return {"tool": "RESP_detect_apnea", "error": "signal too short for apnea screening", "confidence": 0.0}
+    filtered = bandpass_filter(values, data.sampling_rate, low_hz=0.05, high_hz=0.7, order=3)
+    window = max(1, int(2.0 * data.sampling_rate))
+    kernel = np.ones(window) / window
+    envelope = np.sqrt(np.convolve(filtered ** 2, kernel, mode="same"))
+    baseline = float(np.nanmedian(envelope))
+    if baseline <= 0:
+        return {"tool": "RESP_detect_apnea", "error": "flat respiration envelope", "confidence": 0.1}
+    low = envelope < baseline * 0.25
+    min_len = int(10.0 * data.sampling_rate)
+    events = []
+    start = None
+    for idx, is_low in enumerate(low):
+        if is_low and start is None:
+            start = idx
+        elif not is_low and start is not None:
+            if idx - start >= min_len:
+                events.append((start, idx))
+            start = None
+    if start is not None and len(low) - start >= min_len:
+        events.append((start, len(low)))
+    duration_hours = len(values) / data.sampling_rate / 3600.0
+    apnea_index = float(len(events) / duration_hours) if duration_hours > 0 else None
+    longest_event_s = float(max(((end - start) / data.sampling_rate for start, end in events), default=0.0))
+    return {
+        "tool": "RESP_detect_apnea",
+        "apnea_event_count": int(len(events)),
+        "apnea_index_per_hour": apnea_index,
+        "longest_event_s": longest_event_s,
+        "low_respiration_fraction": float(np.mean(low)),
+        "event_intervals_s": [[float(start / data.sampling_rate), float(end / data.sampling_rate)] for start, end in events[:20]],
+        "confidence": 0.55,
+        "method": "respiration_envelope_drop_screening",
+        "disclaimer": "Screening heuristic only; validated apnea labels are required for diagnosis.",
+    }

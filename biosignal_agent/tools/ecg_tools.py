@@ -44,3 +44,45 @@ def ECG_compute_hrv(signal_path: str, sampling_rate: float, column: str | None =
     rr_ms = np.diff(peaks) / float(sampling_rate) * 1000.0
     rmssd = float(np.sqrt(np.mean(np.diff(rr_ms) ** 2))) if len(rr_ms) > 1 else None
     return {"tool": "ECG_compute_hrv", "mean_rr_ms": float(np.mean(rr_ms)), "sdnn_ms": float(np.std(rr_ms, ddof=1)) if len(rr_ms) > 1 else 0.0, "rmssd_ms": rmssd, "confidence": peak_result["confidence"]}
+
+
+
+def ECG_screen_arrhythmia(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    peak_result = ECG_detect_r_peaks(signal_path, sampling_rate, column)
+    peaks = np.asarray(peak_result.get("r_peak_indices", []), dtype=float)
+    if len(peaks) < 4:
+        return {"tool": "ECG_screen_arrhythmia", "error": "not enough R peaks", "confidence": 0.1}
+    rr_s = np.diff(peaks) / float(sampling_rate)
+    rr_s = rr_s[(rr_s >= 0.25) & (rr_s <= 3.0)]
+    if len(rr_s) < 3:
+        return {"tool": "ECG_screen_arrhythmia", "error": "not enough valid RR intervals", "confidence": 0.1}
+    heart_rate = float(60.0 / np.median(rr_s))
+    rr_cv = float(np.std(rr_s) / np.mean(rr_s)) if np.mean(rr_s) > 0 else None
+    pause_count = int(np.sum(rr_s > 2.0))
+    short_long = np.abs(np.diff(rr_s)) / rr_s[:-1] if len(rr_s) > 1 else np.array([])
+    ectopy_proxy_fraction = float(np.mean(short_long > 0.2)) if len(short_long) else 0.0
+    flags = []
+    if heart_rate < 50:
+        flags.append("bradycardia_pattern")
+    if heart_rate > 110:
+        flags.append("tachycardia_pattern")
+    if rr_cv is not None and rr_cv > 0.18:
+        flags.append("irregular_rr_pattern")
+    if pause_count:
+        flags.append("long_pause_pattern")
+    if ectopy_proxy_fraction > 0.15:
+        flags.append("ectopy_proxy_pattern")
+    risk = "elevated" if flags else "low"
+    confidence = min(float(peak_result.get("confidence", 0.5)), 0.7)
+    return {
+        "tool": "ECG_screen_arrhythmia",
+        "heart_rate_bpm": heart_rate,
+        "rr_cv": rr_cv,
+        "pause_count": pause_count,
+        "ectopy_proxy_fraction": ectopy_proxy_fraction,
+        "arrhythmia_flags": flags,
+        "arrhythmia_risk": risk,
+        "confidence": confidence,
+        "method": "rr_interval_screening",
+        "disclaimer": "Screening heuristic only; not a diagnostic rhythm classifier.",
+    }

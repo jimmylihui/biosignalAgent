@@ -658,5 +658,150 @@
       "mean_absolute_value",
       "confidence"
     ]
+  },
+  {
+    "name": "ECG_screen_arrhythmia",
+    "description": "Screen ECG rhythm for RR irregularity, pauses, bradycardia, tachycardia, and ectopy-proxy patterns using detected R peaks. Screening only, not a diagnostic classifier.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "heart_rate_bpm",
+      "rr_cv",
+      "pause_count",
+      "ectopy_proxy_fraction",
+      "arrhythmia_flags",
+      "arrhythmia_risk",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "RESP_detect_apnea",
+    "description": "Screen respiration waveform for low-amplitude apnea-like events lasting at least 10 seconds.",
+    "modality": "RESP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "apnea_event_count",
+      "apnea_index_per_hour",
+      "longest_event_s",
+      "low_respiration_fraction",
+      "event_intervals_s",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "SpO2_detect_desaturation",
+    "description": "Screen SpO2 time series for oxygen desaturation events and estimate oxygen desaturation index.",
+    "modality": "SpO2",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "baseline_spo2_percent",
+      "min_spo2_percent",
+      "time_below_90_fraction",
+      "desaturation_event_count",
+      "oxygen_desaturation_index_per_hour",
+      "event_intervals_s",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EEG_estimate_sleep_stage_features",
+    "description": "Compute single-channel EEG bandpower ratios and a coarse sleep-stage hint. Feature heuristic only, not full sleep staging.",
+    "modality": "EEG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "delta_ratio",
+      "theta_ratio",
+      "alpha_ratio",
+      "beta_ratio",
+      "sleep_stage_hint",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ACC_estimate_sleep_wake",
+    "description": "Estimate a coarse sleep/rest versus wake/activity hint from accelerometer variability. Actigraphy proxy only.",
+    "modality": "ACC",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "activity_std",
+      "activity_level",
+      "sleep_wake_hint",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
   }
 ]

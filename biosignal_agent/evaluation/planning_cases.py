@@ -130,7 +130,7 @@ DEFAULT_PLANNING_CASES = [
         case_id='spo2_summary',
         question='Summarize oxygen saturation and desaturation from this SpO2 signal',
         modality='spo2',
-        expected_tools=('SpO2_assess_quality', 'SpO2_summarize'),
+        expected_tools=('SpO2_assess_quality', 'SpO2_summarize', 'SpO2_detect_desaturation'),
     ),
     PlanningCase(
         case_id='abp_quality',
@@ -203,5 +203,47 @@ DEFAULT_PLANNING_CASES = [
         question='Summarize EMG muscle activation and RMS',
         modality='emg',
         expected_tools=('EMG_assess_quality', 'EMG_summarize_activation'),
+    ),
+    PlanningCase(
+        case_id='ecg_arrhythmia_screen',
+        question='Screen this ECG for arrhythmia patterns such as irregular rhythm, pauses, tachycardia, or bradycardia',
+        modality='ecg',
+        expected_tools=('ECG_assess_quality', 'ECG_detect_r_peaks', 'ECG_compute_hrv', 'ECG_screen_arrhythmia'),
+    ),
+    PlanningCase(
+        case_id='ecg_afib_proxy',
+        question='Check whether this ECG has an irregular RR rhythm pattern suggestive of atrial fibrillation screening concern',
+        modality='ecg',
+        expected_tools=('ECG_assess_quality', 'ECG_detect_r_peaks', 'ECG_compute_hrv', 'ECG_screen_arrhythmia'),
+    ),
+    PlanningCase(
+        case_id='resp_sleep_apnea',
+        question='Detect sleep apnea-like breathing pauses from this respiration signal',
+        modality='resp',
+        expected_tools=('RESP_assess_quality', 'RESP_estimate_rate', 'RESP_detect_apnea'),
+    ),
+    PlanningCase(
+        case_id='spo2_desaturation',
+        question='Estimate oxygen desaturation burden and ODI from this SpO2 signal',
+        modality='spo2',
+        expected_tools=('SpO2_assess_quality', 'SpO2_summarize', 'SpO2_detect_desaturation'),
+    ),
+    PlanningCase(
+        case_id='spo2_apnea_support',
+        question='Look for SpO2 drops below 90 percent that could support sleep apnea screening',
+        modality='spo2',
+        expected_tools=('SpO2_assess_quality', 'SpO2_summarize', 'SpO2_detect_desaturation'),
+    ),
+    PlanningCase(
+        case_id='eeg_sleep_stage_features',
+        question='Estimate sleep stage features from this EEG epoch using delta theta alpha beta power',
+        modality='eeg',
+        expected_tools=('EEG_assess_quality', 'EEG_compute_bandpower', 'EEG_estimate_sleep_stage_features'),
+    ),
+    PlanningCase(
+        case_id='acc_sleep_wake',
+        question='Use accelerometer actigraphy to estimate sleep versus wake or rest versus activity',
+        modality='acc',
+        expected_tools=('ACC_assess_quality', 'ACC_summarize_activity', 'ACC_estimate_sleep_wake'),
     ),
 ]

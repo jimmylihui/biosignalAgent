@@ -27,3 +27,36 @@ def EEG_compute_bandpower(signal_path: str, sampling_rate: float, column: str | 
     powers["method"] = "welch_bandpower"
     powers["tool"] = "EEG_compute_bandpower"
     return powers
+
+
+
+def EEG_estimate_sleep_stage_features(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    bandpower = EEG_compute_bandpower(signal_path, sampling_rate, column)
+    if bandpower.get("error"):
+        return {"tool": "EEG_estimate_sleep_stage_features", "error": bandpower["error"], "confidence": 0.0}
+    total = float(bandpower.get("total_power") or 0.0)
+    if total <= 0:
+        return {"tool": "EEG_estimate_sleep_stage_features", "error": "zero EEG power", "confidence": 0.1}
+    delta_ratio = float(bandpower.get("delta_power", 0.0) / total)
+    theta_ratio = float(bandpower.get("theta_power", 0.0) / total)
+    alpha_ratio = float(bandpower.get("alpha_power", 0.0) / total)
+    beta_ratio = float(bandpower.get("beta_power", 0.0) / total)
+    if delta_ratio > 0.45:
+        stage_hint = "n3_like_slow_wave"
+    elif theta_ratio > 0.30 and alpha_ratio < 0.20:
+        stage_hint = "n1_n2_like"
+    elif alpha_ratio > 0.25 or beta_ratio > 0.25:
+        stage_hint = "wake_rem_like"
+    else:
+        stage_hint = "uncertain"
+    return {
+        "tool": "EEG_estimate_sleep_stage_features",
+        "delta_ratio": delta_ratio,
+        "theta_ratio": theta_ratio,
+        "alpha_ratio": alpha_ratio,
+        "beta_ratio": beta_ratio,
+        "sleep_stage_hint": stage_hint,
+        "confidence": 0.5,
+        "method": "single_channel_bandpower_rules",
+        "disclaimer": "Feature heuristic only; sleep staging requires labeled epochs and usually EEG/EOG/EMG context.",
+    }

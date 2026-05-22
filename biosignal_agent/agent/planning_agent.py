@@ -21,6 +21,39 @@ MODALITY_KEYWORDS = {
     "emg": {"emg", "electromyography", "muscle", "activation", "rms"},
 }
 
+BASIC_ANALYSIS_TOOLS = {
+    "ecg": ["ECG_detect_r_peaks"],
+    "ppg": ["PPG_detect_peaks"],
+    "bcg": ["BCG_detect_j_peaks"],
+    "scg": ["SCG_detect_j_peaks"],
+    "resp": ["RESP_estimate_rate"],
+    "spo2": ["SpO2_summarize"],
+    "abp": ["ABP_detect_pulses"],
+    "pcg": ["PCG_detect_heart_sounds"],
+    "acc": ["ACC_summarize_activity"],
+    "eda": ["EDA_summarize"],
+    "eeg": ["EEG_compute_bandpower"],
+    "emg": ["EMG_summarize_activation"],
+}
+
+TASK_TOOL_RULES = {
+    "ecg": [
+        ({"arrhythmia", "rhythm", "irregular", "afib", "atrial fibrillation", "bradycardia", "tachycardia", "pause"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_arrhythmia"]),
+    ],
+    "resp": [
+        ({"apnea", "apnoea", "hypopnea", "hypopnoea", "sleep disordered", "cessation"}, ["RESP_estimate_rate", "RESP_detect_apnea"]),
+    ],
+    "spo2": [
+        ({"desaturation", "desat", "odi", "oxygen drop", "below 90", "hypoxemia", "hypoxaemia", "apnea"}, ["SpO2_summarize", "SpO2_detect_desaturation"]),
+    ],
+    "eeg": [
+        ({"sleep stage", "sleep staging", "n1", "n2", "n3", "rem", "wake", "slow wave"}, ["EEG_compute_bandpower", "EEG_estimate_sleep_stage_features"]),
+    ],
+    "acc": [
+        ({"sleep", "wake", "actigraphy", "rest", "sleep wake"}, ["ACC_summarize_activity", "ACC_estimate_sleep_wake"]),
+    ],
+}
+
 
 @dataclass
 class PlanningBioSignalAgent:
@@ -79,7 +112,11 @@ class PlanningBioSignalAgent:
             if wants_hrv or any(term in text for term in ["variability", "hrv", "summary", "summarize", "analyze"]):
                 selected.append("ECG_compute_hrv")
         elif wants_analysis:
-            selected.extend(workflow[1:])
+            selected.extend(BASIC_ANALYSIS_TOOLS.get(modality, []))
+
+        for terms, tools in TASK_TOOL_RULES.get(modality, []):
+            if any(term in text for term in terms):
+                selected.extend(tools)
 
         selected = [tool for idx, tool in enumerate(selected) if tool in TOOLS and tool not in selected[:idx]]
         if len(selected) == 1 and wants_analysis:
