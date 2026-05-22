@@ -10,6 +10,7 @@ This catalog separates runnable baseline tasks from future labeled benchmarks. T
 | Generic artifact gate | all single-signal modalities | `Signal_detect_artifacts` | clipping/flatline/jump/noise flags | Useful before downstream tools, especially wearable signals. |
 | Heart or pulse rate | ECG, PPG, BCG, SCG, ABP, PCG | peak/pulse/sound detectors | rate and event indices | ECG uses Pan-Tompkins; PPG/BCG/SCG use Nabian-style peak screening. |
 | PPG perfusion/variability proxy | PPG | `PPG_assess_perfusion_variability` | amplitude proxy, interval CV, low-perfusion flag | Needs calibrated PPG for true perfusion interpretation. |
+| PPG irregular-pulse proxy | PPG | `PPG_screen_pulse_irregularity` | interval CV, normalized RMSSD, successive-change fraction | Statistical AF-like pulse irregularity baseline; ECG labels required for true AF screening. |
 | HRV/autonomic features | ECG | `ECG_compute_hrv` | RR, SDNN, RMSSD | Feature extraction, not disease classification. |
 | Arrhythmia screening | ECG | `ECG_screen_arrhythmia` | brady/tachy/irregular/pause flags | RR-interval heuristic only; next step is labeled rhythm data. |
 | ECG morphology intervals | ECG | `ECG_measure_morphology_intervals` | PR/QRS/QT/QTc/ST proxies | Delineation heuristic; useful for morphology-aware planning cases. |
@@ -26,8 +27,8 @@ This catalog separates runnable baseline tasks from future labeled benchmarks. T
 | Pressure-event proxy | ABP | `ABP_screen_pressure_events` | hypotension/hypertension proxy flags | Needs calibrated ABP and clinical context. |
 | Hemodynamic summary | ABP | `ABP_compute_hemodynamics` | MAP and pulse-pressure proxies | Requires calibrated ABP units for clinical meaning. |
 | Heart-sound timing | PCG | `PCG_detect_heart_sounds` | sound events and HR | Baseline PCG timing. |
-| Murmur proxy | PCG | `PCG_screen_murmur_proxy` | high-frequency ratio, murmur risk proxy | Needs validated PCG segmentation and labels. |
-| Stress/arousal proxy | EDA, HRV, ACC | `EDA_summarize`, `EDA_detect_arousal_events`, `ECG_compute_hrv`, `ACC_summarize_activity` | tonic/phasic/SCR/motion features | Needs multimodal session-level task. |
+| Murmur proxy | PCG | `PCG_screen_murmur_proxy`, `PCG_extract_murmur_features` | high-frequency ratio, spectral/envelope/timing features | Feature baseline supports a small logistic-regression benchmark; needs larger PCG labels. |
+| Stress/arousal proxy | EDA, HRV, ACC | `EDA_summarize`, `EDA_detect_arousal_events`, `EDA_screen_stress_proxy`, `ECG_compute_hrv`, `ACC_summarize_activity` | tonic/phasic/SCR/motion features and score | Needs WESAD-style labels for real stress classification. |
 | Muscle activation | EMG | `EMG_summarize_activation` | RMS/MAV | Baseline activation features. |
 | Muscle fatigue proxy | EMG | `EMG_estimate_fatigue` | median frequency, fatigue hint | Needs task protocol and normalization. |
 | PPG-derived respiration proxy | PPG | `PPG_estimate_respiration_modulation` | respiratory rate, modulation index | Uses PPG envelope respiratory-band modulation; proxy only. |
@@ -44,12 +45,12 @@ Latest rule-planner major-task outputs:
 
 | Eval | Records/Sessions | Runs | Retrieval | Planning | Execution |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Single-modality planning cases | n/a | 61 cases | 1.000 | 1.000 | n/a |
-| Real-world manifest | 26 records | 158 case runs | 1.000 | 1.000 | 1.000 |
-| Dedicated common manifest | 21 records | 93 case runs | 1.000 | 1.000 | 1.000 |
+| Single-modality planning cases | n/a | 63 cases | 1.000 | 1.000 | n/a |
+| Real-world manifest | 25 records | 155 case runs | 1.000 | 1.000 | 1.000 |
+| Dedicated common manifest | 21 records | 96 case runs | 1.000 | 1.000 | 1.000 |
 | Dedicated BCG manifest | 3 records | 15 case runs | 1.000 | 1.000 | 1.000 |
 | Cross-modality session benchmark | 9 sessions | 26 signal runs | 1.000 | 1.000 | 1.000 |
-| Tool-output audit | 49 records | 263 tool runs | n/a | n/a | 1.000 ok rate, 0 errors, 0 low-confidence |
+| Tool-output audit | 49 records | 274 tool runs | n/a | n/a | 1.000 ok rate, 0 errors, 0 low-confidence |
 
 Report artifacts are written under `/data1/jiahui/biosignal-agent/outputs/*major_tasks*`.
 
@@ -75,7 +76,7 @@ Report artifacts are written under `/data1/jiahui/biosignal-agent/outputs/*major
 | Desaturation detection | PSG datasets with SpO2 and scored respiratory events | desaturation/apnea events | ODI error, event precision/recall |
 | Stress/arousal | WESAD or multimodal EDA/ECG/ACC datasets | stress/arousal labels | balanced accuracy, macro-F1 |
 | Seizure or abnormal EEG screening | CHB-MIT or other EEG event datasets | seizure/event labels | event sensitivity, false positives/hour |
-| PCG murmur screening | Implemented via `scripts/prepare_pcg_murmur_dataset.py` on PhysioNet/CinC 2016 | normal/abnormal labels | current murmur proxy F1 0.000 on 10 balanced records; useful hard benchmark for improving PCG tool quality |
+| PCG murmur screening | Implemented via `scripts/prepare_pcg_murmur_dataset.py` on PhysioNet/CinC 2016 | normal/abnormal labels | proxy F1 0.000; feature+logistic-regression baseline F1 0.750 on 10 balanced records |
 | EMG gesture/fatigue | public EMG gesture/fatigue datasets | gesture/fatigue labels | accuracy, macro-F1 |
 
 ## Existing-Work Wrapper Sources

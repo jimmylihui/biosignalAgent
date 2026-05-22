@@ -261,6 +261,12 @@ DEFAULT_PLANNING_CASES = [
         expected_tools=('PPG_assess_quality', 'PPG_detect_peaks', 'PPG_assess_perfusion_variability'),
     ),
     PlanningCase(
+        case_id='ppg_pulse_irregularity',
+        question='Screen this PPG for irregular pulse intervals or atrial fibrillation-like pulse variability',
+        modality='ppg',
+        expected_tools=('PPG_assess_quality', 'PPG_detect_peaks', 'PPG_assess_perfusion_variability', 'PPG_screen_pulse_irregularity'),
+    ),
+    PlanningCase(
         case_id='abp_pressure_events',
         question='Screen ABP for hypotension or hypertension pressure events',
         modality='abp',
@@ -270,13 +276,19 @@ DEFAULT_PLANNING_CASES = [
         case_id='pcg_murmur_proxy',
         question='Screen this phonocardiogram for murmur or abnormal heart sound patterns',
         modality='pcg',
-        expected_tools=('PCG_assess_quality', 'PCG_detect_heart_sounds', 'PCG_screen_murmur_proxy'),
+        expected_tools=('PCG_assess_quality', 'PCG_detect_heart_sounds', 'PCG_screen_murmur_proxy', 'PCG_extract_murmur_features'),
     ),
     PlanningCase(
         case_id='eda_arousal_events',
         question='Detect EDA arousal events and skin conductance responses',
         modality='eda',
         expected_tools=('EDA_assess_quality', 'EDA_summarize', 'EDA_detect_arousal_events'),
+    ),
+    PlanningCase(
+        case_id='eda_stress_proxy',
+        question='Estimate EDA stress level from tonic phasic activity and arousal events',
+        modality='eda',
+        expected_tools=('EDA_assess_quality', 'EDA_summarize', 'EDA_detect_arousal_events', 'EDA_screen_stress_proxy'),
     ),
     PlanningCase(
         case_id='emg_fatigue_proxy',

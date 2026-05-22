@@ -1425,5 +1425,109 @@
       "method",
       "disclaimer"
     ]
+  },
+  {
+    "name": "PPG_screen_pulse_irregularity",
+    "description": "Screen PPG pulse intervals for irregular-pulse or AF-like variability. Statistical baseline proxy only.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "heart_rate_bpm",
+      "pulse_interval_cv",
+      "normalized_rmssd",
+      "successive_change_fraction",
+      "irregular_pulse_score",
+      "irregular_pulse_flags",
+      "irregular_pulse_risk",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EDA_screen_stress_proxy",
+    "description": "Screen EDA tonic/phasic activity and SCR rate for coarse stress/arousal level. Statistical baseline proxy only.",
+    "modality": "EDA",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "stress_arousal_score",
+      "stress_arousal_level",
+      "stress_arousal_flags",
+      "arousal_rate_per_min",
+      "normalized_phasic_std",
+      "mean_level",
+      "tonic_median",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PCG_extract_murmur_features",
+    "description": "Extract PCG spectral, envelope, and timing features for normal/abnormal or murmur baseline classifiers.",
+    "modality": "PCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "low_band_power",
+      "mid_band_power",
+      "high_band_power",
+      "very_high_band_power",
+      "mid_band_ratio",
+      "high_band_ratio",
+      "spectral_centroid_hz",
+      "spectral_entropy",
+      "zero_crossing_rate",
+      "envelope_std",
+      "envelope_p90_median_ratio",
+      "envelope_p95_median_ratio",
+      "envelope_p99_median_ratio",
+      "continuous_fraction_60",
+      "continuous_fraction_75",
+      "num_sounds",
+      "heart_rate_bpm",
+      "sound_interval_cv",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
   }
 ]

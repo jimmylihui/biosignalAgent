@@ -151,7 +151,8 @@
       "modality": "PPG",
       "task": "PPG AF and pulse irregularity",
       "current_tools": [
-        "PPG_assess_perfusion_variability"
+        "PPG_assess_perfusion_variability",
+        "PPG_screen_pulse_irregularity"
       ],
       "existing_work": [
         "pulse interval irregularity",
@@ -174,7 +175,7 @@
         "https://ppg-beats.readthedocs.io/en/latest/datasets/summary/"
       ],
       "wrapper_priority": 3,
-      "next_wrapper": "Create PPG AF planning case only after adding an ECG-referenced PPG AF dataset."
+      "next_wrapper": "Add ECG-referenced PPG AF dataset and compare this pulse-interval baseline against ECG rhythm labels."
     },
     {
       "modality": "PPG",
@@ -442,7 +443,8 @@
       "task": "Normal/abnormal and murmur classification",
       "current_tools": [
         "PCG_screen_murmur_proxy",
-        "PCG_detect_heart_sounds"
+        "PCG_detect_heart_sounds",
+        "PCG_extract_murmur_features"
       ],
       "existing_work": [
         "PhysioNet/CinC 2016 sample logistic-regression classifier",
@@ -465,7 +467,7 @@
         "https://arxiv.org/abs/1707.04642"
       ],
       "wrapper_priority": 1,
-      "next_wrapper": "Build PCG v2: features from Springer states, MFCC/bandpower, and logistic regression on balanced CinC2016 split."
+      "next_wrapper": "Expand beyond the 10-record smoke benchmark, then add Springer/HSMM state features or MFCC baselines."
     },
     {
       "modality": "BCG",
@@ -622,7 +624,8 @@
       "current_tools": [
         "EDA_detect_arousal_events",
         "ECG_compute_hrv",
-        "ACC_summarize_activity"
+        "ACC_summarize_activity",
+        "EDA_screen_stress_proxy"
       ],
       "existing_work": [
         "WESAD multimodal stress classification",
@@ -641,7 +644,7 @@
         "https://www.mdpi.com/1424-8220/22/22/8886"
       ],
       "wrapper_priority": 3,
-      "next_wrapper": "Create WESAD manifest and multimodal stress benchmark after EDA decomposition wrapper."
+      "next_wrapper": "Create WESAD manifest and benchmark EDA-only versus multimodal stress baselines."
     },
     {
       "modality": "EMG",

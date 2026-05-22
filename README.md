@@ -7,15 +7,15 @@ This version keeps signal analysis in explicit Python tools. The agent can use e
 ## Current Tools
 
 - ECG: signal quality, artifact screen, R-peak detection, HRV summary, arrhythmia proxy, ECG-only sleep-apnea proxy, morphology/interval proxy
-- PPG: signal quality, artifact screen, Nabian-style peak detection, heart-rate estimate, perfusion/variability proxy, PPG-derived respiration proxy
+- PPG: signal quality, artifact screen, Nabian-style peak detection, heart-rate estimate, perfusion/variability proxy, irregular-pulse proxy, PPG-derived respiration proxy
 - BCG: signal quality, Nabian-style J-peak detection, heart-rate estimate, BCG-derived respiration proxy
 - SCG: signal quality, Nabian-style J-peak detection, heart-rate estimate, SCG-derived respiration proxy
 - RESP: signal quality, artifact screen, respiratory-rate estimate, apnea proxy, hypopnea proxy, rate/pattern proxy
 - SpO2: signal quality, artifact screen, oxygen-saturation summary, desaturation events, hypoxemia burden
 - ABP: signal quality, artifact screen, pulse detection, heart-rate and pressure-value summary, hypotension/hypertension proxy, MAP/pulse-pressure proxy
-- PCG: signal quality, heart-sound event detection, murmur proxy, S1/S2 segmentation proxy
+- PCG: signal quality, heart-sound event detection, murmur proxy, murmur feature extraction baseline, S1/S2 segmentation proxy
 - ACC: signal quality, activity summary, sleep/wake proxy, activity-bout detection, fall/impact proxy
-- EDA: signal quality, tonic/phasic summary, arousal/SCR event proxy
+- EDA: signal quality, tonic/phasic summary, arousal/SCR event proxy, stress/arousal score proxy
 - EEG: signal quality, artifact screen, bandpower summary, sleep-stage features, seizure-like spike proxy, drowsiness/vigilance proxy, EEG artifact proxy
 - EMG: signal quality, artifact screen, activation summary, fatigue median-frequency proxy, burst/onset proxy
 
@@ -168,7 +168,7 @@ python scripts/evaluate_agent_framework.py \
 
 Latest rule-planner execution eval: retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0 across the default ECG/PPG/BCG/SCG planning cases.
 
-Latest major-task rule-planner eval: 61 planning cases at retrieval/planning accuracy 1.0/1.0; real-world manifest 26 records and 158 case-runs at retrieval/planning/execution accuracy 1.0/1.0/1.0; dedicated common 21 records and 93 runs at 1.0/1.0/1.0; dedicated BCG 3 records and 15 runs at 1.0/1.0/1.0. Tool audit across 49 records and 263 tool-runs has 0 errors and 0 low-confidence outputs.
+Latest major-task rule-planner eval: 63 planning cases at retrieval/planning accuracy 1.0/1.0; real-world manifest 25 records and 155 case-runs at retrieval/planning/execution accuracy 1.0/1.0/1.0; dedicated common 21 records and 96 runs at 1.0/1.0/1.0; dedicated BCG 3 records and 15 runs at 1.0/1.0/1.0. Tool audit across 49 records and 274 tool-runs has 0 errors and 0 low-confidence outputs.
 
 Major-task outputs:
 
@@ -228,7 +228,7 @@ biosignal_agent/tools/source_catalog.json
 docs/tool_source_catalog.md
 ```
 
-The highest-priority wrappers are PCG Springer/HSMM + CinC2016 classification features, PSG YASA/sleep-event fusion, and ECG AF/beat classifiers.
+The highest-priority wrappers are now larger labeled splits for PCG/PSG/ECG baselines, PSG YASA/sleep-event fusion, and ECG AF/beat classifiers.
 
 ## True Labeled Benchmarks
 
@@ -243,6 +243,7 @@ python scripts/evaluate_psg_sleep.py
 
 python scripts/prepare_pcg_murmur_dataset.py --download --max-per-class 5
 python scripts/evaluate_pcg_murmur.py
+python scripts/evaluate_pcg_murmur_v2.py
 ```
 
 Latest labeled benchmark snapshot:
@@ -251,7 +252,7 @@ Latest labeled benchmark snapshot:
 - MIT-BIH beat abnormal screening: F1 0.308 on 18,209 annotated beats; R-peak detection recall 0.936.
 - UCDDB PSG sleep staging: coarse-stage macro-F1 0.241 on 80 windows.
 - UCDDB PSG respiratory events: F1 0.218 on 80 windows.
-- PhysioNet/CinC 2016 PCG normal/abnormal: F1 0.000 on 10 balanced records with the current murmur proxy.
+- PhysioNet/CinC 2016 PCG normal/abnormal: proxy F1 0.000 on 10 balanced records; feature+logistic-regression baseline F1 0.750.
 
 These numbers are intentionally baseline-level: they turn major tasks into measurable targets before replacing heuristics with stronger models.
 
@@ -545,24 +546,24 @@ The planning benchmark now includes broader task prompts beyond peak/rate extrac
 - ECG arrhythmia screening: irregular RR, pauses, bradycardia, tachycardia, ectopy-proxy flags.
 - ECG morphology/interval screening: PR/QRS/QT/QTc and ST-deviation proxies.
 - ECG sleep-apnea proxy: HRV/RR-pattern screening for ECG-only apnea baselines.
-- PPG perfusion/variability proxy: pulse amplitude, interval CV, low-perfusion flag.
+- PPG perfusion/variability and irregular-pulse proxies: pulse amplitude, interval CV, normalized RMSSD, successive interval-change flags.
 - RESP sleep-apnea, hypopnea, and rate-pattern screening: low-amplitude pauses, reduced-flow events, tachypnea/bradypnea/periodic breathing proxies.
 - SpO2 desaturation and hypoxemia burden: ODI-style event count, minimum SpO2, time below 90/88 percent.
 - ABP pressure-event and hemodynamic proxy: approximate hypotension/hypertension flags, MAP, and pulse pressure.
-- PCG murmur proxy: high-frequency continuous heart-sound energy.
-- EDA arousal events: phasic skin-conductance-response peaks.
+- PCG murmur proxy and feature baseline: high-frequency continuous energy plus spectral/envelope/timing features.
+- EDA arousal/stress proxies: phasic skin-conductance-response peaks plus tonic/phasic stress-arousal score.
 - EEG sleep-stage features and seizure-like proxy: band ratios plus robust spike/fast-power screen.
 - EMG activation and fatigue proxy: RMS/MAV plus median-frequency fatigue hint.
 - ACC sleep/wake proxy: actigraphy-style rest/activity hint.
 
-The expanded rule-planning set has 52 planning cases. Latest expanded rule evals:
+The expanded rule-planning set has 63 planning cases. Latest expanded rule evals:
 
 ```text
-planning regression: 52 cases, retrieval/planning accuracy 1.0
-real-world + MIT-BIH ECG: 26 records, 148 case-runs, retrieval/planning/execution accuracy 1.0
-dedicated common datasets: 21 records, 75 case-runs, retrieval/planning/execution accuracy 1.0
-dedicated BCG: 3 records, 12 case-runs, retrieval/planning/execution accuracy 1.0
-tool audit: 49 records, 232 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
+planning regression: 63 cases, retrieval/planning accuracy 1.0
+real-world + MIT-BIH ECG: 25 records, 155 case-runs, retrieval/planning/execution accuracy 1.0
+dedicated common datasets: 21 records, 96 case-runs, retrieval/planning/execution accuracy 1.0
+dedicated BCG: 3 records, 15 case-runs, retrieval/planning/execution accuracy 1.0
+tool audit: 49 records, 274 tool-runs, all modalities ok-rate 1.0, zero errors, zero low-confidence runs
 ```
 
 

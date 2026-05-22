@@ -356,6 +356,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             *labeled_ecg_rhythm_summary(args.ecg_rhythm_eval),
             *labeled_psg_sleep_summary(args.psg_sleep_eval),
             labeled_pcg_murmur_summary(args.pcg_murmur_eval),
+            labeled_pcg_murmur_summary(args.pcg_murmur_v2_eval) | {"name": "pcg_murmur_feature_logreg"},
         ],
         "instruction_data": [
             {"name": "full_sft", **instruction_summary(args.full_sft)},
@@ -380,6 +381,7 @@ def main() -> None:
     parser.add_argument("--ecg-rhythm-eval", default="/data1/jiahui/biosignal-agent/outputs/ecg_rhythm_beat_eval.json")
     parser.add_argument("--psg-sleep-eval", default="/data1/jiahui/biosignal-agent/outputs/psg_sleep_eval.json")
     parser.add_argument("--pcg-murmur-eval", default="/data1/jiahui/biosignal-agent/outputs/pcg_murmur_eval.json")
+    parser.add_argument("--pcg-murmur-v2-eval", default="/data1/jiahui/biosignal-agent/outputs/pcg_murmur_v2_eval.json")
     parser.add_argument("--full-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft.jsonl")
     parser.add_argument("--planning-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft.jsonl")
     parser.add_argument("--out-json", default="/data1/jiahui/biosignal-agent/outputs/benchmark_report_major_tasks.json")

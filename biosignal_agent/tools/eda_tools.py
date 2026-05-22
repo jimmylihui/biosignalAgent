@@ -46,3 +46,39 @@ def EDA_detect_arousal_events(signal_path: str, sampling_rate: float, column: st
         "method": "eda_phasic_peak_screening",
         "disclaimer": "Screening heuristic only; EDA arousal events are not equivalent to emotion or stress labels.",
     }
+
+
+def EDA_screen_stress_proxy(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    summary = EDA_summarize(signal_path, sampling_rate, column)
+    events = EDA_detect_arousal_events(signal_path, sampling_rate, column)
+    if summary.get("error"):
+        return {"tool": "EDA_screen_stress_proxy", "error": summary["error"], "confidence": 0.1}
+    phasic_std = float(summary.get("phasic_std") or 0.0)
+    mean_level = abs(float(summary.get("mean_level") or 0.0))
+    normalized_phasic = float(phasic_std / (mean_level + 1e-8))
+    arousal_rate = events.get("arousal_rate_per_min") if not events.get("error") else None
+    score = 0
+    flags = []
+    if arousal_rate is not None and arousal_rate > 6.0:
+        score += 1
+        flags.append("high_scr_rate")
+    if normalized_phasic > 0.08:
+        score += 1
+        flags.append("high_phasic_variability")
+    if float(summary.get("tonic_median") or 0.0) > float(summary.get("mean_level") or 0.0) * 1.2:
+        score += 1
+        flags.append("elevated_tonic_level_proxy")
+    stress_level = "elevated_stress_arousal_proxy" if score >= 2 else "low_stress_arousal_proxy"
+    return {
+        "tool": "EDA_screen_stress_proxy",
+        "stress_arousal_score": score,
+        "stress_arousal_level": stress_level,
+        "stress_arousal_flags": flags,
+        "arousal_rate_per_min": arousal_rate,
+        "normalized_phasic_std": normalized_phasic,
+        "mean_level": summary.get("mean_level"),
+        "tonic_median": summary.get("tonic_median"),
+        "confidence": 0.55,
+        "method": "eda_tonic_phasic_arousal_score_baseline",
+        "disclaimer": "Stress/arousal proxy only; validated stress classification requires labeled protocol data and multimodal context.",
+    }

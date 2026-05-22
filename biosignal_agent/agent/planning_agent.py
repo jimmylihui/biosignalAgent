@@ -8,7 +8,7 @@ from .tool_registry import TOOLS, WORKFLOWS
 
 MODALITY_KEYWORDS = {
     "ecg": {"ecg", "ekg", "electrocardiogram", "r-peak", "r peak", "qrs", "hrv", "rr", "qt", "qtc", "st", "pr interval", "p wave", "t wave"},
-    "ppg": {"ppg", "photoplethysmography", "pulse", "pleth", "respiration modulation", "respiratory modulation", "ppg respiration"},
+    "ppg": {"ppg", "photoplethysmography", "pulse", "pleth", "respiration modulation", "respiratory modulation", "ppg respiration", "irregular pulse", "pulse irregularity", "af", "afib"},
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak", "bcg respiration", "bcg breathing", "bed-based"},
     "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak", "scg respiration", "scg breathing"},
     "resp": {"resp", "respiration", "respiratory", "breath", "breathing", "tachypnea", "bradypnea", "periodic breathing"},
@@ -43,6 +43,7 @@ TASK_TOOL_RULES = {
 
     "ppg": [
         ({"perfusion", "low perfusion", "pulse variability", "pulse amplitude", "vascular"}, ["PPG_detect_peaks", "PPG_assess_perfusion_variability"]),
+        ({"irregular pulse", "pulse irregularity", "af", "afib", "atrial fibrillation"}, ["PPG_detect_peaks", "PPG_screen_pulse_irregularity"]),
         ({"respiration", "respiratory modulation", "ppg respiration", "breathing"}, ["PPG_detect_peaks", "PPG_estimate_respiration_modulation"]),
     ],
 
@@ -57,11 +58,12 @@ TASK_TOOL_RULES = {
         ({"map", "mean arterial pressure", "pulse pressure", "hemodynamic", "haemodynamic", "perfusion pressure"}, ["ABP_detect_pulses", "ABP_compute_hemodynamics"]),
     ],
     "pcg": [
-        ({"murmur", "valve", "abnormal heart sound"}, ["PCG_detect_heart_sounds", "PCG_screen_murmur_proxy"]),
+        ({"murmur", "valve", "abnormal heart sound"}, ["PCG_detect_heart_sounds", "PCG_screen_murmur_proxy", "PCG_extract_murmur_features"]),
         ({"s1", "s2", "segmentation", "systole", "diastole"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy"]),
     ],
     "eda": [
         ({"arousal", "sympathetic", "stress event", "skin conductance response", "scr"}, ["EDA_summarize", "EDA_detect_arousal_events"]),
+        ({"stress", "stress classification", "stress level", "mental stress"}, ["EDA_summarize", "EDA_detect_arousal_events", "EDA_screen_stress_proxy"]),
     ],
     "emg": [
         ({"fatigue", "median frequency", "muscle fatigue"}, ["EMG_summarize_activation", "EMG_estimate_fatigue"]),
@@ -146,6 +148,8 @@ class PlanningBioSignalAgent:
                 "bandpower",
                 "activation",
                 "perfusion",
+                "irregular pulse",
+                "pulse irregularity",
                 "hypotension",
                 "hypertension",
                 "murmur",

@@ -58,6 +58,48 @@ def PPG_assess_perfusion_variability(signal_path: str, sampling_rate: float, col
 
 
 
+def PPG_screen_pulse_irregularity(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    peaks_result = PPG_detect_peaks(signal_path, sampling_rate, column)
+    peaks = np.asarray(peaks_result.get("peak_indices", []), dtype=float)
+    if len(peaks) < 6:
+        return {"tool": "PPG_screen_pulse_irregularity", "error": "not enough PPG peaks", "confidence": 0.1}
+    intervals_s = np.diff(peaks) / float(data.sampling_rate)
+    intervals_s = intervals_s[(intervals_s >= 0.25) & (intervals_s <= 3.0)]
+    if len(intervals_s) < 5:
+        return {"tool": "PPG_screen_pulse_irregularity", "error": "not enough valid pulse intervals", "confidence": 0.1}
+    mean_interval = float(np.mean(intervals_s))
+    pulse_interval_cv = float(np.std(intervals_s) / mean_interval) if mean_interval > 0 else None
+    rmssd_s = float(np.sqrt(np.mean(np.diff(intervals_s) ** 2))) if len(intervals_s) > 1 else None
+    normalized_rmssd = float(rmssd_s / mean_interval) if rmssd_s is not None and mean_interval > 0 else None
+    successive_change_fraction = float(np.mean(np.abs(np.diff(intervals_s)) > 0.12)) if len(intervals_s) > 1 else 0.0
+    score = 0
+    flags = []
+    if pulse_interval_cv is not None and pulse_interval_cv > 0.16:
+        score += 1
+        flags.append("high_pulse_interval_cv")
+    if normalized_rmssd is not None and normalized_rmssd > 0.18:
+        score += 1
+        flags.append("high_pulse_interval_rmssd")
+    if successive_change_fraction > 0.25:
+        score += 1
+        flags.append("frequent_successive_pulse_changes")
+    risk = "elevated_irregular_pulse_proxy" if score >= 2 else "low_irregular_pulse_proxy"
+    return {
+        "tool": "PPG_screen_pulse_irregularity",
+        "heart_rate_bpm": peaks_result.get("heart_rate_bpm"),
+        "pulse_interval_cv": pulse_interval_cv,
+        "normalized_rmssd": normalized_rmssd,
+        "successive_change_fraction": successive_change_fraction,
+        "irregular_pulse_score": score,
+        "irregular_pulse_flags": flags,
+        "irregular_pulse_risk": risk,
+        "confidence": min(float(peaks_result.get("confidence", 0.5)), 0.62),
+        "method": "ppg_pulse_interval_irregularity_screening",
+        "disclaimer": "PPG irregular-pulse proxy only; AF screening requires ECG reference labels and artifact-aware validation.",
+    }
+
+
 def PPG_estimate_respiration_modulation(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
     data = load_csv_signal(signal_path, sampling_rate, column)
     values = data.values
