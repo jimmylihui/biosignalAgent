@@ -20,8 +20,9 @@ def main() -> None:
     parser.add_argument('--fallback-modality', choices=['ecg', 'ppg', 'bcg'], default=None)
     parser.add_argument('--model', default=DEFAULT_MODEL)
     parser.add_argument('--llm-report', action='store_true', help='Use OpenRouter for final report generation. Default uses deterministic reporting.')
+    parser.add_argument('--retrieved-tool-count', type=int, default=5, help='Number of tool schemas to retrieve for the planner prompt.')
     args = parser.parse_args()
-    agent = OpenRouterBioSignalAgent(model=args.model, use_llm_report=args.llm_report)
+    agent = OpenRouterBioSignalAgent(model=args.model, use_llm_report=args.llm_report, retrieved_tool_count=args.retrieved_tool_count)
     report = agent.run(args.question, args.csv, args.sampling_rate, args.column, args.fallback_modality)
     print(json.dumps(report, indent=2))
 

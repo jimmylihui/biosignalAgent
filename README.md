@@ -2,7 +2,7 @@
 
 Tool-first prototype for ECG, PPG, and BCG signal reasoning.
 
-This first version keeps the LLM out of the critical path: signal analysis is done by explicit Python tools, and the agent selects a basic workflow from the requested modality. Later, the same tool schemas can be used for tool calling, ToolRAG, and instruction tuning traces.
+This version keeps signal analysis in explicit Python tools. The agent can use either deterministic rule planning or an OpenRouter LLM planner, with local fallback when LLM output is unavailable or invalid. Tool schemas and execution traces are structured so they can support ToolRAG, tool calling, and future instruction tuning.
 
 ## Current Tools
 
@@ -95,7 +95,18 @@ It reads API settings from `/home/myid/jl57095/TwinMarket/openrouter_caption_wit
 python examples/ask_openrouter_agent.py   --question "Estimate ECG heart rate and HRV from this signal"   --csv /data1/jiahui/biosignal-agent/datasets/processed/mitdb_100_mlii_60s.csv   --sampling-rate 360   --model openrouter/owl-alpha
 ```
 
-The OpenRouter planner returns JSON tool calls, the executor runs local signal tools, and the reporter asks the same model to summarize results. If OpenRouter fails or rate-limits, the framework falls back to the rule planner or deterministic tool-result report.
+The OpenRouter planner returns JSON tool calls, and the executor runs local signal tools. Final reporting is deterministic by default for speed and reliability; add `--llm-report` when you want the model to write the prose report. If OpenRouter fails, rate-limits, or returns invalid JSON, the framework falls back to the rule planner or deterministic tool-result report.
+
+
+## ToolRAG-Style Tool Retrieval
+
+Before calling the LLM planner, the framework retrieves a small set of relevant tool schemas from the local registry instead of sending every tool. The current retriever is deterministic TF-IDF plus modality hints, so it works offline and can later be replaced with embeddings.
+
+```bash
+python examples/ask_openrouter_agent.py   --question "Estimate ECG heart rate and HRV from this signal"   --csv /data1/jiahui/biosignal-agent/datasets/processed/mitdb_100_mlii_60s.csv   --sampling-rate 360   --fallback-modality ecg   --retrieved-tool-count 3   --model openrouter/owl-alpha
+```
+
+Traces include both `retrieved_tools` and the final `tool_plan`, so planner behavior can be audited separately from tool execution.
 
 ## Trace Logging And Sessions
 

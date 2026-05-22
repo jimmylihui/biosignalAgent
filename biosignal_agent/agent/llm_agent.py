@@ -7,7 +7,7 @@ from typing import Any
 
 from .openrouter_client import DEFAULT_MODEL, chat_completion
 from .planning_agent import PlanningBioSignalAgent
-from .schema_loader import load_tool_schemas
+from .tool_retriever import ToolRetriever
 from .tool_registry import TOOLS
 from biosignal_agent.session.trace_logger import save_trace
 
@@ -17,9 +17,11 @@ class OpenRouterBioSignalAgent:
     model: str = DEFAULT_MODEL
     fallback_to_rules: bool = True
     use_llm_report: bool = False
+    retrieved_tool_count: int = 5
 
     def plan(self, question: str, signal_path: str, sampling_rate: float, column: str | None = None, fallback_modality: str | None = None) -> dict:
-        schemas = load_tool_schemas()
+        modality_hint = fallback_modality
+        schemas = ToolRetriever().retrieve(question, top_k=self.retrieved_tool_count, modality=modality_hint)
         schema_brief = [
             {
                 'name': schema['name'],
@@ -42,6 +44,7 @@ class OpenRouterBioSignalAgent:
             'column': column,
             'fallback_modality': fallback_modality,
             'available_tools': schema_brief,
+            'retrieval': {'top_k': self.retrieved_tool_count, 'tool_names': [schema['name'] for schema in schemas]},
         }
         try:
             text = chat_completion([
@@ -49,7 +52,7 @@ class OpenRouterBioSignalAgent:
                 {'role': 'user', 'content': json.dumps(user, ensure_ascii=True)},
             ], model=self.model, temperature=0.0)
             plan = parse_json_object(text)
-            return self._normalize_plan(plan, signal_path, sampling_rate, column)
+            return self._normalize_plan(plan, signal_path, sampling_rate, column, [schema['name'] for schema in schemas])
         except Exception as exc:
             if not self.fallback_to_rules:
                 raise
@@ -64,6 +67,7 @@ class OpenRouterBioSignalAgent:
                 ],
                 'planner': 'rule_fallback',
                 'fallback_reason': str(exc),
+                'retrieved_tools': [schema['name'] for schema in schemas],
             }
 
     def run(self, question: str, signal_path: str, sampling_rate: float, column: str | None = None, fallback_modality: str | None = None, save_trace_path: bool = True) -> dict:
@@ -87,6 +91,7 @@ class OpenRouterBioSignalAgent:
             'planner': plan.get('planner', 'openrouter'),
             'modality': plan.get('modality'),
             'signal': {'path': signal_path, 'sampling_rate': sampling_rate, 'column': column},
+            'retrieved_tools': plan.get('retrieved_tools'),
             'tool_plan': plan['tool_calls'],
             'tool_results': tool_results,
             'final_report': final_report,
@@ -135,7 +140,7 @@ class OpenRouterBioSignalAgent:
             lines.append('Prototype output for research use only; not a clinical diagnosis.')
             return '\n'.join(lines)
 
-    def _normalize_plan(self, plan: dict, signal_path: str, sampling_rate: float, column: str | None) -> dict:
+    def _normalize_plan(self, plan: dict, signal_path: str, sampling_rate: float, column: str | None, retrieved_tools: list[str]) -> dict:
         calls = plan.get('tool_calls') or []
         normalized = []
         for call in calls:
@@ -153,7 +158,7 @@ class OpenRouterBioSignalAgent:
         quality_tool = f'{modality.upper()}_assess_quality' if modality in {'ecg', 'ppg', 'bcg'} else None
         if quality_tool in TOOLS and all(call['name'] != quality_tool for call in normalized):
             normalized.insert(0, {'name': quality_tool, 'arguments': {'signal_path': signal_path, 'sampling_rate': sampling_rate, 'column': column}})
-        return {'modality': plan.get('modality'), 'tool_calls': normalized, 'planner': 'openrouter'}
+        return {'modality': plan.get('modality'), 'tool_calls': normalized, 'planner': 'openrouter', 'retrieved_tools': retrieved_tools}
 
 
 def parse_json_object(text: str) -> dict[str, Any]:
