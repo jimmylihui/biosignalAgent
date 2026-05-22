@@ -357,3 +357,42 @@ python scripts/validate_instruction_dataset.py /data1/jiahui/biosignal-agent/out
 ```
 
 Latest export: 90 full samples and 32 planning-only samples, both with zero validation errors.
+## Dedicated BCG Dataset Connector
+
+A dedicated BCG connector is available for the Figshare bedside BCG dataset from the Scientific Data article "A ballistocardiogram dataset with reference ECG signals for bedside heart rhythm assessment".
+
+```bash
+python scripts/prepare_dedicated_bcg_dataset.py --limit 3 --seconds 60
+```
+
+The full Figshare dataset is 16.35 GB, so this script streams only the first requested seconds from selected BCG CSV files instead of downloading the full archive. It writes:
+
+```text
+/data1/jiahui/biosignal-agent/datasets/processed/dedicated_bcg/
+/data1/jiahui/biosignal-agent/datasets/processed/dedicated_bcg_manifest.json
+```
+
+Run the BCG-specific evaluation:
+
+```bash
+python scripts/evaluate_real_datasets.py \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/dedicated_bcg_manifest.json \
+  --planner rule \
+  --retrieved-tool-count 3 \
+  --out-json /data1/jiahui/biosignal-agent/outputs/dedicated_bcg_framework_eval_rule.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/dedicated_bcg_framework_eval_rule.csv
+```
+
+Latest dedicated BCG eval: 3 records, 12 case-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0.
+
+The cross-modality session benchmark now also includes a BCG + RESP + ECG session:
+
+```bash
+python scripts/evaluate_sessions.py \
+  --planner rule \
+  --retrieved-tool-count 3 \
+  --out-json /data1/jiahui/biosignal-agent/outputs/session_eval_rule_with_bcg.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/session_eval_rule_with_bcg.csv
+```
+
+Latest session eval with BCG: 7 sessions, 21 signal-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0.

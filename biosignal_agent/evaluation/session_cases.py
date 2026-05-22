@@ -10,6 +10,7 @@ from biosignal_agent.session.schema import BioSignalSession, SignalInput
 
 REAL_MANIFEST = Path('/data1/jiahui/biosignal-agent/datasets/processed/real_world_manifest.json')
 DEDICATED_MANIFEST = Path('/data1/jiahui/biosignal-agent/datasets/processed/dedicated_common_manifest.json')
+DEDICATED_BCG_MANIFEST = Path('/data1/jiahui/biosignal-agent/datasets/processed/dedicated_bcg_manifest.json')
 ECG_RECORD = {
     'dataset': 'mitdb',
     'record': '100',
@@ -36,7 +37,7 @@ class SessionCase:
 
 
 def load_records(paths: list[Path] | None = None) -> list[dict[str, Any]]:
-    paths = paths or [REAL_MANIFEST, DEDICATED_MANIFEST]
+    paths = paths or [REAL_MANIFEST, DEDICATED_MANIFEST, DEDICATED_BCG_MANIFEST]
     records = [ECG_RECORD]
     for path in paths:
         if not path.exists():
@@ -95,6 +96,11 @@ def build_default_session_cases(records: list[dict[str, Any]] | None = None) -> 
             'mechanical_cardiorespiratory',
             'Estimate mechanical cardiac rate from SCG and respiratory rate from the breathing signal.',
             [('scg', 'scg'), ('resp', 'resp')],
+        ),
+        (
+            'bed_bcg_cardiorespiratory',
+            'Estimate bed-based BCG mechanical cardiac rate, respiratory rate, and ECG heart rate variability evidence.',
+            [('bcg', 'bcg'), ('resp', 'resp'), ('ecg', 'ecg')],
         ),
         (
             'heart_sound_hemodynamics',

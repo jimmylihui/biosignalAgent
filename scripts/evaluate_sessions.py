@@ -90,6 +90,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Evaluate cross-modality BioSignalAgent sessions.')
     parser.add_argument('--real-manifest', default='/data1/jiahui/biosignal-agent/datasets/processed/real_world_manifest.json')
     parser.add_argument('--dedicated-manifest', default='/data1/jiahui/biosignal-agent/datasets/processed/dedicated_common_manifest.json')
+    parser.add_argument('--bcg-manifest', default='/data1/jiahui/biosignal-agent/datasets/processed/dedicated_bcg_manifest.json')
     parser.add_argument('--planner', choices=['rule', 'openrouter'], default='rule')
     parser.add_argument('--model', default=DEFAULT_MODEL)
     parser.add_argument('--retrieved-tool-count', type=int, default=3)
@@ -100,7 +101,7 @@ def main() -> None:
     parser.add_argument('--out-csv', default='/data1/jiahui/biosignal-agent/outputs/session_eval_rule.csv')
     args = parser.parse_args()
 
-    records = load_records([Path(args.real_manifest), Path(args.dedicated_manifest)])
+    records = load_records([Path(args.real_manifest), Path(args.dedicated_manifest), Path(args.bcg_manifest)])
     cases = build_default_session_cases(records)
     agent = BioSignalAgentFramework(BioSignalAgentConfig(
         planner=args.planner,
