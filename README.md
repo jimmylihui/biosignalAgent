@@ -186,3 +186,24 @@ python scripts/export_trace_dataset.py \
   --planning-only \
   --out /data1/jiahui/biosignal-agent/outputs/biosignal_planning_sft.jsonl
 ```
+
+## Python Framework Entry Point
+
+Use `BioSignalAgentFramework` when integrating the framework from Python instead of a CLI script:
+
+```python
+from biosignal_agent.agent.framework import BioSignalAgentConfig, BioSignalAgentFramework
+from biosignal_agent.session.schema import SignalInput
+
+agent = BioSignalAgentFramework(BioSignalAgentConfig(planner="rule", retrieved_tool_count=3))
+run = agent.run_signal(
+    "Estimate ECG heart rate and HRV from this signal",
+    SignalInput(
+        modality="ecg",
+        path="/data1/jiahui/biosignal-agent/datasets/processed/mitdb_100_mlii_60s.csv",
+        sampling_rate=360,
+    ),
+)
+```
+
+The same class also runs `BioSignalSession` objects with `run_session(...)`.
