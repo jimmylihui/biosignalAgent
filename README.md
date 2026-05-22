@@ -324,3 +324,36 @@ Default sessions cover:
 - PCG + ABP + ECG
 
 Latest session eval: 6 sessions, 18 signal-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0. Each session saves a trace under `/data1/jiahui/biosignal-agent/outputs/traces/`.
+## TxAgent-Style Instruction Dataset Export
+
+Export traces into instruction JSONL with single-signal and multi-signal samples:
+
+```bash
+python scripts/export_trace_dataset.py \
+  --include-negative \
+  --out /data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft.jsonl
+
+python scripts/export_trace_dataset.py \
+  --planning-only \
+  --include-negative \
+  --out /data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft.jsonl
+```
+
+The full export includes:
+
+- `biosignal_tool_planning`
+- `biosignal_tool_execution_trace`
+- `biosignal_report_generation`
+- `biosignal_session_tool_planning`
+- `biosignal_session_tool_execution_trace`
+- `biosignal_session_report_generation`
+- `biosignal_negative_tool_planning`
+
+Validate JSONL format and task counts:
+
+```bash
+python scripts/validate_instruction_dataset.py /data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft.jsonl
+python scripts/validate_instruction_dataset.py /data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft.jsonl
+```
+
+Latest export: 90 full samples and 32 planning-only samples, both with zero validation errors.
