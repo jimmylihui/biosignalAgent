@@ -422,3 +422,20 @@ Latest optimized tool audit: 44 records, 88 tool-runs, all modalities ok-rate 1.
 ```
 
 All optimized framework evals retained retrieval accuracy 1.0, planning accuracy 1.0, and execution accuracy 1.0.
+
+## Benchmark Report Index
+
+Build one TxAgent-style benchmark index from the current manifests, real-data evals, session eval, tool audit, and instruction JSONL validation:
+
+```bash
+python scripts/build_benchmark_report.py
+```
+
+This writes:
+
+```text
+/data1/jiahui/biosignal-agent/outputs/benchmark_report.json
+/data1/jiahui/biosignal-agent/outputs/benchmark_report.md
+```
+
+The report is intended as the stable comparison surface when changing the planner backend, adding datasets, or improving individual signal tools.
