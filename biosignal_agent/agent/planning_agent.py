@@ -37,7 +37,7 @@ class PlanningBioSignalAgent:
 
         wants_hrv = "hrv" in text or "heart rate variability" in text or "rmssd" in text or "sdnn" in text
         wants_peaks = any(term in text for term in ["peak", "peaks", "heart rate", "bpm", "rate", "rr", "pulse"])
-        wants_general = any(term in text for term in ["analyze", "report", "summary", "quality", "what"])
+        wants_general = any(term in text for term in ["analyze", "report", "summary", "what"])
 
         if modality == "ecg":
             if wants_peaks or wants_hrv or wants_general:
@@ -51,7 +51,8 @@ class PlanningBioSignalAgent:
             if wants_peaks or wants_general:
                 selected.append("BCG_detect_j_peaks")
 
-        if len(selected) == 1:
+        needs_analysis = wants_peaks or wants_hrv or wants_general
+        if len(selected) == 1 and needs_analysis:
             retrieved = [schema["name"] for schema in find_tool_schemas(question, top_k=3)]
             for tool_name in retrieved:
                 if tool_name in TOOLS and tool_name.startswith(modality.upper()) and tool_name not in selected:

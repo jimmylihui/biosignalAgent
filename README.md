@@ -207,3 +207,33 @@ run = agent.run_signal(
 ```
 
 The same class also runs `BioSignalSession` objects with `run_session(...)`.
+
+## Real PPG/BCG-Like Dataset Expansion
+
+Prepare public real-world PPG and mechanical cardiac signal examples from PhysioNet:
+
+```bash
+python scripts/prepare_real_ppg_bcg_data.py --limit 5 --seconds 60
+```
+
+This exports BIDMC PPG records and CEBSDB SCG records to CSV under:
+
+```text
+/data1/jiahui/biosignal-agent/datasets/processed/real_world/
+/data1/jiahui/biosignal-agent/datasets/processed/real_world_manifest.json
+```
+
+CEBSDB provides seismocardiogram (SCG), not bed/load-cell BCG. In this prototype it is treated as a BCG-like mechanical cardiac waveform so the BCG agent pathway can be evaluated with real mechanical heart-signal data before a dedicated BCG dataset is added.
+
+Run systematic real-data framework evaluation across the expanded question set:
+
+```bash
+python scripts/evaluate_real_datasets.py \
+  --planner rule \
+  --include-ecg \
+  --retrieved-tool-count 3 \
+  --out-json /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/real_dataset_framework_eval_rule.csv
+```
+
+Latest real-data rule eval: 11 records, 44 case-runs, retrieval accuracy 1.0, planning accuracy 1.0, execution accuracy 1.0.
