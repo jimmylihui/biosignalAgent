@@ -66,14 +66,16 @@ Report artifacts are written under `/data1/jiahui/biosignal-agent/outputs/*major
 | --- | --- | --- | --- |
 | Arrhythmia classification | MIT-BIH Arrhythmia, AFDB, CinC rhythm datasets | beat/rhythm labels | sensitivity, specificity, F1 by rhythm class |
 | MIT-BIH arrhythmia windows | Implemented via `scripts/prepare_labeled_arrhythmia_dataset.py` | annotation-derived normal/abnormal window labels | current RR-screen baseline: F1 0.680 on 240 windows |
+| MIT-BIH rhythm/AF + beat windows | Implemented via `scripts/prepare_ecg_rhythm_beat_dataset.py` | rhythm aux notes and beat symbols | current AF F1 0.442 on 240 windows; beat-abnormal F1 0.308 on 18,209 beats |
 | Sleep apnea detection | Apnea-ECG, Sleep-EDF/SHHS-style PSG resources where accessible | apnea/hypopnea events or AHI | event F1, AHI MAE, subject-level severity accuracy |
 | Apnea-ECG minute labels | Implemented via `scripts/prepare_apnea_ecg_dataset.py` | minute-level apnea/normal ECG labels | current ECG-only proxy: F1 0.125 on 60 windows |
 | UCDDB RESP/SpO2 windows | Implemented via `scripts/prepare_ucddb_resp_spo2_dataset.py` | PSG respiratory-event labels with Flow and SpO2 channels | current RESP/SpO2 baseline with hypopnea tool: F1 0.588 on 40 windows |
+| UCDDB PSG sleep windows | Implemented via `scripts/prepare_psg_sleep_dataset.py` | sleep-stage labels plus respiratory-event labels using EEG/Flow/SpO2 | current coarse sleep-stage macro-F1 0.241 and respiratory-event F1 0.218 on 80 windows |
 | Sleep staging | Sleep-EDF, PhysioNet sleep datasets | 30 s sleep stages | epoch accuracy, macro-F1, Cohen kappa |
 | Desaturation detection | PSG datasets with SpO2 and scored respiratory events | desaturation/apnea events | ODI error, event precision/recall |
 | Stress/arousal | WESAD or multimodal EDA/ECG/ACC datasets | stress/arousal labels | balanced accuracy, macro-F1 |
 | Seizure or abnormal EEG screening | CHB-MIT or other EEG event datasets | seizure/event labels | event sensitivity, false positives/hour |
-| PCG murmur screening | PhysioNet/CinC heart sound challenge data | normal/abnormal or murmur labels | AUROC, sensitivity/specificity |
+| PCG murmur screening | Implemented via `scripts/prepare_pcg_murmur_dataset.py` on PhysioNet/CinC 2016 | normal/abnormal labels | current murmur proxy F1 0.000 on 10 balanced records; useful hard benchmark for improving PCG tool quality |
 | EMG gesture/fatigue | public EMG gesture/fatigue datasets | gesture/fatigue labels | accuracy, macro-F1 |
 
 ## Planning Direction

@@ -144,6 +144,94 @@ def labeled_ucddb_summary(path: str | Path) -> dict[str, Any]:
     }
 
 
+def labeled_ecg_rhythm_summary(path: str | Path) -> list[dict[str, Any]]:
+    payload = load_json(path)
+    if payload.get("missing"):
+        return [{"name": "ecg_rhythm_af_windows", **payload}, {"name": "ecg_beat_abnormal", **payload}]
+    af = payload.get("af_metrics", {})
+    beat = payload.get("beat_abnormal_metrics", {})
+    return [
+        {
+            "name": "ecg_rhythm_af_windows",
+            "path": str(path),
+            "num_windows": payload.get("num_windows"),
+            "truth_counts": payload.get("rhythm_truth_counts", {}),
+            "prediction_counts": payload.get("rhythm_prediction_counts", {}),
+            "accuracy": af.get("accuracy"),
+            "precision": af.get("precision"),
+            "recall_sensitivity": af.get("recall_sensitivity"),
+            "specificity": af.get("specificity"),
+            "f1": af.get("f1"),
+        },
+        {
+            "name": "ecg_beat_abnormal",
+            "path": str(path),
+            "num_windows": payload.get("num_beats"),
+            "truth_counts": payload.get("beat_truth_counts", {}),
+            "prediction_counts": payload.get("beat_prediction_counts", {}),
+            "accuracy": beat.get("accuracy"),
+            "precision": beat.get("precision"),
+            "recall_sensitivity": beat.get("recall_sensitivity"),
+            "specificity": beat.get("specificity"),
+            "f1": beat.get("f1"),
+            "beat_detection_recall": payload.get("beat_detection_recall"),
+        },
+    ]
+
+
+def labeled_psg_sleep_summary(path: str | Path) -> list[dict[str, Any]]:
+    payload = load_json(path)
+    if payload.get("missing"):
+        return [{"name": "psg_sleep_stage", **payload}, {"name": "psg_respiratory_events", **payload}]
+    sleep = payload.get("sleep_stage_metrics", {})
+    resp = payload.get("respiratory_event_metrics", {})
+    return [
+        {
+            "name": "psg_sleep_stage",
+            "path": str(path),
+            "num_windows": payload.get("num_windows"),
+            "truth_counts": payload.get("sleep_truth_counts", {}),
+            "prediction_counts": payload.get("sleep_prediction_counts", {}),
+            "accuracy": sleep.get("accuracy"),
+            "precision": None,
+            "recall_sensitivity": None,
+            "specificity": None,
+            "f1": sleep.get("macro_f1"),
+        },
+        {
+            "name": "psg_respiratory_events",
+            "path": str(path),
+            "num_windows": payload.get("num_windows"),
+            "truth_counts": payload.get("resp_truth_counts", {}),
+            "prediction_counts": payload.get("resp_prediction_counts", {}),
+            "accuracy": resp.get("accuracy"),
+            "precision": resp.get("precision"),
+            "recall_sensitivity": resp.get("recall_sensitivity"),
+            "specificity": resp.get("specificity"),
+            "f1": resp.get("f1"),
+        },
+    ]
+
+
+def labeled_pcg_murmur_summary(path: str | Path) -> dict[str, Any]:
+    payload = load_json(path)
+    if payload.get("missing"):
+        return {"name": "pcg_murmur_normal_abnormal", **payload}
+    metrics = payload.get("metrics", {})
+    return {
+        "name": "pcg_murmur_normal_abnormal",
+        "path": str(path),
+        "num_windows": payload.get("num_records"),
+        "truth_counts": payload.get("truth_counts", {}),
+        "prediction_counts": payload.get("prediction_counts", {}),
+        "accuracy": metrics.get("accuracy"),
+        "precision": metrics.get("precision"),
+        "recall_sensitivity": metrics.get("recall_sensitivity"),
+        "specificity": metrics.get("specificity"),
+        "f1": metrics.get("f1"),
+    }
+
+
 def instruction_summary(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     if not path.exists():
@@ -265,6 +353,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             labeled_arrhythmia_summary(args.arrhythmia_eval),
             labeled_apnea_ecg_summary(args.apnea_ecg_eval),
             labeled_ucddb_summary(args.ucddb_eval),
+            *labeled_ecg_rhythm_summary(args.ecg_rhythm_eval),
+            *labeled_psg_sleep_summary(args.psg_sleep_eval),
+            labeled_pcg_murmur_summary(args.pcg_murmur_eval),
         ],
         "instruction_data": [
             {"name": "full_sft", **instruction_summary(args.full_sft)},
@@ -286,6 +377,9 @@ def main() -> None:
     parser.add_argument("--arrhythmia-eval", default="/data1/jiahui/biosignal-agent/outputs/labeled_arrhythmia_eval.json")
     parser.add_argument("--apnea-ecg-eval", default="/data1/jiahui/biosignal-agent/outputs/apnea_ecg_eval.json")
     parser.add_argument("--ucddb-eval", default="/data1/jiahui/biosignal-agent/outputs/ucddb_resp_spo2_eval_more_tasks.json")
+    parser.add_argument("--ecg-rhythm-eval", default="/data1/jiahui/biosignal-agent/outputs/ecg_rhythm_beat_eval.json")
+    parser.add_argument("--psg-sleep-eval", default="/data1/jiahui/biosignal-agent/outputs/psg_sleep_eval.json")
+    parser.add_argument("--pcg-murmur-eval", default="/data1/jiahui/biosignal-agent/outputs/pcg_murmur_eval.json")
     parser.add_argument("--full-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft.jsonl")
     parser.add_argument("--planning-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft.jsonl")
     parser.add_argument("--out-json", default="/data1/jiahui/biosignal-agent/outputs/benchmark_report_major_tasks.json")

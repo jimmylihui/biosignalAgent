@@ -213,6 +213,31 @@ PAT benchmark uses synchronized BIDMC bidmc01 ECG+PPG: median PAT 528 ms, IQR 16
 outputs: /data1/jiahui/biosignal-agent/outputs/session_eval_rule_major_tasks.json
 ```
 
+## True Labeled Benchmarks
+
+The framework now has three stronger labeled benchmark tracks in addition to planning/tool execution tests:
+
+```bash
+python scripts/prepare_ecg_rhythm_beat_dataset.py --max-windows-per-record 5
+python scripts/evaluate_ecg_rhythm_beat.py
+
+python scripts/prepare_psg_sleep_dataset.py --max-windows-per-record 80
+python scripts/evaluate_psg_sleep.py
+
+python scripts/prepare_pcg_murmur_dataset.py --download --max-per-class 5
+python scripts/evaluate_pcg_murmur.py
+```
+
+Latest labeled benchmark snapshot:
+
+- MIT-BIH rhythm/AF windows: AF F1 0.442 on 240 windows.
+- MIT-BIH beat abnormal screening: F1 0.308 on 18,209 annotated beats; R-peak detection recall 0.936.
+- UCDDB PSG sleep staging: coarse-stage macro-F1 0.241 on 80 windows.
+- UCDDB PSG respiratory events: F1 0.218 on 80 windows.
+- PhysioNet/CinC 2016 PCG normal/abnormal: F1 0.000 on 10 balanced records with the current murmur proxy.
+
+These numbers are intentionally baseline-level: they turn major tasks into measurable targets before replacing heuristics with stronger models.
+
 ## Trace-To-Training Export
 
 Agent traces can be exported to JSONL samples for later planning/report fine-tuning or prompt evaluation:
