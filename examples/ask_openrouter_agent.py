@@ -19,8 +19,9 @@ def main() -> None:
     parser.add_argument('--column', default=None)
     parser.add_argument('--fallback-modality', choices=['ecg', 'ppg', 'bcg'], default=None)
     parser.add_argument('--model', default=DEFAULT_MODEL)
+    parser.add_argument('--llm-report', action='store_true', help='Use OpenRouter for final report generation. Default uses deterministic reporting.')
     args = parser.parse_args()
-    agent = OpenRouterBioSignalAgent(model=args.model)
+    agent = OpenRouterBioSignalAgent(model=args.model, use_llm_report=args.llm_report)
     report = agent.run(args.question, args.csv, args.sampling_rate, args.column, args.fallback_modality)
     print(json.dumps(report, indent=2))
 

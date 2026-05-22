@@ -15,6 +15,7 @@ from .tool_registry import TOOLS
 class OpenRouterBioSignalAgent:
     model: str = DEFAULT_MODEL
     fallback_to_rules: bool = True
+    use_llm_report: bool = False
 
     def plan(self, question: str, signal_path: str, sampling_rate: float, column: str | None = None, fallback_modality: str | None = None) -> dict:
         schemas = load_tool_schemas()
@@ -78,7 +79,7 @@ class OpenRouterBioSignalAgent:
             args.setdefault('column', column)
             result = TOOLS[name](**args)
             tool_results.append({'tool': name, 'arguments': args, 'result': result})
-        final_report = self.generate_report(question, plan, tool_results)
+        final_report = self.generate_report(question, plan, tool_results) if self.use_llm_report else self.deterministic_report(question, tool_results)
         return {
             'question': question,
             'model': self.model,
@@ -89,6 +90,24 @@ class OpenRouterBioSignalAgent:
             'final_report': final_report,
             'disclaimer': 'Prototype output for research use only; not a clinical diagnosis.',
         }
+
+
+    def deterministic_report(self, question: str, tool_results: list[dict]) -> str:
+        lines = [f'Question: {question}', 'Tool findings:']
+        for item in tool_results:
+            result = item.get('result', {})
+            tool = item.get('tool', 'unknown_tool')
+            if 'quality' in result:
+                lines.append(f"- {tool}: signal quality is {result['quality']} with confidence {result.get('confidence')}.")
+            elif 'heart_rate_bpm' in result and result['heart_rate_bpm'] is not None:
+                method = result.get('method', 'unknown method')
+                lines.append(f"- {tool}: heart rate {result['heart_rate_bpm']:.1f} bpm using {method}; confidence {result.get('confidence')}.")
+            elif 'sdnn_ms' in result:
+                lines.append(f"- {tool}: mean RR {result['mean_rr_ms']:.1f} ms, SDNN {result['sdnn_ms']:.1f} ms, RMSSD {result['rmssd_ms']:.1f} ms.")
+            else:
+                lines.append(f"- {tool}: {json.dumps(result, ensure_ascii=True)}")
+        lines.append('Prototype output for research use only; not a clinical diagnosis.')
+        return '\n'.join(lines)
 
     def generate_report(self, question: str, plan: dict, tool_results: list[dict]) -> str:
         system = (
