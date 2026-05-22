@@ -78,6 +78,10 @@ Report artifacts are written under `/data1/jiahui/biosignal-agent/outputs/*major
 | PCG murmur screening | Implemented via `scripts/prepare_pcg_murmur_dataset.py` on PhysioNet/CinC 2016 | normal/abnormal labels | current murmur proxy F1 0.000 on 10 balanced records; useful hard benchmark for improving PCG tool quality |
 | EMG gesture/fatigue | public EMG gesture/fatigue datasets | gesture/fatigue labels | accuracy, macro-F1 |
 
+## Existing-Work Wrapper Sources
+
+The next implementation layer is tracked in `biosignal_agent/tools/source_catalog.json` and summarized in `docs/tool_source_catalog.md`. The catalog maps each task to existing algorithms/libraries, public datasets, source URLs, wrapper priority, and the next wrapper to build.
+
 ## Planning Direction
 
 Short-term planning eval should include both single-modality tasks and cross-modality sessions, for example:

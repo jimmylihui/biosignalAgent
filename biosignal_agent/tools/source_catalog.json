@@ -1,0 +1,735 @@
+{
+  "version": 1,
+  "description": "Existing-work sources for BioSignalAgent task/tool wrappers.",
+  "entries": [
+    {
+      "modality": "ECG",
+      "task": "R-peak and QRS detection",
+      "current_tools": [
+        "ECG_detect_r_peaks"
+      ],
+      "existing_work": [
+        "Pan-Tompkins QRS detector",
+        "Hamilton-style QRS detectors",
+        "NeuroKit2 ECG cleaning/peak detection",
+        "WFDB annotation/evaluation utilities"
+      ],
+      "candidate_libraries": [
+        "neurokit2",
+        "wfdb",
+        "biosppy"
+      ],
+      "candidate_datasets": [
+        "MIT-BIH Arrhythmia Database",
+        "QT Database",
+        "Noise Stress Test Database"
+      ],
+      "source_urls": [
+        "https://physionet.org/content/mitdb/",
+        "https://wfdb.readthedocs.io/",
+        "https://neuropsychology.github.io/NeuroKit/"
+      ],
+      "wrapper_priority": 1,
+      "next_wrapper": "Keep Pan-Tompkins as default, add detector comparison and annotation-tolerance evaluator."
+    },
+    {
+      "modality": "ECG",
+      "task": "AF and rhythm classification",
+      "current_tools": [
+        "ECG_screen_arrhythmia"
+      ],
+      "existing_work": [
+        "PhysioNet/CinC 2017 single-lead AF challenge",
+        "RR irregularity plus P-wave/f-wave feature methods",
+        "CNN, DenseNet, CNN-BiLSTM rhythm classifiers"
+      ],
+      "candidate_libraries": [
+        "wfdb",
+        "scikit-learn",
+        "pytorch"
+      ],
+      "candidate_datasets": [
+        "PhysioNet/CinC 2017",
+        "MIT-BIH AFDB",
+        "MIT-BIH Arrhythmia rhythm aux notes"
+      ],
+      "source_urls": [
+        "https://physionet.org/challenge/2017/",
+        "https://physionet.org/content/afdb/",
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC8052181/"
+      ],
+      "wrapper_priority": 1,
+      "next_wrapper": "Add feature-based AF/rhythm classifier baseline over the existing ECG rhythm benchmark."
+    },
+    {
+      "modality": "ECG",
+      "task": "Beat classification",
+      "current_tools": [
+        "ECG_detect_r_peaks",
+        "ECG_screen_arrhythmia"
+      ],
+      "existing_work": [
+        "AAMI EC57 beat classes",
+        "wavelet plus SVM/RF classifiers",
+        "1D CNN beat classifiers",
+        "inter-patient MIT-BIH protocols"
+      ],
+      "candidate_libraries": [
+        "wfdb",
+        "scikit-learn",
+        "pytorch"
+      ],
+      "candidate_datasets": [
+        "MIT-BIH Arrhythmia Database",
+        "MIT-BIH Supraventricular Arrhythmia Database",
+        "INCART"
+      ],
+      "source_urls": [
+        "https://physionet.org/content/mitdb/",
+        "https://pubmed.ncbi.nlm.nih.gov/41395626/"
+      ],
+      "wrapper_priority": 2,
+      "next_wrapper": "Add per-beat feature extraction and AAMI-class baseline for normal vs abnormal and multiclass beats."
+    },
+    {
+      "modality": "ECG",
+      "task": "ECG morphology intervals",
+      "current_tools": [
+        "ECG_measure_morphology_intervals"
+      ],
+      "existing_work": [
+        "ECG delineation with wavelets",
+        "QT/QRS/PR interval measurement",
+        "QT Database evaluation"
+      ],
+      "candidate_libraries": [
+        "neurokit2",
+        "wfdb"
+      ],
+      "candidate_datasets": [
+        "QT Database",
+        "MIT-BIH Arrhythmia Database"
+      ],
+      "source_urls": [
+        "https://physionet.org/content/qtdb/",
+        "https://neuropsychology.github.io/NeuroKit/"
+      ],
+      "wrapper_priority": 3,
+      "next_wrapper": "Add QTDB-backed interval evaluator before treating morphology flags as reliable."
+    },
+    {
+      "modality": "PPG",
+      "task": "Pulse peak detection",
+      "current_tools": [
+        "PPG_detect_peaks"
+      ],
+      "existing_work": [
+        "HeartPy beat detector",
+        "pyPPG fiducial point detection",
+        "PPG-beats benchmark methods",
+        "NeuroKit2 PPG processing"
+      ],
+      "candidate_libraries": [
+        "heartpy",
+        "pyPPG",
+        "neurokit2"
+      ],
+      "candidate_datasets": [
+        "PPG-beats datasets",
+        "MIMIC PERform",
+        "BIDMC PPG and Respiration"
+      ],
+      "source_urls": [
+        "https://ppg-beats.readthedocs.io/en/latest/datasets/summary/",
+        "https://github.com/paulvangentcom/heartrate_analysis_python",
+        "https://pyppg.readthedocs.io/"
+      ],
+      "wrapper_priority": 2,
+      "next_wrapper": "Add optional HeartPy/pyPPG detector backend and compare against current Nabian-style proxy."
+    },
+    {
+      "modality": "PPG",
+      "task": "PPG AF and pulse irregularity",
+      "current_tools": [
+        "PPG_assess_perfusion_variability"
+      ],
+      "existing_work": [
+        "pulse interval irregularity",
+        "Poincare features",
+        "entropy features",
+        "wearable DNN AF detectors"
+      ],
+      "candidate_libraries": [
+        "scikit-learn",
+        "pytorch"
+      ],
+      "candidate_datasets": [
+        "MIMIC PERform AF",
+        "PPG AF datasets",
+        "simultaneous ECG/PPG subsets"
+      ],
+      "source_urls": [
+        "https://www.nature.com/articles/s41746-019-0207-9",
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC9632370/",
+        "https://ppg-beats.readthedocs.io/en/latest/datasets/summary/"
+      ],
+      "wrapper_priority": 3,
+      "next_wrapper": "Create PPG AF planning case only after adding an ECG-referenced PPG AF dataset."
+    },
+    {
+      "modality": "PPG",
+      "task": "Respiration from PPG",
+      "current_tools": [
+        "PPG_estimate_respiration_modulation"
+      ],
+      "existing_work": [
+        "baseline wander modulation",
+        "amplitude modulation",
+        "frequency modulation / RSA",
+        "respiratory-band fusion"
+      ],
+      "candidate_libraries": [
+        "scipy",
+        "neurokit2"
+      ],
+      "candidate_datasets": [
+        "BIDMC PPG and Respiration",
+        "MIMIC waveform",
+        "Capnobase"
+      ],
+      "source_urls": [
+        "https://www.mdpi.com/1424-8220/22/6/2079/htm",
+        "https://www.ncbi.nlm.nih.gov/books/NBK543644/"
+      ],
+      "wrapper_priority": 3,
+      "next_wrapper": "Split PPG respiration into AM/FM/BW feature extractors and benchmark against RESP."
+    },
+    {
+      "modality": "PPG+ECG",
+      "task": "Pulse arrival/transit timing and BP proxy",
+      "current_tools": [
+        "Session_compute_ecg_ppg_pulse_arrival"
+      ],
+      "existing_work": [
+        "pulse arrival time",
+        "pulse transit time",
+        "ECG R-peak to PPG foot/peak delay",
+        "cuffless BP estimation reviews"
+      ],
+      "candidate_libraries": [
+        "scipy",
+        "scikit-learn"
+      ],
+      "candidate_datasets": [
+        "BIDMC",
+        "MIMIC waveform"
+      ],
+      "source_urls": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC6912608/",
+        "https://www.mdpi.com/1424-8220/20/19/5699"
+      ],
+      "wrapper_priority": 3,
+      "next_wrapper": "Add PPG foot detection and calibrated ABP/MIMIC PAT-to-BP evaluation before BP claims."
+    },
+    {
+      "modality": "RESP",
+      "task": "Respiratory rate and pattern",
+      "current_tools": [
+        "RESP_estimate_rate",
+        "RESP_screen_rate_pattern"
+      ],
+      "existing_work": [
+        "peak/envelope breath detection",
+        "spectral respiratory rate",
+        "tachypnea/bradypnea rule sets"
+      ],
+      "candidate_libraries": [
+        "neurokit2",
+        "scipy"
+      ],
+      "candidate_datasets": [
+        "BIDMC",
+        "UCDDB",
+        "MIMIC waveform"
+      ],
+      "source_urls": [
+        "https://physionet.org/content/bidmc/",
+        "https://physionet.org/content/ucddb/"
+      ],
+      "wrapper_priority": 2,
+      "next_wrapper": "Add alternate envelope and spectral rate estimators for robust PSG windows."
+    },
+    {
+      "modality": "RESP+SpO2+PSG",
+      "task": "Sleep apnea and hypopnea detection",
+      "current_tools": [
+        "RESP_detect_apnea",
+        "RESP_detect_hypopnea",
+        "SpO2_detect_desaturation",
+        "Session_screen_sleep_apnea_multimodal"
+      ],
+      "existing_work": [
+        "AASM airflow reduction rules",
+        "SpO2 desaturation lag fusion",
+        "PSG event detection",
+        "AHI severity scoring"
+      ],
+      "candidate_libraries": [
+        "yasa",
+        "mne",
+        "scipy"
+      ],
+      "candidate_datasets": [
+        "UCDDB",
+        "SHHS",
+        "MESA",
+        "Apnea-ECG"
+      ],
+      "source_urls": [
+        "https://physionet.org/content/ucddb/",
+        "https://sleepdata.org/datasets/shhs",
+        "https://physionet.org/content/apnea-ecg/"
+      ],
+      "wrapper_priority": 1,
+      "next_wrapper": "Improve UCDDB PSG respiratory-event recall with Flow envelope, hypopnea, desaturation timing, and fusion thresholds."
+    },
+    {
+      "modality": "SpO2",
+      "task": "Desaturation and hypoxemia burden",
+      "current_tools": [
+        "SpO2_summarize",
+        "SpO2_detect_desaturation",
+        "SpO2_assess_hypoxemia_burden"
+      ],
+      "existing_work": [
+        "3 percent and 4 percent desaturation event rules",
+        "ODI",
+        "time-below-threshold burden"
+      ],
+      "candidate_libraries": [
+        "scipy"
+      ],
+      "candidate_datasets": [
+        "UCDDB",
+        "SHHS",
+        "MESA"
+      ],
+      "source_urls": [
+        "https://physionet.org/content/ucddb/",
+        "https://sleepdata.org/datasets/mesa"
+      ],
+      "wrapper_priority": 2,
+      "next_wrapper": "Add configurable 3 percent/4 percent ODI and event-recovery windows."
+    },
+    {
+      "modality": "EEG+EOG+EMG",
+      "task": "Sleep staging",
+      "current_tools": [
+        "EEG_compute_bandpower",
+        "EEG_estimate_sleep_stage_features"
+      ],
+      "existing_work": [
+        "YASA automatic sleep staging",
+        "DeepSleepNet",
+        "U-Sleep",
+        "SeqSleepNet",
+        "AASM EEG/EOG/EMG scoring"
+      ],
+      "candidate_libraries": [
+        "yasa",
+        "mne",
+        "pytorch"
+      ],
+      "candidate_datasets": [
+        "Sleep-EDF",
+        "ISRUC",
+        "UCDDB",
+        "MESA"
+      ],
+      "source_urls": [
+        "https://yasa-sleep.org/generated/yasa.SleepStaging.html",
+        "https://arxiv.org/abs/1703.04046",
+        "https://arxiv.org/abs/2111.08446"
+      ],
+      "wrapper_priority": 1,
+      "next_wrapper": "Add YASA wrapper and PSG manifest channels for EEG/EOG/EMG, then compare against current bandpower baseline."
+    },
+    {
+      "modality": "EEG",
+      "task": "Seizure-like event detection",
+      "current_tools": [
+        "EEG_screen_seizure_like_activity"
+      ],
+      "existing_work": [
+        "CHB-MIT seizure detection baselines",
+        "spike/energy methods",
+        "CNN/RNN event detectors"
+      ],
+      "candidate_libraries": [
+        "mne",
+        "scipy",
+        "pytorch"
+      ],
+      "candidate_datasets": [
+        "CHB-MIT",
+        "TUH EEG Seizure Corpus"
+      ],
+      "source_urls": [
+        "https://physionet.org/content/chbmit/",
+        "https://isip.piconepress.com/projects/tuh_eeg/"
+      ],
+      "wrapper_priority": 4,
+      "next_wrapper": "Add CHB-MIT small benchmark before changing seizure proxy."
+    },
+    {
+      "modality": "EEG",
+      "task": "EEG artifact detection",
+      "current_tools": [
+        "EEG_detect_artifact_proxy",
+        "Signal_detect_artifacts"
+      ],
+      "existing_work": [
+        "MNE ICA",
+        "autoreject",
+        "blink/muscle high-frequency features",
+        "multi-channel artifact labels"
+      ],
+      "candidate_libraries": [
+        "mne",
+        "autoreject",
+        "yasa"
+      ],
+      "candidate_datasets": [
+        "EEG artifact datasets",
+        "Sleep PSG with EOG/EMG context"
+      ],
+      "source_urls": [
+        "https://mne.tools/stable/",
+        "https://autoreject.github.io/"
+      ],
+      "wrapper_priority": 4,
+      "next_wrapper": "Add MNE-based channel-aware artifact features once multi-channel EEG manifests are available."
+    },
+    {
+      "modality": "PCG",
+      "task": "S1/S2 segmentation",
+      "current_tools": [
+        "PCG_segment_s1_s2_proxy"
+      ],
+      "existing_work": [
+        "Springer logistic-regression HSMM segmentation",
+        "Schmidt HMM-style segmentation",
+        "PhysioToolkit HSS package"
+      ],
+      "candidate_libraries": [
+        "PhysioToolkit HSS",
+        "matlab/octave wrappers",
+        "python ports if available"
+      ],
+      "candidate_datasets": [
+        "PhysioNet/CinC 2016",
+        "PASCAL Heart Sound Challenge"
+      ],
+      "source_urls": [
+        "https://archive.physionet.org/physiotools/hss/",
+        "https://physionet.org/content/challenge-2016/"
+      ],
+      "wrapper_priority": 1,
+      "next_wrapper": "Replace alternating-peak proxy with Springer HSMM annotations or wrapper."
+    },
+    {
+      "modality": "PCG",
+      "task": "Normal/abnormal and murmur classification",
+      "current_tools": [
+        "PCG_screen_murmur_proxy",
+        "PCG_detect_heart_sounds"
+      ],
+      "existing_work": [
+        "PhysioNet/CinC 2016 sample logistic-regression classifier",
+        "MFCC plus CNN",
+        "feature and deep-learning ensembles",
+        "CirCor/PhysioNet 2022 murmur tasks"
+      ],
+      "candidate_libraries": [
+        "librosa",
+        "scikit-learn",
+        "pytorch"
+      ],
+      "candidate_datasets": [
+        "PhysioNet/CinC 2016",
+        "CirCor DigiScope / PhysioNet 2022"
+      ],
+      "source_urls": [
+        "https://physionet.org/content/challenge-2016/",
+        "https://physionet.org/content/circor-heart-sound/",
+        "https://arxiv.org/abs/1707.04642"
+      ],
+      "wrapper_priority": 1,
+      "next_wrapper": "Build PCG v2: features from Springer states, MFCC/bandpower, and logistic regression on balanced CinC2016 split."
+    },
+    {
+      "modality": "BCG",
+      "task": "J-peak, heart rate, and respiration",
+      "current_tools": [
+        "BCG_detect_j_peaks",
+        "BCG_estimate_respiration"
+      ],
+      "existing_work": [
+        "time-domain local maxima",
+        "Hilbert transform",
+        "phase vocoder",
+        "wavelet decomposition for heart/respiration components"
+      ],
+      "candidate_libraries": [
+        "scipy",
+        "pywavelets"
+      ],
+      "candidate_datasets": [
+        "CEBSDB",
+        "bed-based BCG datasets",
+        "chair/mattress BCG datasets"
+      ],
+      "source_urls": [
+        "https://pubmed.ncbi.nlm.nih.gov/25312966/",
+        "https://arxiv.org/abs/1807.00951",
+        "https://arxiv.org/abs/1809.03174"
+      ],
+      "wrapper_priority": 3,
+      "next_wrapper": "Add wavelet/Hilbert BCG detector comparison against ECG-aligned records."
+    },
+    {
+      "modality": "SCG",
+      "task": "J-peak, heart rate, respiration, and cardiac timing",
+      "current_tools": [
+        "SCG_detect_j_peaks",
+        "SCG_estimate_respiration"
+      ],
+      "existing_work": [
+        "SCG AO/AC/MC event detection",
+        "Hilbert and template matching",
+        "cardiorespiratory SCG monitoring",
+        "systolic time interval estimation"
+      ],
+      "candidate_libraries": [
+        "scipy",
+        "pywavelets"
+      ],
+      "candidate_datasets": [
+        "CEBSDB",
+        "OpenSCG-style datasets",
+        "SCG+ECG lab datasets"
+      ],
+      "source_urls": [
+        "https://pubmed.ncbi.nlm.nih.gov/25312966/",
+        "https://www.mdpi.com/1424-8220/22/23/9565",
+        "https://arxiv.org/abs/1803.10346"
+      ],
+      "wrapper_priority": 3,
+      "next_wrapper": "Add ECG-aligned SCG event timing benchmark for AO/J peak reliability."
+    },
+    {
+      "modality": "ACC",
+      "task": "Activity recognition and actigraphy sleep/wake",
+      "current_tools": [
+        "ACC_summarize_activity",
+        "ACC_estimate_sleep_wake",
+        "ACC_detect_activity_bouts"
+      ],
+      "existing_work": [
+        "Cole-Kripke/Sadeh-style actigraphy",
+        "UCI HAR features",
+        "Random Forest/CNN/LSTM activity classifiers"
+      ],
+      "candidate_libraries": [
+        "scikit-learn",
+        "tsfresh"
+      ],
+      "candidate_datasets": [
+        "UCI HAR",
+        "WISDM",
+        "MESA actigraphy/PSG",
+        "SHHS actigraphy"
+      ],
+      "source_urls": [
+        "https://archive.ics.uci.edu/dataset/240/human+activity+recognition+using+smartphones",
+        "https://sleepdata.org/datasets/mesa",
+        "https://sleepdata.org/datasets/shhs"
+      ],
+      "wrapper_priority": 4,
+      "next_wrapper": "Add actigraphy sleep/wake benchmark using PSG-labeled MESA/SHHS if accessible."
+    },
+    {
+      "modality": "ACC",
+      "task": "Fall and impact detection",
+      "current_tools": [
+        "ACC_detect_fall_proxy"
+      ],
+      "existing_work": [
+        "impact threshold plus posture change",
+        "accelerometer/gyroscope fall classifiers",
+        "public fall dataset comparisons"
+      ],
+      "candidate_libraries": [
+        "scikit-learn",
+        "tsfresh"
+      ],
+      "candidate_datasets": [
+        "SisFall",
+        "MobiFall",
+        "UP-Fall",
+        "UCI HAR adjacent datasets"
+      ],
+      "source_urls": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC5539544/",
+        "https://www.sciencedirect.com/science/article/abs/pii/S1350453315001575"
+      ],
+      "wrapper_priority": 4,
+      "next_wrapper": "Add one public fall dataset before tuning impact thresholds."
+    },
+    {
+      "modality": "EDA",
+      "task": "Tonic/phasic decomposition and SCR events",
+      "current_tools": [
+        "EDA_summarize",
+        "EDA_detect_arousal_events"
+      ],
+      "existing_work": [
+        "cvxEDA",
+        "NeuroKit2 EDA processing",
+        "pyEDA feature extraction",
+        "SCR peak detection"
+      ],
+      "candidate_libraries": [
+        "neurokit2",
+        "pyEDA",
+        "cvxEDA"
+      ],
+      "candidate_datasets": [
+        "WESAD",
+        "AMIGOS",
+        "DEAP"
+      ],
+      "source_urls": [
+        "https://www.mdpi.com/1424-8220/22/22/8886",
+        "https://www.sciencedirect.com/science/article/pii/S1877050921006438"
+      ],
+      "wrapper_priority": 3,
+      "next_wrapper": "Add NeuroKit2 EDA phasic decomposition and WESAD stress/arousal benchmark."
+    },
+    {
+      "modality": "EDA+ECG+ACC",
+      "task": "Stress/arousal classification",
+      "current_tools": [
+        "EDA_detect_arousal_events",
+        "ECG_compute_hrv",
+        "ACC_summarize_activity"
+      ],
+      "existing_work": [
+        "WESAD multimodal stress classification",
+        "SVM/RF/ANN baselines",
+        "EDA as sympathetic arousal anchor"
+      ],
+      "candidate_libraries": [
+        "scikit-learn",
+        "neurokit2"
+      ],
+      "candidate_datasets": [
+        "WESAD"
+      ],
+      "source_urls": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC12987280/",
+        "https://www.mdpi.com/1424-8220/22/22/8886"
+      ],
+      "wrapper_priority": 3,
+      "next_wrapper": "Create WESAD manifest and multimodal stress benchmark after EDA decomposition wrapper."
+    },
+    {
+      "modality": "EMG",
+      "task": "Activation, bursts, and onset detection",
+      "current_tools": [
+        "EMG_summarize_activation",
+        "EMG_detect_bursts"
+      ],
+      "existing_work": [
+        "RMS envelope",
+        "Teager-Kaiser energy operator",
+        "threshold onset detection",
+        "integrated EMG"
+      ],
+      "candidate_libraries": [
+        "scipy",
+        "neurokit2"
+      ],
+      "candidate_datasets": [
+        "EMGDB",
+        "Ninapro",
+        "gesture/fatigue datasets"
+      ],
+      "source_urls": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC10059683/",
+        "https://ninapro.hevs.ch/"
+      ],
+      "wrapper_priority": 4,
+      "next_wrapper": "Add onset detector variants and gesture/fatigue labels before model training."
+    },
+    {
+      "modality": "EMG",
+      "task": "Muscle fatigue",
+      "current_tools": [
+        "EMG_estimate_fatigue"
+      ],
+      "existing_work": [
+        "median frequency decline",
+        "mean power frequency decline",
+        "RMS increase under sustained load",
+        "fatigue threshold detection"
+      ],
+      "candidate_libraries": [
+        "scipy",
+        "pywavelets"
+      ],
+      "candidate_datasets": [
+        "Ninapro",
+        "fatigue protocol datasets",
+        "EMGDB for abnormality not fatigue"
+      ],
+      "source_urls": [
+        "https://www.mdpi.com/2076-3417/9/15/2952",
+        "https://www.frontiersin.org/articles/10.3389/fnsys.2022.893275/full"
+      ],
+      "wrapper_priority": 4,
+      "next_wrapper": "Add protocol-aware fatigue benchmark rather than tuning current single-window proxy."
+    },
+    {
+      "modality": "ABP",
+      "task": "Pressure events and hemodynamics",
+      "current_tools": [
+        "ABP_detect_pulses",
+        "ABP_screen_pressure_events",
+        "ABP_compute_hemodynamics"
+      ],
+      "existing_work": [
+        "ABP pulse onset/systolic/diastolic detection",
+        "MAP and pulse pressure",
+        "hypotension prediction from ICU waveforms",
+        "pulse contour analysis"
+      ],
+      "candidate_libraries": [
+        "wfdb",
+        "scipy",
+        "scikit-learn"
+      ],
+      "candidate_datasets": [
+        "MIMIC waveform",
+        "BIDMC",
+        "UCI cuffless BP datasets"
+      ],
+      "source_urls": [
+        "https://physionet.org/content/mimic3wdb/",
+        "https://physionet.org/content/bidmc/"
+      ],
+      "wrapper_priority": 3,
+      "next_wrapper": "Add MIMIC/BIDMC calibrated ABP benchmark for MAP/pulse pressure and hypotension flags."
+    }
+  ]
+}

@@ -213,6 +213,23 @@ PAT benchmark uses synchronized BIDMC bidmc01 ECG+PPG: median PAT 528 ms, IQR 16
 outputs: /data1/jiahui/biosignal-agent/outputs/session_eval_rule_major_tasks.json
 ```
 
+## Existing-Work Source Catalog
+
+BioSignalAgent tracks existing algorithms, libraries, and public benchmarks in a machine-readable source catalog:
+
+```bash
+python scripts/validate_tool_source_catalog.py
+```
+
+Catalog files:
+
+```text
+biosignal_agent/tools/source_catalog.json
+docs/tool_source_catalog.md
+```
+
+The highest-priority wrappers are PCG Springer/HSMM + CinC2016 classification features, PSG YASA/sleep-event fusion, and ECG AF/beat classifiers.
+
 ## True Labeled Benchmarks
 
 The framework now has three stronger labeled benchmark tracks in addition to planning/tool execution tests:
