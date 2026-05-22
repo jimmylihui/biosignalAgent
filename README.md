@@ -96,3 +96,32 @@ python examples/ask_openrouter_agent.py   --question "Estimate ECG heart rate an
 ```
 
 The OpenRouter planner returns JSON tool calls, the executor runs local signal tools, and the reporter asks the same model to summarize results. If OpenRouter fails or rate-limits, the framework falls back to the rule planner or deterministic tool-result report.
+
+## Trace Logging And Sessions
+
+Every `ask_openrouter_agent.py` run saves a JSON trace under:
+
+```text
+/data1/jiahui/biosignal-agent/outputs/traces/
+```
+
+A trace contains the question, planner, model, selected tools, tool results, final report, and timestamp. These traces are the starting point for future instruction-tuning data.
+
+Run a multi-signal session from JSON:
+
+```json
+{
+  "question": "Estimate heart rate from these signals and summarize confidence.",
+  "signals": [
+    {"modality": "ecg", "path": "...csv", "sampling_rate": 360, "label": "ecg_example"},
+    {"modality": "ppg", "path": "...csv", "sampling_rate": 100, "label": "ppg_example"},
+    {"modality": "bcg", "path": "...csv", "sampling_rate": 100, "label": "bcg_example"}
+  ]
+}
+```
+
+```bash
+python examples/run_session.py --session session.json
+```
+
+By default, multi-signal sessions use the rule planner for speed and reliability. Use `--llm-planner` to call OpenRouter for each signal.

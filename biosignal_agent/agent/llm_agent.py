@@ -9,6 +9,7 @@ from .openrouter_client import DEFAULT_MODEL, chat_completion
 from .planning_agent import PlanningBioSignalAgent
 from .schema_loader import load_tool_schemas
 from .tool_registry import TOOLS
+from biosignal_agent.session.trace_logger import save_trace
 
 
 @dataclass
@@ -65,7 +66,7 @@ class OpenRouterBioSignalAgent:
                 'fallback_reason': str(exc),
             }
 
-    def run(self, question: str, signal_path: str, sampling_rate: float, column: str | None = None, fallback_modality: str | None = None) -> dict:
+    def run(self, question: str, signal_path: str, sampling_rate: float, column: str | None = None, fallback_modality: str | None = None, save_trace_path: bool = True) -> dict:
         plan = self.plan(question, signal_path, sampling_rate, column, fallback_modality)
         tool_results = []
         for call in plan['tool_calls']:
@@ -80,16 +81,20 @@ class OpenRouterBioSignalAgent:
             result = TOOLS[name](**args)
             tool_results.append({'tool': name, 'arguments': args, 'result': result})
         final_report = self.generate_report(question, plan, tool_results) if self.use_llm_report else self.deterministic_report(question, tool_results)
-        return {
+        trace = {
             'question': question,
             'model': self.model,
             'planner': plan.get('planner', 'openrouter'),
             'modality': plan.get('modality'),
+            'signal': {'path': signal_path, 'sampling_rate': sampling_rate, 'column': column},
             'tool_plan': plan['tool_calls'],
             'tool_results': tool_results,
             'final_report': final_report,
             'disclaimer': 'Prototype output for research use only; not a clinical diagnosis.',
         }
+        if save_trace_path:
+            trace['trace_path'] = str(save_trace(trace))
+        return trace
 
 
     def deterministic_report(self, question: str, tool_results: list[dict]) -> str:
