@@ -80,7 +80,7 @@ def dice_iou_from_logits(logits, target, threshold: float = 0.5) -> tuple[float,
 
 def train(args: argparse.Namespace) -> dict[str, Any]:
     import torch
-    from torch.utils.data import DataLoader
+    from torch.utils.data import DataLoader, WeightedRandomSampler
 
     manifest = json.loads(Path(args.manifest).read_text())
     records = [row for row in manifest.get("records", []) if row.get("mask_path")]
@@ -90,7 +90,20 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     if not records:
         raise ValueError("No records selected for U-Net training.")
     dataset = WaveformMaskDataset(records, args.height, args.width, augment=args.augment, num_classes=args.num_classes)
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+    sampler = None
+    shuffle = True
+    if args.variant_weight:
+        weights = []
+        for row in records:
+            weight = 1.0
+            for spec in args.variant_weight:
+                name, _, value = spec.partition(":")
+                if row.get("variant") == name and value:
+                    weight = float(value)
+            weights.append(weight)
+        sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+        shuffle = False
+    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, sampler=sampler)
     device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else "cpu")
     model = build_waveform_segmentation_model(args.backbone, out_channels=args.num_classes).to(device)
     pos_pixels = 0.0
@@ -158,6 +171,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "model_type": args.backbone,
         "backbone": args.backbone,
         "augment": bool(args.augment),
+        "variant_weight": args.variant_weight,
     }
     torch.save(checkpoint, out)
     report = {"model_path": str(out), **{k: v for k, v in checkpoint.items() if k != "model_state"}, "final": history[-1] if history else {}}
@@ -180,6 +194,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--augment", action="store_true", help="Apply lightweight screenshot/plot appearance augmentation during training.")
+    parser.add_argument("--variant-weight", action="append", default=None, help="Oversample a variant, e.g. multi_panel_multitrace:3.0. Repeat for multiple variants.")
     parser.add_argument("--cpu", action="store_true")
     args = parser.parse_args()
     report = train(args)

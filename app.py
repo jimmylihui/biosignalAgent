@@ -548,12 +548,18 @@ def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0
         resized = Image.fromarray(rgb).resize((int(input_width), int(input_height)), Image.BILINEAR)
         arr = np.asarray(resized, dtype=np.float32) / 255.0
         tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
-        model = build_waveform_segmentation_model(checkpoint.get("model_type") or checkpoint.get("backbone"))
+        num_classes = int(checkpoint.get("num_classes", 1))
+        model = build_waveform_segmentation_model(checkpoint.get("model_type") or checkpoint.get("backbone"), out_channels=num_classes)
         model.load_state_dict(checkpoint["model_state"])
         model.eval()
         with torch.no_grad():
-            prob = torch.sigmoid(model(tensor))[0, 0].cpu().numpy()
-        mask_small = prob >= float(probability_threshold)
+            logits = model(tensor)
+            if num_classes > 1:
+                probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+                mask_small = np.argmax(probs, axis=0) == 1
+            else:
+                prob = torch.sigmoid(logits)[0, 0].cpu().numpy()
+                mask_small = prob >= float(probability_threshold)
         mask = Image.fromarray((mask_small.astype(np.uint8) * 255), mode="L").resize((width, height), Image.NEAREST)
         raw_mask = np.asarray(mask, dtype=np.uint8) > 0
         selected_mask, area_info = select_waveform_mask_area(raw_mask, panel_policy="bottom", pad=max(3, int(height * 0.01)))
@@ -575,7 +581,7 @@ def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0
         area_fraction = bbox.get("area_fraction") if bbox else None
         caption = (
             f"Amber area = selected mask region/panel used for digitization; red pixels = curve mask inside that area. "
-            f"model={Path(UNET_MODEL_PATH).name}, threshold={probability_threshold}, "
+            f"model={Path(UNET_MODEL_PATH).name}, classes={num_classes}, threshold={probability_threshold}, "
             f"mask_fraction={mask_fraction:.4f}, selected_mask_fraction={selected_fraction:.4f}"
             + (f", area_fraction={float(area_fraction):.4f}." if area_fraction is not None else ".")
         )
