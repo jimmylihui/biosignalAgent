@@ -20,18 +20,18 @@ from scripts.build_biosignal_live_controller_sft_v4 import (
 from scripts.run_biosignalagent_e2e_controller import PLANNER_SYSTEM
 
 CORE_TOOLS = {
-    'ecg': ['ECG_assess_quality', 'ECG_detect_r_peaks', 'ECG_compute_hrv'],
-    'ppg': ['PPG_assess_quality', 'PPG_detect_peaks'],
-    'resp': ['RESP_assess_quality', 'RESP_estimate_rate'],
-    'spo2': ['SpO2_assess_quality', 'SpO2_summarize'],
-    'abp': ['ABP_assess_quality', 'ABP_detect_pulses'],
-    'pcg': ['PCG_assess_quality', 'PCG_detect_heart_sounds'],
-    'acc': ['ACC_assess_quality', 'ACC_summarize_activity'],
-    'eda': ['EDA_assess_quality', 'EDA_summarize'],
-    'eeg': ['EEG_assess_quality', 'EEG_compute_bandpower'],
-    'emg': ['EMG_assess_quality', 'EMG_summarize_activation'],
-    'scg': ['SCG_assess_quality', 'SCG_detect_j_peaks'],
-    'bcg': ['BCG_assess_quality', 'BCG_detect_j_peaks'],
+    'ecg': ['ECG_detect_r_peaks', 'ECG_compute_hrv'],
+    'ppg': ['PPG_detect_peaks'],
+    'resp': ['RESP_estimate_rate'],
+    'spo2': ['SpO2_summarize'],
+    'abp': ['ABP_detect_pulses'],
+    'pcg': ['PCG_detect_heart_sounds'],
+    'acc': ['ACC_summarize_activity'],
+    'eda': ['EDA_summarize'],
+    'eeg': ['EEG_compute_bandpower'],
+    'emg': ['EMG_summarize_activation'],
+    'scg': ['SCG_detect_j_peaks'],
+    'bcg': ['BCG_detect_j_peaks'],
 }
 
 COMBOS = [
@@ -45,9 +45,9 @@ COMBOS = [
 ]
 
 FOLLOWUP_TEMPLATES = [
-    'For each modality in this session, select the quality gate and core measurement tools needed before reporting.',
+    'For each modality in this session, select only the core measurement tools needed before reporting; add quality tools only if the question asks about reliability, artifacts, or confidence.',
     'Do not stop after one signal; plan tools for every modality that appears in the session.',
-    'Use compact null arguments, but include all per-modality quality and measurement tools.',
+    'Use compact null arguments and avoid redundant preflight tools unless explicitly requested.',
 ]
 
 

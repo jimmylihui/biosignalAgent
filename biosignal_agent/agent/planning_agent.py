@@ -42,7 +42,7 @@ TASK_TOOL_RULES = {
     ],
 
     "ppg": [
-        ({"heart rate", "hr", "bpm", "pulse rate"}, ["PPG_detect_peaks", "PPG_estimate_heart_rate"]),
+        ({"heart rate", "hr", "bpm", "pulse rate"}, ["PPG_detect_peaks"]),
         ({"prv", "pulse rate variability", "hrv", "pulse variability", "rmssd", "sdnn"}, ["PPG_detect_peaks", "PPG_compute_prv"]),
         ({"fiducial", "onset", "dicrotic", "notch", "systolic peak", "pulse morphology"}, ["PPG_detect_peaks", "PPG_detect_fiducial_points"]),
         ({"spo2", "oxygen saturation", "blood oxygen", "red infrared", "red/ir"}, ["PPG_estimate_spo2"]),
@@ -71,10 +71,10 @@ TASK_TOOL_RULES = {
         ({"heart rate", "hr", "bpm"}, ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate"]),
         ({"murmur", "abnormal heart sound"}, ["PCG_detect_heart_sounds", "Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features"]),
         ({"valve", "valvular", "aortic", "mitral", "tricuspid"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy", "PCG_extract_murmur_features", "PCG_screen_murmur_proxy", "PCG_screen_valve_disease_proxy"]),
-        ({"congenital", "chd", "pediatric structural", "structural abnormality"}, ["PCG_assess_quality", "PCG_detect_heart_sounds", "PCG_screen_murmur_proxy", "PCG_screen_congenital_abnormality_proxy"]),
+        ({"congenital", "chd", "pediatric structural", "structural abnormality"}, ["PCG_detect_heart_sounds", "PCG_screen_murmur_proxy", "PCG_screen_congenital_abnormality_proxy"]),
         ({"s3", "s4", "extra heart sound", "gallop"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy", "PCG_detect_s3_s4_proxy"]),
         ({"rhythm", "irregular", "arrhythmia", "cycle variability"}, ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate", "PCG_assess_rhythm_irregularity"]),
-        ({"heart function", "cardiac function", "monitoring", "longitudinal", "trend"}, ["PCG_assess_quality", "PCG_segment_s1_s2_proxy", "PCG_extract_murmur_features", "PCG_monitor_heart_function_proxy"]),
+        ({"heart function", "cardiac function", "monitoring", "longitudinal", "trend"}, ["PCG_segment_s1_s2_proxy", "PCG_extract_murmur_features", "PCG_monitor_heart_function_proxy"]),
         ({"spectrogram", "heart sound classification", "pcg classification"}, ["Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features"]),
         ({"s1", "s2", "segmentation", "systole", "diastole"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy"]),
     ],
@@ -88,7 +88,7 @@ TASK_TOOL_RULES = {
         ({"spectrogram", "classification", "condition", "condition classification", "myopathy", "neuropathy", "healthy"}, ["Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "EMG_summarize_activation"]),
     ],
     "ecg": [
-        ({"heart rate", "bpm", "r-peak", "r peak", "qrs detection"}, ["ECG_detect_r_peaks", "ECG_estimate_heart_rate"]),
+        ({"heart rate", "bpm", "r-peak", "r peak", "qrs detection"}, ["ECG_detect_r_peaks"]),
         ({"beat classification", "beat-level", "beat level", "pvc", "pac", "sveb", "veb", "ectopy"}, ["ECG_detect_r_peaks", "ECG_classify_beats", "ECG_screen_arrhythmia"]),
         ({"afib", "atrial fibrillation", "af detection", "af screening"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_detect_afib", "ECG_classify_rhythm_segment"]),
         ({"arrhythmia", "rhythm", "irregular", "bradycardia", "tachycardia", "pause"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_classify_rhythm_segment", "ECG_screen_arrhythmia"]),
@@ -96,7 +96,7 @@ TASK_TOOL_RULES = {
         ({"qt", "qtc", "long qt", "qt prolongation"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval"]),
         ({"conduction", "bundle branch", "av block", "pr interval", "qrs duration"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_screen_conduction_block"]),
         ({"ischemia", "ischaemia", "st elevation", "st depression", "st abnormality"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_screen_ischemia_st"]),
-        ({"stress", "fatigue", "recovery", "autonomic", "heart rate variability", "hrv", "rmssd", "sdnn", "lf hf"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_assess_stress_fatigue_hrv"]),
+        ({"stress", "fatigue", "recovery", "autonomic"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_assess_stress_fatigue_hrv"]),
         ({"morphology", "interval", "intervals", "p wave", "t wave"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval", "ECG_screen_conduction_block", "ECG_screen_ischemia_st"]),
     ],
     "resp": [
@@ -143,11 +143,12 @@ class PlanningBioSignalAgent:
         text = question.lower()
         workflow = WORKFLOWS.get(modality, [])
         selected = []
-        if workflow and workflow[0] in TOOLS:
-            selected.append(workflow[0])
 
         wants_hrv = any(term in text for term in ["hrv", "heart rate variability", "rmssd", "sdnn"])
+        wants_quality = any(term in text for term in ["quality", "signal quality", "reliable", "reliability", "confidence", "confident", "limitation", "limitations", "trust", "usable", "validity"])
         wants_artifact = any(term in text for term in ["artifact", "noise", "noisy", "motion artifact", "clipping", "flatline", "signal dropout", "dropout"])
+        if (wants_quality or wants_artifact) and workflow and workflow[0] in TOOLS:
+            selected.append(workflow[0])
         wants_analysis = any(
             term in text
             for term in [
@@ -233,7 +234,7 @@ class PlanningBioSignalAgent:
                 selected.extend(tools)
 
         selected = [tool for idx, tool in enumerate(selected) if tool in TOOLS and tool not in selected[:idx]]
-        if len(selected) == 1 and wants_analysis:
+        if not selected and wants_analysis:
             retrieved = [schema["name"] for schema in find_tool_schemas(question, top_k=3)]
             for tool_name in retrieved:
                 if tool_name in TOOLS and tool_name in workflow and tool_name not in selected:
