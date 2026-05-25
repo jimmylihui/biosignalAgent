@@ -455,6 +455,111 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
         return _trajectory_md(steps), f"Error: {type(exc).__name__}: {exc}", {"error": str(exc), "stage": "image_demo"}, None, None
 
 
+
+
+def _file_path_from_gradio(file_obj: Any) -> str | None:
+    if file_obj is None:
+        return None
+    if isinstance(file_obj, (str, Path)):
+        return str(file_obj)
+    if isinstance(file_obj, dict):
+        for key in ("path", "name", "orig_name"):
+            value = file_obj.get(key)
+            if value:
+                return str(value)
+    value = getattr(file_obj, "name", None) or getattr(file_obj, "path", None)
+    return str(value) if value else None
+
+
+def _is_image_path(path: str) -> bool:
+    return Path(path).suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff"}
+
+
+def _is_csv_path(path: str) -> bool:
+    return Path(path).suffix.lower() in {".csv", ".txt", ".tsv"}
+
+
+def _assistant_message_from_pipeline(kind: str, trajectory: str, report: str, payload: dict[str, Any]) -> str:
+    compact_payload = _compact_tool_result(payload, max_items=8) if isinstance(payload, dict) else payload
+    lines = [
+        "I treated this as a live BioSignalAgent request, not a static form run.",
+        "",
+        f"**Input type:** `{kind}`",
+        "",
+        trajectory,
+        "",
+        report or "No report was produced.",
+        "",
+        "<details><summary>Compact tool trace JSON</summary>",
+        "",
+        "```json",
+        json.dumps(_jsonable(compact_payload), indent=2)[:6000],
+        "```",
+        "",
+        "</details>",
+    ]
+    return "\n".join(lines)
+
+
+def biosignal_chat_response(
+    message: str,
+    history: list[dict[str, Any]] | None,
+    upload: Any,
+    sampling_rate: float,
+    modality_hint: str,
+    trace_method: str,
+) -> str:
+    question = (message or "").strip() or DEFAULT_CSV_QUESTION
+    sampling_rate = float(sampling_rate or 250.0)
+    modality_hint = modality_hint or "auto"
+    trace_method = trace_method or "path"
+    upload_path = _file_path_from_gradio(upload)
+
+    if upload_path and _is_image_path(upload_path):
+        trajectory, report, payload, _plot, _csv = run_image_demo(
+            upload_path,
+            question,
+            sampling_rate,
+            modality_hint,
+            None,
+            None,
+            trace_method,
+        )
+        return _assistant_message_from_pipeline("waveform image", trajectory, report, payload)
+
+    if upload_path and _is_csv_path(upload_path):
+        trajectory, report, payload, _plot = run_csv_demo(upload_path, question, sampling_rate, modality_hint, "")
+        return _assistant_message_from_pipeline("signal CSV", trajectory, report, payload)
+
+    planner = PlanningBioSignalAgent()
+    guessed_modality, matched = _modality_from_text_hint(question, "")
+    route = modality_hint if modality_hint != "auto" else (guessed_modality or "unknown")
+    plan = planner.plan(question, None if route == "unknown" else route)
+    steps = [
+        {
+            "title": "Conversation understanding",
+            "items": [
+                f"User request: `{question[:180]}`",
+                f"Modality inferred from text: `{guessed_modality or 'unknown'}`" + (f" via `{matched}`" if matched else ""),
+                f"Final route: `{route}`",
+            ],
+        },
+        {
+            "title": "Tool planning",
+            "items": [
+                "No signal file was attached, so I can only plan and explain the tool route.",
+                "Candidate tools: " + (", ".join(f"`{tool}`" for tool in plan) if plan else "none"),
+            ],
+        },
+    ]
+    return "\n".join([
+        "Attach a waveform image or CSV and ask the question naturally; I will classify, digitize if needed, call tools, and ground the report in outputs.",
+        "",
+        _trajectory_md(steps),
+        "",
+        f"**Safety note:** {DISCLAIMER}",
+    ])
+
 def summarize_tool_universe():
     try:
         schemas = load_tool_schemas()
@@ -480,13 +585,35 @@ def summarize_tool_universe():
 
 
 def build_demo() -> gr.Blocks:
-    with gr.Blocks(title="BioSignalAgent Demo") as demo:
+    with gr.Blocks(title="BioSignalAgent Chat Demo") as demo:
         gr.Markdown(
-            "# BioSignalAgent Demo\n"
-            "Upload a biosignal CSV or waveform image, then inspect a TxAgent-style trajectory: input understanding, routing, tool planning, tool calls, and grounded reporting. "
-            "This public demo is for research prototyping only and does not provide medical diagnosis."
+            "# BioSignalAgent\n"
+            "Ask a biosignal question like a TxAgent-style AI bot. Upload a waveform image or CSV, and the agent will route modality, extract scale/OCR when possible, digitize images, call tools, and return a grounded research-use report. "
+            "Advanced tabs remain available for debugging each pipeline stage."
         )
-        with gr.Tab("CSV signal"):
+        with gr.Tab("AI bot"):
+            gr.Markdown(
+                "Upload one file, then ask naturally: `What modality is this? Digitize it, estimate heart rate/HRV, and show which tools you used.`"
+            )
+            with gr.Row():
+                bot_upload = gr.File(label="Signal image or CSV", file_types=[".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".csv", ".tsv", ".txt"], type="filepath")
+                with gr.Column(scale=1):
+                    bot_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
+                    bot_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
+                    bot_trace_method = gr.Dropdown(label="Image trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
+            gr.ChatInterface(
+                fn=biosignal_chat_response,
+                chatbot=gr.Chatbot(label="BioSignalAgent", height=650, buttons=["copy", "copy_all"], layout="bubble"),
+                textbox=gr.Textbox(placeholder="Ask BioSignalAgent to analyze the uploaded biosignal...", lines=2),
+                additional_inputs=[bot_upload, bot_sampling_rate, bot_modality, bot_trace_method],
+                examples=[
+                    ["Classify this waveform image, digitize the trace, then estimate heart rate and explain the tools you used."],
+                    ["Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations."],
+                    ["This image may be low resolution. Recover the signal if possible and tell me whether the result is reliable."],
+                ],
+            )
+
+        with gr.Tab("Advanced: CSV signal"):
             with gr.Row():
                 csv_file = gr.File(label="Signal CSV", file_types=[".csv"], type="filepath")
                 with gr.Column():
@@ -501,7 +628,7 @@ def build_demo() -> gr.Blocks:
             csv_json = gr.JSON(label="Tool trace JSON")
             csv_button.click(run_csv_demo, [csv_file, csv_question, csv_sampling_rate, csv_modality, csv_column], [csv_trajectory, csv_report, csv_json, csv_plot])
 
-        with gr.Tab("Waveform image"):
+        with gr.Tab("Advanced: waveform image"):
             with gr.Row():
                 image_file = gr.Image(label="Waveform image", type="filepath")
                 with gr.Column():
@@ -522,7 +649,6 @@ def build_demo() -> gr.Blocks:
         with gr.Tab("ToolUniverse"):
             gr.Markdown(summarize_tool_universe())
     return demo
-
 
 demo = build_demo()
 
