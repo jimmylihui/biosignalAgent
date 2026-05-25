@@ -69,6 +69,7 @@ def _load_multimodal_benchmark_cases(limit: int = 8) -> dict[str, dict[str, Any]
 
 MULTIMODAL_BENCHMARK_CASES = _load_multimodal_benchmark_cases()
 MULTIMODAL_BENCHMARK_CHOICES = [BENCHMARK_NONE, *MULTIMODAL_BENCHMARK_CASES.keys()]
+DEFAULT_MULTIMODAL_BENCHMARK = next(iter(MULTIMODAL_BENCHMARK_CASES.keys()), BENCHMARK_NONE)
 
 
 def _selected_benchmark_case(label: str | None) -> dict[str, Any] | None:
@@ -970,7 +971,14 @@ def _human_answer_from_session(label: str | None, question: str, trace: dict[str
         "Signals from the benchmark:",
     ]
     for sig in signals:
-        lines.append(f"- `{sig.get('label') or Path(str(sig.get('path') or '')).name}`: `{sig.get('modality')}` at `{sig.get('sampling_rate')}` Hz")
+        lines.append(f"- `{sig.get('label') or Path(str(sig.get('path') or '')).name}`: `{sig.get('modality')}` at `{sig.get('sampling_rate')}` Hz, CSV `{sig.get('path')}`")
+    lines.append("")
+    lines.append("Benchmark signal previews:")
+    for sig in signals[:4]:
+        path = str(sig.get("path") or "")
+        if path and Path(path).exists():
+            title = f"{str(sig.get('modality') or 'signal').upper()} benchmark CSV - {sig.get('label') or Path(path).name}"
+            lines.append(_signal_preview_card(path, float(sig.get("sampling_rate") or 0) or None, title))
     lines.append("")
     for run in trace.get("runs", []):
         sig = run.get("signal") or {}
@@ -1797,8 +1805,34 @@ def _clear_chat():
     return []
 
 
+def _benchmark_data_preview_html(label: str | None) -> str:
+    case = _selected_benchmark_case(label)
+    if not case:
+        return "<div class='bs-benchmark-empty'>Select a benchmark task to load its bundled CSV signals.</div>"
+    parts = [
+        "<div class='bs-benchmark-preview'>",
+        f"<div class='bs-benchmark-title'>{case.get('case_id', 'BioSignalBench case')}</div>",
+        f"<div class='bs-benchmark-meta'>{case.get('modality', 'multimodal')} · {len(case.get('signals') or [])} CSV signals</div>",
+    ]
+    for sig in (case.get("signals") or [])[:4]:
+        label_text = sig.get("label") or Path(str(sig.get("path") or "")).name
+        modality = str(sig.get("modality") or "signal").upper()
+        sr = sig.get("sampling_rate")
+        path = str(sig.get("path") or "")
+        parts.append("<div class='bs-benchmark-signal'>")
+        parts.append(f"<div class='bs-benchmark-signal-title'>{modality} · {label_text}</div>")
+        parts.append(f"<div class='bs-benchmark-path'>{path}</div>")
+        if path and Path(path).exists():
+            parts.append(_signal_preview_card(path, float(sr) if sr else None, f"{modality} benchmark signal"))
+        else:
+            parts.append("<div class='bs-benchmark-empty'>CSV file is unavailable on this machine.</div>")
+        parts.append("</div>")
+    parts.append("</div>")
+    return "".join(parts)
+
+
 def _load_benchmark_question(label: str | None):
-    return gr.update(value=_benchmark_question(label) or "")
+    return gr.update(value=_benchmark_question(label) or ""), gr.update(value=_benchmark_data_preview_html(label))
 
 
 
@@ -1897,6 +1931,37 @@ CUSTOM_CSS = """
   border-radius: 10px !important;
   border-color: #dedede !important;
   background: #ffffff !important;
+}
+.bs-benchmark-panel {
+  max-height: 420px;
+  overflow-y: auto;
+  border-top: 1px solid var(--bs-border);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+.bs-benchmark-preview {
+  font-size: 12px;
+  color: var(--bs-text);
+}
+.bs-benchmark-title {
+  font-weight: 650;
+  margin-bottom: 2px;
+}
+.bs-benchmark-meta, .bs-benchmark-path, .bs-benchmark-empty {
+  color: var(--bs-muted);
+  overflow-wrap: anywhere;
+}
+.bs-benchmark-signal {
+  border-top: 1px solid var(--bs-border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.bs-benchmark-signal-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.bs-benchmark-panel img {
+  max-width: 100%;
 }
 .bs-main {
   height: 100vh;
@@ -2062,8 +2127,9 @@ Upload a biosignal image or CSV, then ask a question.
                     bot_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
                     bot_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
                     bot_trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
-                    bot_benchmark_task = gr.Dropdown(label="Benchmark multimodal task", choices=MULTIMODAL_BENCHMARK_CHOICES, value=BENCHMARK_NONE)
+                    bot_benchmark_task = gr.Dropdown(label="Benchmark multimodal task", choices=MULTIMODAL_BENCHMARK_CHOICES, value=DEFAULT_MULTIMODAL_BENCHMARK)
                     bot_load_benchmark = gr.Button("Load benchmark question")
+                    bot_benchmark_preview = gr.HTML(value=_benchmark_data_preview_html(DEFAULT_MULTIMODAL_BENCHMARK), elem_classes=["bs-benchmark-panel"])
             with gr.Column(scale=1, elem_classes=["bs-main"]):
                 with gr.Column(elem_classes=["bs-main-inner"]):
                     gr.HTML(
@@ -2086,6 +2152,7 @@ Upload a biosignal image or CSV, then ask a question.
                         chat_question = gr.Textbox(
                             label="Question",
                             placeholder="Ask anything about the uploaded biosignal",
+                            value=_benchmark_question(DEFAULT_MULTIMODAL_BENCHMARK),
                             lines=2,
                             scale=10,
                             autofocus=True,
@@ -2094,8 +2161,8 @@ Upload a biosignal image or CSV, then ask a question.
                         chat_clear = gr.Button("Clear", scale=1)
                         chat_send = gr.Button("↑", variant="primary", scale=1)
                     chat_inputs = [chat_question, chatbot, bot_upload, bot_sampling_rate, bot_modality, bot_trace_method, bot_benchmark_task]
-                    bot_load_benchmark.click(_load_benchmark_question, bot_benchmark_task, chat_question)
-                    bot_benchmark_task.change(_load_benchmark_question, bot_benchmark_task, chat_question)
+                    bot_load_benchmark.click(_load_benchmark_question, bot_benchmark_task, [chat_question, bot_benchmark_preview])
+                    bot_benchmark_task.change(_load_benchmark_question, bot_benchmark_task, [chat_question, bot_benchmark_preview])
                     chat_question.submit(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
                     chat_send.click(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
                     chat_clear.click(_clear_chat, outputs=chatbot)
