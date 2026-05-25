@@ -1355,15 +1355,15 @@ def _signal_preview_card(csv_path: str | None, sampling_rate: float | None, titl
         return f"<div><b>{title}</b><br><span style='color:#999'>preview unavailable: {exc}</span></div>"
 
 
-def _image_pipeline_visuals(payload: dict[str, Any]) -> list[str]:
+def _image_pipeline_visual_groups(payload: dict[str, Any]) -> dict[str, list[str]]:
     digitization = payload.get("digitization") or {}
     image_path = digitization.get("image_path") or payload.get("image_path")
     out_csv = digitization.get("out_csv")
     sampling_rate = digitization.get("sampling_rate")
-    visuals: list[str] = []
+    groups: dict[str, list[str]] = {"input": [], "digitization": []}
     if image_path:
-        visuals.append(_image_preview_card("Uploaded image", image_path, "Original input seen by the image pipeline."))
-        visuals.append(_segmentation_overlay_card(image_path, probability_threshold=0.65))
+        groups["input"].append(_image_preview_card("Uploaded image", image_path, "Original input seen by the image pipeline."))
+        groups["digitization"].append(_segmentation_overlay_card(image_path, probability_threshold=0.65))
     signals = digitization.get("signals") or []
     if signals:
         for idx, signal in enumerate(signals[:8], 1):
@@ -1381,10 +1381,15 @@ def _image_pipeline_visuals(payload: dict[str, Any]) -> list[str]:
             card = _signal_preview_card(panel_csv, panel_sr, title, y_limits=_axis_y_limits_from_signal(signal))
             if caption and "</div>" in card:
                 card = card.replace("</div>", f"<div style='color:#777;font-size:0.85em;margin-top:4px'>{caption}</div></div>", 1)
-            visuals.append(card)
+            groups["digitization"].append(card)
     elif out_csv:
-        visuals.append(_signal_preview_card(out_csv, sampling_rate, "Digitized waveform preview", y_limits=_axis_y_limits_from_signal(digitization)))
-    return visuals
+        groups["digitization"].append(_signal_preview_card(out_csv, sampling_rate, "Digitized waveform preview", y_limits=_axis_y_limits_from_signal(digitization)))
+    return groups
+
+
+def _image_pipeline_visuals(payload: dict[str, Any]) -> list[str]:
+    groups = _image_pipeline_visual_groups(payload)
+    return [*groups.get("input", []), *groups.get("digitization", [])]
 
 
 def _tool_call_card(name: str, args: dict[str, Any] | None = None, result: dict[str, Any] | None = None, icon: str = "T") -> str:
@@ -1439,48 +1444,74 @@ def _human_answer_from_pipeline(kind: str, question: str, report: str, payload: 
     modality = signal_report.get("modality") or "unknown"
     plan = signal_report.get("plan") or []
     findings = signal_report.get("findings") or []
-    cards = _tool_cards_from_payload(kind, payload if isinstance(payload, dict) else {})
     lines = [
-        "I’ll inspect the image first, then show the tool calls I used before giving the result.",
+        "I’ll walk through this like an agent run: inspect the input, call each tool, show its output, then answer.",
         "",
     ]
+
     if kind == "waveform image":
         ocr = payload.get("ocr") or {}
         image_classifier = payload.get("image_classifier") or {}
+        scale = payload.get("scale") or {}
+        axis_ocr = payload.get("axis_ocr") or {}
+        digitization = payload.get("digitization") or {}
+        image_path = digitization.get("image_path") or payload.get("image_path")
         classifier_modality = image_classifier.get("predicted_modality")
         final_modality = modality if modality and modality != "unknown" else classifier_modality
+        visual_groups = _image_pipeline_visual_groups(payload)
+
         if final_modality and final_modality != "unknown":
-            lines.extend([f"This looks like a `{final_modality}` waveform image. I’ll still check OCR/axis text because screenshots can fool the image classifier.", ""])
+            lines.extend([f"The image looks like a `{final_modality}` waveform. I’ll still use text and axis hints because plot screenshots can confuse the image classifier.", ""])
         else:
-            lines.extend(["I can see this is a waveform plot image, but the modality classifier did not produce a confident label yet. I’ll continue with image OCR, axis reading, and waveform digitization rather than pretending the route is known.", ""])
+            lines.extend(["I can see this is a waveform plot image, but the modality is not confident yet. I’ll use OCR, axis reading, and digitization before deciding how much to trust the signal tools.", ""])
         if payload.get("error"):
-            lines.extend([f"The run stopped during `{payload.get('stage', 'image_demo')}` with `{payload.get('error_type', 'error')}`: {payload.get('error')}", "I’ll still show the uploaded image when available so we can debug the failure visually.", ""])
-        if final_modality and image_classifier.get("predicted_modality") and image_classifier.get("predicted_modality") != final_modality:
-            lines.extend([
-                f"One important detail: the image CNN leaned toward `{image_classifier.get('predicted_modality')}`, but the OCR/title context pointed to `{final_modality}`, so I used the text-grounded route for this case.",
-                "",
-            ])
+            lines.extend([f"The run stopped during `{payload.get('stage', 'image_demo')}` with `{payload.get('error_type', 'error')}`: {payload.get('error')}", ""])
+
+        lines.append("First, I read text from the image and route the modality.")
+        lines.append(_tool_call_card("Signal_read_image_text_ocr", {"image": "uploaded"}, ocr, "T"))
         if ocr.get("text"):
-            lines.extend([f"OCR picked up: `{str(ocr.get('text'))[:180]}`", ""])
-        axis_ocr = payload.get("axis_ocr") or {}
+            lines.append(f"OCR text: `{str(ocr.get('text'))[:180]}`")
+        lines.append(_tool_call_card("Signal_classify_modality_from_image_cnn", {"image": "uploaded"}, image_classifier, "T"))
+        if final_modality and image_classifier.get("predicted_modality") and image_classifier.get("predicted_modality") != final_modality:
+            lines.append(f"The CNN leaned toward `{image_classifier.get('predicted_modality')}`, but text/context pointed to `{final_modality}`, so I used the text-grounded route here.")
+        lines.extend(visual_groups.get("input", []))
+        lines.append("")
+
+        lines.append("Next, I estimate the plot scale and read axis ticks.")
+        lines.append(_tool_call_card("Signal_estimate_image_scale", {"use_ocr": True}, scale, "T"))
+        lines.append(_tool_call_card("Signal_extract_plot_axes_ocr", {"x_axis": True, "y_axis": True}, axis_ocr, "T"))
         if axis_ocr.get("panels"):
-            first_axis = axis_ocr.get("panels", [{}])[0]
-            lines.extend([
-                "I also tried to read the plot axes before digitizing, because otherwise the recovered signal stays in pixel/normalized units.",
-                f"For panel 1, I read x ticks `{first_axis.get('x_tick_values')}` and y ticks `{first_axis.get('y_tick_values')}`; inferred duration `{first_axis.get('duration_s')}` and y range `({first_axis.get('value_min')}, {first_axis.get('value_max')})`.",
-                "",
-            ])
-        visuals = _image_pipeline_visuals(payload)
-        if visuals:
-            lines.append("Here are the visual checkpoints I used:")
-            lines.extend(visuals)
-            lines.append("")
+            for axis in axis_ocr.get("panels", [])[:3]:
+                panel_idx = axis.get("panel_index") or 1
+                lines.append(
+                    f"Panel {panel_idx}: x ticks `{axis.get('x_tick_values')}`, y ticks `{axis.get('y_tick_values')}`, duration `{axis.get('duration_s')}`, y range `({axis.get('value_min')}, {axis.get('value_max')})`."
+                )
+        else:
+            lines.append("I could not read reliable axis ticks, so any recovered waveform may still be in normalized or partially calibrated units.")
+        lines.append("")
+
+        lines.append("Then I digitize the waveform. The segmentation and recovered signal below are the output of this tool.")
+        lines.append(_tool_call_card("Signal_digitize_waveform_image", {"trace": "visible waveform"}, digitization, "T"))
+        lines.extend(visual_groups.get("digitization", []))
+        lines.append("")
     else:
         lines.extend([f"I read the uploaded CSV and routed it as `{modality}` before selecting tools.", ""])
-    if cards:
-        lines.append("I’m going to call these tools:")
-        lines.extend(cards)
+
+    report_cards = []
+    for call in (signal_report.get("tool_calls") or [])[:8]:
+        if isinstance(call, dict):
+            report_cards.append(_tool_call_card(str(call.get("tool") or "tool"), call.get("args") or {}, call.get("result") or call, "T"))
+    if report_cards:
+        lines.append("Finally, I call the signal-analysis tools on the recovered signal.")
+        lines.extend(report_cards)
         lines.append("")
+    elif kind != "waveform image":
+        cards = _tool_cards_from_payload(kind, payload if isinstance(payload, dict) else {})
+        if cards:
+            lines.append("I’m going to call these tools:")
+            lines.extend(cards)
+            lines.append("")
+
     if plan:
         lines.append("The final tool route is: " + ", ".join(f"`{tool}`" for tool in plan) + ".")
         lines.append("")
@@ -1502,7 +1533,6 @@ def _human_answer_from_pipeline(kind: str, question: str, report: str, payload: 
         "</details>",
     ])
     return "\n".join(lines)
-
 
 def _chat_progress(text: str, tool_cards: list[str] | None = None) -> str:
     lines = [text]
