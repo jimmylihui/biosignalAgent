@@ -893,6 +893,100 @@ def run_csv_demo(csv_file: str | None, question: str, sampling_rate: float, moda
         return _trajectory_md(steps), f"Error: {type(exc).__name__}: {exc}", {"error": str(exc), "stage": "csv_demo"}, None
 
 
+def _axis_panel_by_index(axis_ocr: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    panels = axis_ocr.get("panels") or []
+    out: dict[int, dict[str, Any]] = {}
+    for idx, panel in enumerate(panels, 1):
+        try:
+            out[int(panel.get("panel_index") or idx)] = panel
+        except Exception:
+            out[idx] = panel
+    return out
+
+
+def _signal_selected_bbox(signal: dict[str, Any]) -> dict[str, Any]:
+    if signal.get("selected_bbox"):
+        return signal.get("selected_bbox") or {}
+    area = signal.get("selected_mask_area") or {}
+    return area.get("selected") or {}
+
+
+def _rewrite_csv_with_axis_calibration(csv_path: str, signal: dict[str, Any], panel_axis: dict[str, Any]) -> bool:
+    if not csv_path or not Path(csv_path).exists():
+        return False
+    plot_area = panel_axis.get("plot_area") or {}
+    bbox = _signal_selected_bbox(signal)
+    required = ["x_min", "x_max", "y_min", "y_max"]
+    if not all(k in plot_area for k in required) or not all(k in bbox for k in required):
+        return False
+    x_ticks = [float(v) for v in (panel_axis.get("x_tick_values") or []) if v is not None]
+    y_ticks = [float(v) for v in (panel_axis.get("y_tick_values") or []) if v is not None]
+    if len(x_ticks) < 2 or len(y_ticks) < 2:
+        return False
+    x0, x1 = min(x_ticks), max(x_ticks)
+    y0, y1 = min(y_ticks), max(y_ticks)
+    plot_x0, plot_x1 = float(plot_area["x_min"]), float(plot_area["x_max"])
+    plot_y0, plot_y1 = float(plot_area["y_min"]), float(plot_area["y_max"])
+    bbox_x0, bbox_x1 = float(bbox["x_min"]), float(bbox["x_max"])
+    bbox_y0, bbox_y1 = float(bbox["y_min"]), float(bbox["y_max"])
+    if plot_x1 <= plot_x0 or plot_y1 <= plot_y0 or bbox_x1 <= bbox_x0 or bbox_y1 <= bbox_y0 or y1 <= y0:
+        return False
+    frame = pd.read_csv(csv_path)
+    if "signal" not in frame.columns or len(frame) < 2:
+        return False
+    values = frame["signal"].to_numpy(dtype=float)
+    # Recover the digitized trace's relative y position inside its selected mask bbox,
+    # then remap that absolute pixel position through the full plot-area y-axis.
+    source_y0 = float(panel_axis.get("value_min") if panel_axis.get("value_min") is not None else y0)
+    source_y1 = float(panel_axis.get("value_max") if panel_axis.get("value_max") is not None else y1)
+    if source_y1 <= source_y0:
+        return False
+    normalized = 2.0 * (values - source_y0) / (source_y1 - source_y0) - 1.0
+    y_rel = (1.0 - normalized) * max(1.0, bbox_y1 - bbox_y0) / 2.0
+    y_abs = bbox_y0 + y_rel
+    calibrated_values = y1 - ((y_abs - plot_y0) / (plot_y1 - plot_y0)) * (y1 - y0)
+    n = len(values)
+    x_abs = bbox_x0 + np.linspace(0.0, max(0.0, bbox_x1 - bbox_x0), n)
+    calibrated_time = x0 + ((x_abs - plot_x0) / (plot_x1 - plot_x0)) * (x1 - x0)
+    frame = pd.DataFrame({"time_s": calibrated_time, "signal": calibrated_values})
+    frame.to_csv(csv_path, index=False)
+    signal["sampling_rate"] = float((n - 1) / max(1e-12, calibrated_time[-1] - calibrated_time[0])) if n > 1 else None
+    signal["value_min"] = float(np.nanmin(calibrated_values)) if n else None
+    signal["value_max"] = float(np.nanmax(calibrated_values)) if n else None
+    signal["time_min"] = float(np.nanmin(calibrated_time)) if n else None
+    signal["time_max"] = float(np.nanmax(calibrated_time)) if n else None
+    signal["scale"] = "axis_calibrated_from_vlm_plot_area"
+    signal["axis_calibration"] = {
+        "panel_index": panel_axis.get("panel_index"),
+        "x_tick_values": x_ticks,
+        "y_tick_values": y_ticks,
+        "plot_area": plot_area,
+        "trace_bbox": bbox,
+    }
+    return True
+
+
+def _apply_axis_calibration_to_digitization(digitized: dict[str, Any], axis_ocr: dict[str, Any]) -> dict[str, Any]:
+    if not digitized or digitized.get("error"):
+        return digitized
+    by_index = _axis_panel_by_index(axis_ocr)
+    signals = digitized.get("signals") or [digitized]
+    applied = 0
+    for idx, signal in enumerate(signals, 1):
+        panel_idx = int(signal.get("panel_index") or idx)
+        panel_axis = by_index.get(panel_idx) or by_index.get(idx) or {}
+        if _rewrite_csv_with_axis_calibration(str(signal.get("out_csv") or ""), signal, panel_axis):
+            applied += 1
+    if signals and signals[0] is not digitized:
+        primary = signals[0]
+        for key in ("sampling_rate", "value_min", "value_max", "time_min", "time_max", "scale", "axis_calibration"):
+            if key in primary:
+                digitized[key] = primary[key]
+    digitized["axis_calibration_applied"] = int(applied)
+    digitized["axis_calibration_source"] = axis_ocr.get("llm_axis_provider") or "ocr"
+    return digitized
+
+
 def _digitization_result_is_usable(result: dict[str, Any]) -> bool:
     if not result or result.get("error"):
         return False
@@ -1003,7 +1097,10 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
         calibrated_value_min = value_min if value_min is not None else axis_value_min
         calibrated_value_max = value_max if value_max is not None else axis_value_max
         user_sr = float(sampling_rate) if sampling_rate and sampling_rate > 0 else None
-        sr = user_sr or axis_ocr.get("sampling_rate") or scale.get("sampling_rate")
+        axis_sr = axis_ocr.get("sampling_rate")
+        # In the image demo, axis ticks are more trustworthy than the default UI
+        # sampling-rate value because plot screenshots often use arbitrary x-scales.
+        sr = axis_sr or user_sr or scale.get("sampling_rate")
         axis_panel_summaries = []
         for panel in (axis_ocr.get("panels") or [])[:4]:
             axis_panel_summaries.append(
@@ -1022,6 +1119,8 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
             ],
         })
         digitized = _digitize_with_fallback(image_file, sr, str(out_csv), calibrated_value_min, calibrated_value_max, trace_method)
+        digitized = _apply_axis_calibration_to_digitization(digitized, axis_ocr)
+        sr = digitized.get("sampling_rate") or sr
         digitizer_route = str(digitized.get("fallback_priority") or digitized.get("method") or digitized.get("tool") or "segmentation_or_fallback_digitizer")
         if digitized.get("fallback_from_ml_error"):
             digitizer_route += " after ML model unavailable"
@@ -1061,7 +1160,7 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
             "signal_report": report,
             "disclaimer": DISCLAIMER,
         }
-        return _trajectory_md(steps), _short_report(report), _jsonable(payload), _plot_signal(values, sr, "Digitized waveform"), str(primary_csv)
+        return _trajectory_md(steps), _short_report(report), _jsonable(payload), _plot_csv_signal(str(primary_csv), sr, "Digitized waveform", y_limits=_axis_y_limits_from_signal(digitized)), str(primary_csv)
     except Exception as exc:
         steps.append({"title": "Failure", "status": "error", "detail": f"{type(exc).__name__}: {exc}"})
         payload = {"image_path": image_file, "error": str(exc), "error_type": type(exc).__name__, "stage": "image_demo", "disclaimer": DISCLAIMER}
@@ -1115,6 +1214,41 @@ def _image_preview_card(title: str, image_path: str, caption: str = "") -> str:
         return _visual_card(title, uri, caption)
     except Exception as exc:
         return f"<div><b>{title}</b><br><span style='color:#999'>preview unavailable: {exc}</span></div>"
+
+
+def _plot_csv_signal(csv_path: str, sampling_rate: float | None, title: str, y_limits: tuple[float, float] | None = None):
+    frame = pd.read_csv(csv_path)
+    values = frame["signal"].to_numpy(dtype=float) if "signal" in frame.columns else frame.select_dtypes(include=[np.number]).iloc[:, -1].to_numpy(dtype=float)
+    if "time_s" in frame.columns:
+        x = frame["time_s"].to_numpy(dtype=float)
+        xlabel = "Time (s)"
+    elif sampling_rate and sampling_rate > 0:
+        x = np.arange(len(values), dtype=float) / float(sampling_rate)
+        xlabel = "Time (s)"
+    else:
+        x = np.arange(len(values), dtype=float)
+        xlabel = "Sample"
+    fig, ax = plt.subplots(figsize=(6, 2.3))
+    ax.plot(x, values, linewidth=1.2)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Amplitude")
+    if len(x):
+        ax.set_xlim(float(np.nanmin(x)), float(np.nanmax(x)))
+    if y_limits is not None and y_limits[1] > y_limits[0]:
+        pad = 0.03 * (float(y_limits[1]) - float(y_limits[0]))
+        ax.set_ylim(float(y_limits[0]) - pad, float(y_limits[1]) + pad)
+    ax.grid(alpha=0.25)
+    fig.tight_layout()
+    return fig
+
+
+def _axis_y_limits_from_signal(signal: dict[str, Any]) -> tuple[float, float] | None:
+    calib = signal.get("axis_calibration") or {}
+    ticks = [float(v) for v in (calib.get("y_tick_values") or []) if v is not None]
+    if len(ticks) >= 2:
+        return min(ticks), max(ticks)
+    return None
 
 
 def _visual_card(title: str, data_uri: str, caption: str = "") -> str:
@@ -1207,12 +1341,11 @@ def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0
         return f"<div style='border:1px solid #eee;border-radius:8px;padding:10px;margin:10px 0'><b>Segmentation overlay</b><br><span style='color:#999'>Unavailable: {exc}</span></div>"
 
 
-def _signal_preview_card(csv_path: str | None, sampling_rate: float | None, title: str = "Digitized waveform") -> str:
+def _signal_preview_card(csv_path: str | None, sampling_rate: float | None, title: str = "Digitized waveform", y_limits: tuple[float, float] | None = None) -> str:
     if not csv_path:
         return ""
     try:
-        values, _column = _read_signal(csv_path, "signal")
-        fig = _plot_signal(values, sampling_rate, title)
+        fig = _plot_csv_signal(csv_path, sampling_rate, title, y_limits=y_limits)
         buf = BytesIO()
         fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
         plt.close(fig)
@@ -1245,12 +1378,12 @@ def _image_pipeline_visuals(payload: dict[str, Any]) -> list[str]:
                 if selected:
                     caption_bits.append(f"area={selected}")
             caption = "; ".join(caption_bits) or f"Recovered signal from `{Path(panel_csv or '').name}`."
-            card = _signal_preview_card(panel_csv, panel_sr, title)
+            card = _signal_preview_card(panel_csv, panel_sr, title, y_limits=_axis_y_limits_from_signal(signal))
             if caption and "</div>" in card:
                 card = card.replace("</div>", f"<div style='color:#777;font-size:0.85em;margin-top:4px'>{caption}</div></div>", 1)
             visuals.append(card)
     elif out_csv:
-        visuals.append(_signal_preview_card(out_csv, sampling_rate, "Digitized waveform preview"))
+        visuals.append(_signal_preview_card(out_csv, sampling_rate, "Digitized waveform preview", y_limits=_axis_y_limits_from_signal(digitization)))
     return visuals
 
 
