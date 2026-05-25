@@ -46,6 +46,8 @@ A lightweight comparison on the rendered digitization benchmark favored an augme
 
 The chat demo also embeds visual checkpoints in image runs: the uploaded plot, a multi-class segmentation overlay: blue non-target/distractor pixels, red target-trace pixels, and amber selected mask-area/panel, and the recovered digitized waveform preview. These are included directly in the agent answer so users can inspect whether the correct mask area, panel, and trace were selected before trusting downstream measurements.
 
+Axis OCR is now a separate visible step in the image pipeline. `Signal_extract_plot_axes_ocr` crops each selected panel's x-axis and y-axis bands, reads tick labels with Tesseract, applies conservative post-processing for common OCR errors such as `10` -> `1` and `-1` -> `4`, and passes inferred x-axis duration/sampling rate plus y-axis value bounds into digitization when readable. If tick labels are unreadable, the report explicitly marks the axis calibration as partial instead of silently pretending the physical scale is known.
+
 ## Target-aware segmentation experiment
 
 A weighted 3-class target-aware U-Net is now the default image digitization segmentation model. Compared with the previous binary multi-style model on the same target-aware validation split, it improved mean Dice from 0.8260 to 0.8337 and mean IoU from 0.7115 to 0.7201. The largest gain is on multi-panel + multi-trace plots, where Dice improved from 0.6841 to 0.7777.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import tempfile
 import time
 from io import BytesIO
@@ -140,6 +141,206 @@ def _extract_optional_ocr_text(image_path: str) -> dict[str, Any]:
         return {"available": True, "text": cleaned[:800]}
     except Exception as exc:
         return {"available": False, "text": "", "error": str(exc)}
+
+
+def _numbers_from_text(text: str) -> list[float]:
+    values: list[float] = []
+    for token in re.findall(r"[-+]?\d+(?:\.\d+)?", str(text or "")):
+        try:
+            values.append(float(token))
+        except ValueError:
+            continue
+    return values
+
+
+def _ordered_axis_values_from_tokens(tokens: list[dict[str, Any]]) -> list[float]:
+    raw = [token for token in tokens if str(token.get("variant", "")).startswith("raw_")]
+    source = raw or tokens
+    source = sorted(source, key=lambda token: float(token.get("x", 0.0)))
+    collapsed: list[dict[str, Any]] = []
+    for token in source:
+        try:
+            value = float(token.get("value"))
+            x = float(token.get("x"))
+        except Exception:
+            continue
+        if collapsed and abs(x - float(collapsed[-1].get("x", 0.0))) <= 8:
+            # Prefer multi-character tokens because OCR often splits 10 into 1.
+            prev_text = str(collapsed[-1].get("text", ""))
+            text = str(token.get("text", ""))
+            if len(text) > len(prev_text):
+                collapsed[-1] = token
+            continue
+        collapsed.append(token)
+    values = [float(token.get("value")) for token in collapsed]
+    if len(values) >= 4:
+        diffs = [values[i + 1] - values[i] for i in range(len(values) - 1) if values[i + 1] > values[i]]
+        positive_diffs = [d for d in diffs if d > 0]
+        if positive_diffs:
+            step = float(np.median(positive_diffs))
+            if step > 0 and values[-1] <= values[-2]:
+                values[-1] = values[-2] + step
+    return sorted(set(float(v) for v in values if np.isfinite(v)))
+
+
+def _clean_y_tick_values(values: list[float]) -> list[float]:
+    vals = sorted(set(float(v) for v in values if np.isfinite(v)))
+    if len(vals) <= 3:
+        return vals
+    if any(abs(v) < 1e-6 for v in vals):
+        positives = sorted(v for v in vals if v > 0)
+        for pos in positives:
+            if any(abs(v + pos) < max(1e-6, abs(pos) * 0.05) for v in vals if v < 0):
+                return [-float(pos), 0.0, float(pos)]
+    return vals
+
+
+def _ocr_axis_crop(image, psm: int = 6) -> dict[str, Any]:
+    try:
+        import pytesseract
+        from PIL import Image, ImageOps
+
+        base = image.convert("L")
+        base = ImageOps.autocontrast(base.resize((max(1, base.width * 4), max(1, base.height * 4))))
+        arr = np.asarray(base, dtype=np.uint8)
+        threshold = int(np.percentile(arr, 72))
+        binary = Image.fromarray(np.where(arr < threshold, 0, 255).astype(np.uint8))
+        variants = [(base, psm, f"raw_psm{int(psm)}"), (base, 11, "raw_psm11"), (binary, psm, f"binary_psm{int(psm)}"), (binary, 11, "binary_psm11")]
+        texts: list[str] = []
+        tokens: list[dict[str, Any]] = []
+        seen_token_keys: set[tuple[float, int, int]] = set()
+        for crop, mode, variant_name in variants:
+            config = f"--psm {int(mode)} -c tessedit_char_whitelist=0123456789.-+"
+            try:
+                text = pytesseract.image_to_string(crop, config=config)
+                if text.strip():
+                    texts.append(" ".join(text.split()))
+            except Exception:
+                text = ""
+            try:
+                data = pytesseract.image_to_data(crop, config=config, output_type=pytesseract.Output.DICT)
+            except Exception:
+                continue
+            n = len(data.get("text", []))
+            for idx in range(n):
+                raw = str(data["text"][idx]).strip()
+                nums = _numbers_from_text(raw)
+                if not nums:
+                    continue
+                try:
+                    conf = float(data.get("conf", [0] * n)[idx])
+                except Exception:
+                    conf = 0.0
+                x = (float(data["left"][idx]) + float(data["width"][idx]) / 2.0) / 4.0
+                y = (float(data["top"][idx]) + float(data["height"][idx]) / 2.0) / 4.0
+                for value in nums:
+                    key = (round(float(value), 3), int(round(x)), int(round(y)))
+                    if key in seen_token_keys:
+                        continue
+                    seen_token_keys.add(key)
+                    tokens.append({"value": float(value), "text": raw, "x": x, "y": y, "confidence": conf, "variant": variant_name})
+        number_values = sorted(set(float(token["value"]) for token in tokens))
+        if not number_values:
+            number_values = sorted(set(_numbers_from_text(" ".join(texts))))
+        return {"available": True, "text": " | ".join(texts)[:400], "numbers": number_values, "tokens": tokens}
+    except Exception as exc:
+        return {"available": False, "text": "", "numbers": [], "tokens": [], "error": str(exc)}
+
+
+def _extract_plot_axes_ocr(image_path: str, max_panels: int = 8) -> dict[str, Any]:
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    width, height = image.size
+    panels: list[dict[str, Any]] = []
+    areas: list[tuple[np.ndarray, dict[str, Any]]] = []
+    try:
+        import torch
+
+        checkpoint = torch.load(UNET_MODEL_PATH, map_location="cpu", weights_only=False)
+        input_height, input_width = checkpoint.get("input_size", [160, 384])
+        rgb = np.asarray(image)
+        resized = image.resize((int(input_width), int(input_height)), Image.BILINEAR)
+        arr = np.asarray(resized, dtype=np.float32) / 255.0
+        tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
+        num_classes = int(checkpoint.get("num_classes", 1))
+        model = build_waveform_segmentation_model(checkpoint.get("model_type") or checkpoint.get("backbone"), out_channels=num_classes)
+        model.load_state_dict(checkpoint["model_state"])
+        model.eval()
+        with torch.no_grad():
+            logits = model(tensor)
+            if num_classes > 1:
+                probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+                mask_small = np.argmax(probs, axis=0) == 1
+            else:
+                mask_small = torch.sigmoid(logits)[0, 0].cpu().numpy() >= 0.65
+        mask = Image.fromarray((mask_small.astype(np.uint8) * 255), mode="L").resize((width, height), Image.NEAREST)
+        raw_mask = np.asarray(mask, dtype=np.uint8) > 0
+        areas, _summary = select_waveform_mask_areas(raw_mask, pad=max(3, int(height * 0.01)))
+    except Exception:
+        areas = []
+
+    if not areas:
+        scale = Signal_estimate_image_scale(image_path, use_ocr=False)
+        bbox = scale.get("plot_area") or {"left": 0, "right": width - 1, "top": 0, "bottom": height - 1}
+        areas = [(np.zeros((height, width), dtype=bool), {"x_min": int(bbox.get("left", 0)), "x_max": int(bbox.get("right", width - 1)), "y_min": int(bbox.get("top", 0)), "y_max": int(bbox.get("bottom", height - 1)), "panel_index": 1, "selection_mode": "scale_plot_area_fallback"})]
+
+    for idx, (_mask, bbox) in enumerate(areas[:max(1, int(max_panels))], 1):
+        x_min = max(0, int(bbox.get("x_min", 0)))
+        x_max = min(width, int(bbox.get("x_max", width)))
+        y_min = max(0, int(bbox.get("y_min", 0)))
+        y_max = min(height, int(bbox.get("y_max", height)))
+        pad_x = max(20, int(width * 0.10))
+        pad_y = max(18, int(height * 0.08))
+        x_crop_box = (max(0, x_min - int(pad_x * 0.2)), max(0, y_max - int(pad_y * 0.35)), min(width, x_max + int(pad_x * 0.05)), min(height, y_max + int(pad_y * 1.25)))
+        y_crop_box = (max(0, x_min - int(pad_x * 1.4)), max(0, y_min - int(pad_y * 0.25)), min(width, x_min + int(pad_x * 0.65)), min(height, y_max + int(pad_y * 0.25)))
+        x_ocr = _ocr_axis_crop(image.crop(x_crop_box), psm=6)
+        y_ocr = _ocr_axis_crop(image.crop(y_crop_box), psm=6)
+        x_values = _ordered_axis_values_from_tokens(x_ocr.get("tokens", [])) or sorted(set(float(v) for v in x_ocr.get("numbers", []) if np.isfinite(v)))
+        y_raw_tokens = [token for token in y_ocr.get("tokens", []) if str(token.get("variant", "")).startswith("raw_")]
+        y_source_values = [float(token.get("value")) for token in y_raw_tokens if np.isfinite(float(token.get("value")))]
+        y_values = _clean_y_tick_values(sorted(set(y_source_values if len(set(y_source_values)) >= 2 else [float(v) for v in y_ocr.get("numbers", []) if np.isfinite(v)])))
+        duration_s = None
+        if len(x_values) >= 2:
+            span = float(max(x_values) - min(x_values))
+            if span > 0:
+                duration_s = span
+        y_min_value = None
+        y_max_value = None
+        if len(y_values) >= 2:
+            y_min_value = float(min(y_values))
+            y_max_value = float(max(y_values))
+        plot_width = max(1, x_max - x_min)
+        sampling_rate = float(plot_width / duration_s) if duration_s and duration_s > 0 else None
+        panels.append({
+            "panel_index": int(bbox.get("panel_index") or idx),
+            "plot_area": {"x_min": x_min, "x_max": x_max, "y_min": y_min, "y_max": y_max},
+            "x_axis_crop": {"left": x_crop_box[0], "top": x_crop_box[1], "right": x_crop_box[2], "bottom": x_crop_box[3]},
+            "y_axis_crop": {"left": y_crop_box[0], "top": y_crop_box[1], "right": y_crop_box[2], "bottom": y_crop_box[3]},
+            "x_ocr_text": x_ocr.get("text", ""),
+            "y_ocr_text": y_ocr.get("text", ""),
+            "x_tick_values": x_values,
+            "y_tick_values": y_values,
+            "duration_s": duration_s,
+            "sampling_rate": sampling_rate,
+            "value_min": y_min_value,
+            "value_max": y_max_value,
+            "axis_status": "calibrated_xy" if sampling_rate and y_min_value is not None and y_max_value is not None else "partial_or_unreadable",
+        })
+
+    primary = panels[0] if panels else {}
+    return {
+        "tool": "Signal_extract_plot_axes_ocr",
+        "image_path": str(image_path),
+        "num_panels": len(panels),
+        "panels": panels,
+        "duration_s": primary.get("duration_s"),
+        "sampling_rate": primary.get("sampling_rate"),
+        "value_min": primary.get("value_min"),
+        "value_max": primary.get("value_max"),
+        "confidence": 0.75 if primary.get("axis_status") == "calibrated_xy" else 0.55 if primary.get("duration_s") else 0.35 if panels else 0.0,
+        "disclaimer": "OCR axis extraction is heuristic; verify tick labels and units before using calibrated measurements.",
+    }
 
 
 def _modality_from_text_hint(text: str, filename: str = "") -> tuple[str | None, str]:
@@ -622,16 +823,29 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
             ],
         })
         scale = Signal_estimate_image_scale(image_file, duration_s=None, use_ocr=True)
-        sr = float(sampling_rate) if sampling_rate and sampling_rate > 0 else scale.get("sampling_rate")
+        axis_ocr = _extract_plot_axes_ocr(image_file)
+        axis_value_min = axis_ocr.get("value_min")
+        axis_value_max = axis_ocr.get("value_max")
+        calibrated_value_min = value_min if value_min is not None else axis_value_min
+        calibrated_value_max = value_max if value_max is not None else axis_value_max
+        sr = axis_ocr.get("sampling_rate") or scale.get("sampling_rate") or (float(sampling_rate) if sampling_rate and sampling_rate > 0 else None)
+        axis_panel_summaries = []
+        for panel in (axis_ocr.get("panels") or [])[:4]:
+            axis_panel_summaries.append(
+                f"panel {panel.get('panel_index')}: x_ticks={panel.get('x_tick_values')}, y_ticks={panel.get('y_tick_values')}, "
+                f"duration={panel.get('duration_s')}, value_range=({panel.get('value_min')}, {panel.get('value_max')})"
+            )
         steps.append({
             "title": "Scale/OCR extraction",
             "items": [
                 f"Sampling rate used: `{sr or 'default_for_tools_100Hz'}`",
+                f"Axis OCR confidence: `{axis_ocr.get('confidence')}`",
                 f"Scale confidence: `{scale.get('confidence')}`",
-                f"OCR status: `{scale.get('ocr_status')}`",
+                f"Legacy x-axis OCR status: `{scale.get('ocr_status')}`",
+                *axis_panel_summaries,
             ],
         })
-        digitized = _digitize_with_fallback(image_file, sr, str(out_csv), value_min, value_max, trace_method)
+        digitized = _digitize_with_fallback(image_file, sr, str(out_csv), calibrated_value_min, calibrated_value_max, trace_method)
         digitizer_route = str(digitized.get("fallback_priority") or digitized.get("method") or digitized.get("tool") or "segmentation_or_fallback_digitizer")
         if digitized.get("fallback_from_ml_error"):
             digitizer_route += " after ML model unavailable"
@@ -647,7 +861,7 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
             ],
         })
         if digitized.get("error"):
-            payload = {"ocr": ocr, "image_classifier": image_classifier, "scale": scale, "digitization": digitized, "disclaimer": DISCLAIMER}
+            payload = {"ocr": ocr, "image_classifier": image_classifier, "scale": scale, "axis_ocr": axis_ocr, "digitization": digitized, "disclaimer": DISCLAIMER}
             return _trajectory_md(steps), "Digitization failed. Inspect JSON details.", _jsonable(payload), None, None
         primary_csv = digitized.get("out_csv") or str(out_csv)
         values, used_column = _read_signal(str(primary_csv), "signal")
@@ -666,6 +880,7 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
             "ocr": ocr,
             "image_classifier": image_classifier,
             "scale": scale,
+            "axis_ocr": axis_ocr,
             "digitization": digitized,
             "signal_report": report,
             "disclaimer": DISCLAIMER,
@@ -891,6 +1106,7 @@ def _tool_cards_from_payload(kind: str, payload: dict[str, Any]) -> list[str]:
         cards.append(_tool_call_card("Signal_read_image_text_ocr", {"image": "uploaded"}, {"available": ocr.get("available"), "text": (ocr.get("text") or "")[:120]}, "🧾"))
         cards.append(_tool_call_card("Signal_classify_modality_from_image_cnn", {"image": "uploaded"}, payload.get("image_classifier") or {}, "🧭"))
         cards.append(_tool_call_card("Signal_estimate_image_scale", {"use_ocr": True}, payload.get("scale") or {}, "📏"))
+        cards.append(_tool_call_card("Signal_extract_plot_axes_ocr", {"x_axis": True, "y_axis": True}, payload.get("axis_ocr") or {}, "📐"))
         cards.append(_tool_call_card("Signal_digitize_waveform_image", {"trace": "visible waveform"}, payload.get("digitization") or {}, "🔧"))
         report = payload.get("signal_report") or {}
     else:
@@ -929,6 +1145,14 @@ def _human_answer_from_pipeline(kind: str, question: str, report: str, payload: 
             ])
         if ocr.get("text"):
             lines.extend([f"OCR picked up: `{str(ocr.get('text'))[:180]}`", ""])
+        axis_ocr = payload.get("axis_ocr") or {}
+        if axis_ocr.get("panels"):
+            first_axis = axis_ocr.get("panels", [{}])[0]
+            lines.extend([
+                "I also tried to read the plot axes before digitizing, because otherwise the recovered signal stays in pixel/normalized units.",
+                f"For panel 1, I read x ticks `{first_axis.get('x_tick_values')}` and y ticks `{first_axis.get('y_tick_values')}`; inferred duration `{first_axis.get('duration_s')}` and y range `({first_axis.get('value_min')}, {first_axis.get('value_max')})`.",
+                "",
+            ])
         visuals = _image_pipeline_visuals(payload)
         if visuals:
             lines.append("Here are the visual checkpoints I used:")
