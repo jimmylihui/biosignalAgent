@@ -83,6 +83,198 @@ def _plot_signal(values: np.ndarray, sampling_rate: float | None, title: str):
     return fig
 
 
+
+
+def _trajectory_md(steps: list[dict[str, Any]]) -> str:
+    lines = ["## Agent trajectory", ""]
+    for idx, step in enumerate(steps, 1):
+        title = step.get("title", f"Step {idx}")
+        status = step.get("status", "ok")
+        lines.append(f"### {idx}. {title}")
+        lines.append(f"**Status:** `{status}`")
+        detail = step.get("detail")
+        if detail:
+            lines.append("")
+            lines.append(str(detail))
+        items = step.get("items") or []
+        if items:
+            lines.append("")
+            for item in items:
+                lines.append(f"- {item}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _compact_tool_result(result: dict[str, Any], max_items: int = 10) -> dict[str, Any]:
+    keep = {}
+    for key, value in result.items():
+        if key in {"r_peak_indices", "peak_indices", "indices", "signal", "samples", "probabilities_per_sample"}:
+            if isinstance(value, list):
+                keep[key] = {"count": len(value), "preview": value[:8]}
+            else:
+                keep[key] = "omitted_for_display"
+        elif isinstance(value, (str, int, float, bool)) or value is None:
+            keep[key] = value
+        elif isinstance(value, list):
+            keep[key] = value[:max_items]
+        elif isinstance(value, dict):
+            keep[key] = {str(k): v for k, v in list(value.items())[:max_items]}
+    return keep
+
+
+def _extract_optional_ocr_text(image_path: str) -> dict[str, Any]:
+    try:
+        import pytesseract
+        from PIL import Image, ImageOps
+
+        image = Image.open(image_path).convert("L")
+        # Upscale and increase contrast a little; this helps small plot titles.
+        image = ImageOps.autocontrast(image.resize((image.width * 2, image.height * 2)))
+        text = pytesseract.image_to_string(image)
+        cleaned = " ".join(text.split())
+        return {"available": True, "text": cleaned[:800]}
+    except Exception as exc:
+        return {"available": False, "text": "", "error": str(exc)}
+
+
+def _modality_from_text_hint(text: str, filename: str = "") -> tuple[str | None, str]:
+    hay = f"{text} {filename}".lower()
+    rules = [
+        ("ecg", ["ecg", "ekg", "qrs", "r-peak", "r peak", "filtered ecg", "original ecg"]),
+        ("ppg", ["ppg", "pleth", "photopleth"]),
+        ("pcg", ["pcg", "phonocardi", "heart sound", "murmur"]),
+        ("resp", ["resp", "respiration", "breathing", "airflow"]),
+        ("spo2", ["spo2", "saturation", "oximetry"]),
+        ("abp", ["abp", "arterial", "blood pressure"]),
+        ("eda", ["eda", "gsr", "skin conductance"]),
+        ("eeg", ["eeg", "electroencephal"]),
+        ("emg", ["emg", "electromy"]),
+        ("scg", ["scg", "seismocardi"]),
+        ("bcg", ["bcg", "ballistocardi"]),
+        ("acc", ["accelerometer", "acceleration", "actigraphy"]),
+    ]
+    for modality, needles in rules:
+        for needle in needles:
+            if needle in hay:
+                return modality, needle
+    return None, ""
+
+
+def _blue_trace_mask(rgb: np.ndarray) -> np.ndarray:
+    arr = rgb.astype(float)
+    r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
+    # Matplotlib default blue is roughly (31, 119, 180); allow anti-aliased variants.
+    blueish = (b > 85) & (g > 55) & (r < 130) & (b > r + 25) & (g > r + 15)
+    saturated = (np.maximum.reduce([r, g, b]) - np.minimum.reduce([r, g, b])) > 35
+    not_gray_grid = np.abs(r - g) + np.abs(g - b) > 35
+    return blueish & saturated & not_gray_grid
+
+
+def _select_trace_component(mask: np.ndarray, panel_policy: str = "auto") -> tuple[np.ndarray, dict[str, Any]]:
+    from scipy import ndimage
+
+    labels, num = ndimage.label(mask)
+    if num <= 0:
+        return mask, {"num_components": 0, "selected": None}
+    components = []
+    h, w = mask.shape
+    for label_id in range(1, num + 1):
+        ys, xs = np.nonzero(labels == label_id)
+        if len(xs) < 20:
+            continue
+        x_span = int(xs.max() - xs.min() + 1)
+        y_span = int(ys.max() - ys.min() + 1)
+        if x_span < max(20, int(w * 0.08)):
+            continue
+        components.append({
+            "label": label_id,
+            "pixels": int(len(xs)),
+            "x_span": x_span,
+            "y_span": y_span,
+            "x_min": int(xs.min()),
+            "x_max": int(xs.max()),
+            "y_min": int(ys.min()),
+            "y_max": int(ys.max()),
+            "y_center": float(np.mean(ys)),
+        })
+    if not components:
+        return mask, {"num_components": int(num), "selected": None}
+    # If there are two ECG panels, bottom panel usually corresponds to filtered signal.
+    if panel_policy == "top":
+        chosen = min(components, key=lambda c: c["y_center"])
+    elif panel_policy == "bottom":
+        chosen = max(components, key=lambda c: c["y_center"])
+    else:
+        # Prefer bottom among similarly wide components; otherwise choose widest/most signal-like.
+        wide = sorted(components, key=lambda c: c["x_span"], reverse=True)[:3]
+        chosen = max(wide, key=lambda c: (c["y_center"], c["x_span"], c["pixels"]))
+    selected = labels == int(chosen["label"])
+    return selected, {"num_components": int(num), "candidates": components[:8], "selected": chosen, "panel_policy": panel_policy}
+
+
+def _digitize_color_trace_image(
+    image_path: str,
+    sampling_rate: float | None,
+    out_csv: str,
+    value_min: float | None = None,
+    value_max: float | None = None,
+    panel_policy: str = "auto",
+) -> dict[str, Any]:
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    rgb = np.asarray(image)
+    mask = _blue_trace_mask(rgb)
+    raw_fraction = float(mask.mean()) if mask.size else 0.0
+    selected, component_info = _select_trace_component(mask, panel_policy=panel_policy)
+    if not np.any(selected):
+        return {"tool": "Signal_digitize_plot_image_color_trace", "error": "no blue/color trace component detected", "confidence": 0.0, "raw_mask_fraction": raw_fraction, "component_info": component_info}
+    ys, xs = np.nonzero(selected)
+    x_min, x_max = int(xs.min()), int(xs.max())
+    y_min, y_max = int(ys.min()), int(ys.max())
+    crop = selected[y_min:y_max + 1, x_min:x_max + 1]
+    height, width = crop.shape
+    y_values = np.full(width, np.nan, dtype=float)
+    for x in range(width):
+        rows = np.flatnonzero(crop[:, x])
+        if len(rows):
+            y_values[x] = float(np.median(rows))
+    finite = np.isfinite(y_values)
+    coverage = float(finite.mean()) if len(y_values) else 0.0
+    if finite.sum() < max(8, int(width * 0.05)):
+        return {"tool": "Signal_digitize_plot_image_color_trace", "error": "too few trace columns after color segmentation", "confidence": 0.0, "pixel_coverage": coverage, "component_info": component_info}
+    x_idx = np.arange(width)
+    y_values[~finite] = np.interp(x_idx[~finite], x_idx[finite], y_values[finite])
+    # Invert image coordinates. Use robust component bounds rather than full figure bounds.
+    normalized = 1.0 - 2.0 * (y_values / max(1, height - 1))
+    if value_min is not None and value_max is not None and float(value_max) != float(value_min):
+        values = float(value_min) + (normalized + 1.0) / 2.0 * (float(value_max) - float(value_min))
+        scale = "calibrated_from_user_y_bounds"
+    else:
+        values = normalized
+        scale = "normalized_within_selected_trace_panel"
+    frame = pd.DataFrame({"signal": values})
+    if sampling_rate is not None and sampling_rate > 0:
+        frame.insert(0, "time_s", np.arange(len(values), dtype=float) / float(sampling_rate))
+    Path(out_csv).parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(out_csv, index=False)
+    return {
+        "tool": "Signal_digitize_plot_image_color_trace",
+        "out_csv": str(out_csv),
+        "num_points": int(len(values)),
+        "sampling_rate": float(sampling_rate) if sampling_rate else None,
+        "pixel_coverage": coverage,
+        "raw_mask_fraction": raw_fraction,
+        "selected_bbox": {"x_min": x_min, "x_max": x_max, "y_min": y_min, "y_max": y_max},
+        "component_info": component_info,
+        "value_min": float(np.nanmin(values)) if len(values) else None,
+        "value_max": float(np.nanmax(values)) if len(values) else None,
+        "scale": scale,
+        "confidence": min(0.97, max(0.35, coverage)),
+        "method": "color_trace_component_panel_digitizer",
+        "disclaimer": "Color-trace plot digitizer; verify selected panel, axes, and calibration before clinical use.",
+    }
+
 def _short_report(result: dict[str, Any]) -> str:
     lines = ["## BioSignalAgent Report", "", f"**Modality:** `{result.get('modality', 'unknown')}`", ""]
     plan = result.get("plan") or []
@@ -102,24 +294,43 @@ def _short_report(result: dict[str, Any]) -> str:
 
 
 def run_csv_demo(csv_file: str | None, question: str, sampling_rate: float, modality_hint: str, column: str | None):
+    steps: list[dict[str, Any]] = []
     if not csv_file:
-        return "Upload a CSV file first.", {}, None
+        return "Upload a CSV file first.", "", {}, None
     if not sampling_rate or sampling_rate <= 0:
-        return "Sampling rate must be a positive number.", {}, None
+        return "Sampling rate must be a positive number.", "", {}, None
     question = (question or DEFAULT_CSV_QUESTION).strip()
     fallback = None if modality_hint == "auto" else modality_hint
     try:
         values, used_column = _read_signal(csv_file, column or None)
+        steps.append({"title": "Input parsing", "items": [f"CSV column: `{used_column}`", f"Samples: `{len(values)}`", f"Sampling rate: `{sampling_rate}` Hz"]})
         classifier = Signal_classify_modality(csv_file, float(sampling_rate), column=used_column)
         if fallback is None:
             fallback = classifier.get("predicted_modality")
-        result = PlanningBioSignalAgent().run(question, csv_file, float(sampling_rate), used_column, fallback)
+        steps.append({
+            "title": "Modality routing",
+            "items": [
+                f"Classifier prediction: `{classifier.get('predicted_modality')}` confidence `{classifier.get('confidence')}`",
+                f"Final route: `{fallback}`",
+            ],
+        })
+        planner = PlanningBioSignalAgent()
+        plan = planner.plan(question, fallback)
+        steps.append({"title": "Tool planning", "items": [f"Selected `{len(plan)}` tools: " + ", ".join(f"`{tool}`" for tool in plan)]})
+        result = planner.run(question, csv_file, float(sampling_rate), used_column, fallback)
         result["input_column"] = used_column
         result["modality_classifier"] = classifier
         result["disclaimer"] = DISCLAIMER
-        return _short_report(result), _jsonable(result), _plot_signal(values, sampling_rate, "Uploaded signal")
+        tool_items = []
+        for call in result.get("tool_calls", [])[:8]:
+            compact = _compact_tool_result(call.get("result", {}))
+            tool_items.append(f"`{call.get('tool')}` -> keys {list(compact)[:8]}")
+        steps.append({"title": "Tool execution", "items": tool_items or ["No tools executed."]})
+        steps.append({"title": "Grounded report", "detail": "Report is assembled from local tool outputs and includes a research-use limitation."})
+        return _trajectory_md(steps), _short_report(result), _jsonable(result), _plot_signal(values, sampling_rate, "Uploaded signal")
     except Exception as exc:
-        return f"Error: {type(exc).__name__}: {exc}", {"error": str(exc), "stage": "csv_demo"}, None
+        steps.append({"title": "Failure", "status": "error", "detail": f"{type(exc).__name__}: {exc}"})
+        return _trajectory_md(steps), f"Error: {type(exc).__name__}: {exc}", {"error": str(exc), "stage": "csv_demo"}, None
 
 
 def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_csv: str, value_min: float | None, value_max: float | None, trace_method: str):
@@ -148,34 +359,100 @@ def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_cs
 
 
 def run_image_demo(image_file: str | None, question: str, sampling_rate: float | None, modality_hint: str, value_min: float | None, value_max: float | None, trace_method: str):
+    steps: list[dict[str, Any]] = []
     if not image_file:
-        return "Upload an image first.", {}, None, None
+        return "Upload an image first.", "", {}, None, None
     question = (question or DEFAULT_IMAGE_QUESTION).strip()
     fallback = None if modality_hint == "auto" else modality_hint
     try:
         work_dir = Path(tempfile.mkdtemp(prefix="biosignalagent_demo_"))
         out_csv = work_dir / "digitized_signal.csv"
+        ocr = _extract_optional_ocr_text(image_file)
+        hint_modality, hint_token = _modality_from_text_hint(ocr.get("text", ""), Path(image_file).name)
         image_classifier = Signal_classify_modality_from_image(image_file)
+        routed_by = "user_hint" if fallback else "image_classifier"
+        if fallback is None and hint_modality:
+            fallback = hint_modality
+            routed_by = f"text_hint:{hint_token}"
         if fallback is None:
             fallback = image_classifier.get("predicted_modality")
+        steps.append({
+            "title": "Input and text understanding",
+            "items": [
+                f"OCR available: `{ocr.get('available')}`",
+                f"OCR/title text preview: `{ocr.get('text', '')[:160]}`",
+                f"Text hint modality: `{hint_modality}` via `{hint_token}`" if hint_modality else "No text modality hint found.",
+            ],
+        })
+        steps.append({
+            "title": "Modality routing",
+            "items": [
+                f"Image classifier prediction: `{image_classifier.get('predicted_modality')}` confidence `{image_classifier.get('confidence')}`",
+                f"Final route: `{fallback}` ({routed_by})",
+            ],
+        })
         scale = Signal_estimate_image_scale(image_file, duration_s=None, use_ocr=True)
         sr = float(sampling_rate) if sampling_rate and sampling_rate > 0 else scale.get("sampling_rate")
-        digitized = _digitize_with_fallback(image_file, sr, str(out_csv), value_min, value_max, trace_method)
+        steps.append({
+            "title": "Scale/OCR extraction",
+            "items": [
+                f"Sampling rate used: `{sr or 'default_for_tools_100Hz'}`",
+                f"Scale confidence: `{scale.get('confidence')}`",
+                f"OCR status: `{scale.get('ocr_status')}`",
+            ],
+        })
+        color_digitized = _digitize_color_trace_image(
+            image_file,
+            sr,
+            str(out_csv),
+            value_min=value_min,
+            value_max=value_max,
+            panel_policy="auto",
+        )
+        if color_digitized.get("error"):
+            digitized = _digitize_with_fallback(image_file, sr, str(out_csv), value_min, value_max, trace_method)
+            digitizer_route = "fallback_dark_or_ml_trace"
+            if digitized.get("fallback_from_ml_error"):
+                digitizer_route += " after ML model unavailable"
+        else:
+            digitized = color_digitized
+            digitizer_route = "color_trace_panel_digitizer"
+        steps.append({
+            "title": "Panel and trace digitization",
+            "items": [
+                f"Digitizer: `{digitizer_route}`",
+                f"Points: `{digitized.get('num_points')}`",
+                f"Pixel coverage: `{digitized.get('pixel_coverage')}`",
+                f"Selected box: `{digitized.get('selected_bbox')}`",
+                f"Failure: `{digitized.get('error')}`" if digitized.get("error") else "Digitization completed.",
+            ],
+        })
         if digitized.get("error"):
-            payload = {"image_classifier": image_classifier, "scale": scale, "digitization": digitized, "disclaimer": DISCLAIMER}
-            return "Digitization failed. Inspect JSON details.", _jsonable(payload), None, None
+            payload = {"ocr": ocr, "image_classifier": image_classifier, "scale": scale, "digitization": digitized, "disclaimer": DISCLAIMER}
+            return _trajectory_md(steps), "Digitization failed. Inspect JSON details.", _jsonable(payload), None, None
         values, used_column = _read_signal(str(out_csv), "signal")
-        report = PlanningBioSignalAgent().run(question, str(out_csv), float(sr or 100.0), used_column, fallback)
+        planner = PlanningBioSignalAgent()
+        plan = planner.plan(question, fallback)
+        steps.append({"title": "Tool planning", "items": [f"Selected `{len(plan)}` tools for `{fallback}`: " + ", ".join(f"`{tool}`" for tool in plan)]})
+        report = planner.run(question, str(out_csv), float(sr or 100.0), used_column, fallback)
+        tool_items = []
+        for call in report.get("tool_calls", [])[:8]:
+            compact = _compact_tool_result(call.get("result", {}))
+            tool_items.append(f"`{call.get('tool')}` -> keys {list(compact)[:8]}")
+        steps.append({"title": "Tool execution", "items": tool_items or ["No tools executed."]})
+        steps.append({"title": "Grounded report", "detail": "Report is grounded in the digitized signal and local tool outputs. Verify image calibration before use."})
         payload = {
+            "ocr": ocr,
             "image_classifier": image_classifier,
             "scale": scale,
             "digitization": digitized,
             "signal_report": report,
             "disclaimer": DISCLAIMER,
         }
-        return _short_report(report), _jsonable(payload), _plot_signal(values, sr, "Digitized waveform"), str(out_csv)
+        return _trajectory_md(steps), _short_report(report), _jsonable(payload), _plot_signal(values, sr, "Digitized waveform"), str(out_csv)
     except Exception as exc:
-        return f"Error: {type(exc).__name__}: {exc}", {"error": str(exc), "stage": "image_demo"}, None, None
+        steps.append({"title": "Failure", "status": "error", "detail": f"{type(exc).__name__}: {exc}"})
+        return _trajectory_md(steps), f"Error: {type(exc).__name__}: {exc}", {"error": str(exc), "stage": "image_demo"}, None, None
 
 
 def summarize_tool_universe():
@@ -206,7 +483,7 @@ def build_demo() -> gr.Blocks:
     with gr.Blocks(title="BioSignalAgent Demo") as demo:
         gr.Markdown(
             "# BioSignalAgent Demo\n"
-            "Upload a biosignal CSV or waveform image, run offline tool planning/execution, and inspect grounded tool outputs. "
+            "Upload a biosignal CSV or waveform image, then inspect a TxAgent-style trajectory: input understanding, routing, tool planning, tool calls, and grounded reporting. "
             "This public demo is for research prototyping only and does not provide medical diagnosis."
         )
         with gr.Tab("CSV signal"):
@@ -218,10 +495,11 @@ def build_demo() -> gr.Blocks:
                     csv_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
                     csv_column = gr.Textbox(label="Column name (optional)", value="")
                     csv_button = gr.Button("Run CSV analysis", variant="primary")
+            csv_trajectory = gr.Markdown(label="Agent trajectory")
             csv_report = gr.Markdown(label="Report")
             csv_plot = gr.Plot(label="Signal preview")
             csv_json = gr.JSON(label="Tool trace JSON")
-            csv_button.click(run_csv_demo, [csv_file, csv_question, csv_sampling_rate, csv_modality, csv_column], [csv_report, csv_json, csv_plot])
+            csv_button.click(run_csv_demo, [csv_file, csv_question, csv_sampling_rate, csv_modality, csv_column], [csv_trajectory, csv_report, csv_json, csv_plot])
 
         with gr.Tab("Waveform image"):
             with gr.Row():
@@ -234,11 +512,12 @@ def build_demo() -> gr.Blocks:
                     value_max = gr.Number(label="Y-axis max if known", value=None)
                     trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
                     image_button = gr.Button("Run image pipeline", variant="primary")
+            image_trajectory = gr.Markdown(label="Agent trajectory")
             image_report = gr.Markdown(label="Report")
             image_plot = gr.Plot(label="Digitized signal preview")
             image_json = gr.JSON(label="Pipeline JSON")
             digitized_file = gr.File(label="Digitized CSV")
-            image_button.click(run_image_demo, [image_file, image_question, image_sampling_rate, image_modality, value_min, value_max, trace_method], [image_report, image_json, image_plot, digitized_file])
+            image_button.click(run_image_demo, [image_file, image_question, image_sampling_rate, image_modality, value_min, value_max, trace_method], [image_trajectory, image_report, image_json, image_plot, digitized_file])
 
         with gr.Tab("ToolUniverse"):
             gr.Markdown(summarize_tool_universe())
