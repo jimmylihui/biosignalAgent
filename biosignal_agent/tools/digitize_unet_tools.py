@@ -301,7 +301,127 @@ def select_waveform_mask_area(mask: np.ndarray, panel_policy: str = "bottom", pa
     bbox["mask_pixel_fraction_full"] = float(mask.mean()) if mask.size else 0.0
     bbox["mask_pixel_fraction_selected"] = float(selected.mean()) if selected.size else 0.0
     bbox["area_fraction"] = float(((bbox["y_max"] - bbox["y_min"]) * (bbox["x_max"] - bbox["x_min"])) / max(1, height * width))
+
     return selected, {"selected": bbox, "panel_policy": panel_policy}
+
+
+def select_waveform_mask_areas(mask: np.ndarray, pad: int = 4, min_x_fraction: float = 0.08) -> tuple[list[tuple[np.ndarray, dict[str, Any]]], dict[str, Any]]:
+    """Return all signal-like mask areas, ordered from top to bottom.
+
+    The single-trace selector intentionally picks one target panel for backward
+    compatibility. This helper keeps every plausible subplot/panel so the demo
+    can digitize multi-panel images instead of silently dropping the others.
+    """
+    mask = np.asarray(mask, dtype=bool)
+    if mask.ndim != 2 or not np.any(mask):
+        return [], {"reason": "empty_mask"}
+    height, width = mask.shape
+    min_x_span = max(20, int(width * float(min_x_fraction)))
+
+    def _make_area(area_mask: np.ndarray, source: dict[str, Any]) -> tuple[np.ndarray, dict[str, Any]]:
+        ys, xs = np.nonzero(area_mask)
+        bbox = {
+            "x_min": max(0, int(xs.min()) - pad),
+            "x_max": min(width, int(xs.max()) + 1 + pad),
+            "y_min": max(0, int(ys.min()) - pad),
+            "y_max": min(height, int(ys.max()) + 1 + pad),
+            **source,
+        }
+        selected = np.zeros_like(mask, dtype=bool)
+        selected[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]] = area_mask[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]]
+        bbox["mask_pixel_fraction_full"] = float(mask.mean()) if mask.size else 0.0
+        bbox["mask_pixel_fraction_selected"] = float(selected.mean()) if selected.size else 0.0
+        bbox["area_fraction"] = float(((bbox["y_max"] - bbox["y_min"]) * (bbox["x_max"] - bbox["x_min"])) / max(1, height * width))
+        return selected, bbox
+
+    areas: list[tuple[np.ndarray, dict[str, Any]]] = []
+    try:
+        from scipy import ndimage
+
+        labels, num = ndimage.label(mask)
+        components: list[dict[str, Any]] = []
+        for label_id in range(1, num + 1):
+            ys, xs = np.nonzero(labels == label_id)
+            if len(xs) < 12:
+                continue
+            x_span = int(xs.max() - xs.min() + 1)
+            y_span = int(ys.max() - ys.min() + 1)
+            if x_span < min_x_span:
+                continue
+            vertical_var = float(np.std(ys))
+            if vertical_var < max(1.5, height * 0.006):
+                continue
+            components.append({
+                "label": int(label_id),
+                "x_min": int(xs.min()),
+                "x_max": int(xs.max()) + 1,
+                "y_min": int(ys.min()),
+                "y_max": int(ys.max()) + 1,
+                "pixels": int(len(xs)),
+                "x_span": x_span,
+                "y_span": y_span,
+                "y_center": float(np.mean(ys)),
+                "vertical_std": vertical_var,
+                "score": float(x_span * np.sqrt(max(1, len(xs))) * max(1.0, vertical_var) / max(1.0, np.sqrt(y_span))),
+            })
+        if components:
+            components = sorted(components, key=lambda c: c["y_center"])
+            panel_margin = max(8, int(height * 0.08))
+            groups: list[list[dict[str, Any]]] = []
+            for comp in components:
+                placed = False
+                for group in groups:
+                    center = float(np.mean([g["y_center"] for g in group]))
+                    if abs(float(comp["y_center"]) - center) <= panel_margin:
+                        group.append(comp)
+                        placed = True
+                        break
+                if not placed:
+                    groups.append([comp])
+            for idx, group in enumerate(groups, 1):
+                area_mask = np.zeros_like(mask, dtype=bool)
+                for comp in group:
+                    area_mask |= labels == int(comp["label"])
+                ys, xs = np.nonzero(area_mask)
+                if len(xs) and int(xs.max() - xs.min() + 1) >= min_x_span:
+                    selected, bbox = _make_area(area_mask, {
+                        "selection_mode": "all_same_panel_trace_components",
+                        "panel_index": idx,
+                        "merged_components": group,
+                        "num_merged_components": len(group),
+                    })
+                    areas.append((selected, bbox))
+    except Exception:
+        areas = []
+
+    if not areas:
+        row_counts = mask.sum(axis=1)
+        threshold = max(2, int(width * 0.006))
+        active_rows = row_counts >= threshold
+        try:
+            from scipy import ndimage
+
+            active_rows = ndimage.binary_dilation(active_rows, iterations=max(2, int(height * 0.015)))
+            row_labels, num = ndimage.label(active_rows)
+            for label_id in range(1, num + 1):
+                rows = np.flatnonzero(row_labels == label_id)
+                if len(rows) < max(3, int(height * 0.015)):
+                    continue
+                y1, y2 = int(rows.min()), int(rows.max()) + 1
+                area_mask = np.zeros_like(mask, dtype=bool)
+                area_mask[y1:y2, :] = mask[y1:y2, :]
+                ys, xs = np.nonzero(area_mask)
+                if len(xs) and int(xs.max() - xs.min() + 1) >= min_x_span:
+                    selected, bbox = _make_area(area_mask, {"selection_mode": "all_row_band_fallback", "panel_index": len(areas) + 1})
+                    areas.append((selected, bbox))
+        except Exception:
+            areas = []
+
+    areas.sort(key=lambda item: (item[1].get("y_min", 0), item[1].get("x_min", 0)))
+    for idx, (_selected, bbox) in enumerate(areas, 1):
+        bbox["panel_index"] = idx
+    return areas, {"num_areas": len(areas), "mask_pixel_fraction_full": float(mask.mean()) if mask.size else 0.0}
+
 
 def Signal_digitize_waveform_image_unet(
     image_path: str,
@@ -377,4 +497,105 @@ def Signal_digitize_waveform_image_unet(
     result["selected_mask_pixel_fraction"] = float(np.mean(mask_arr)) if mask_arr.size else 0.0
     result["input_size"] = [int(input_height), int(input_width)]
     result["num_classes"] = int(checkpoint.get("num_classes", 1))
+    return result
+
+
+
+def Signal_digitize_waveform_image_unet_all(
+    image_path: str,
+    sampling_rate: float | None = None,
+    out_csv: str | None = None,
+    value_min: float | None = None,
+    value_max: float | None = None,
+    crop_left: int = 0,
+    crop_right: int = 0,
+    crop_top: int = 0,
+    crop_bottom: int = 0,
+    model_path: str | None = None,
+    probability_threshold: float = 0.5,
+    smooth_window: int = 1,
+    trace_method: str = "median",
+    max_panels: int = 8,
+) -> dict[str, Any]:
+    model_file = Path(model_path) if model_path else UNET_MODEL_PATH
+    if not model_file.exists():
+        return {"tool": "Signal_digitize_waveform_image_unet_all", "error": f"model not found: {model_file}", "confidence": 0.0}
+    try:
+        import torch
+
+        checkpoint = torch.load(model_file, map_location="cpu", weights_only=False)
+        input_height, input_width = checkpoint.get("input_size", [128, 384])
+        rgb, crop, _ = _crop_rgb_image(image_path, crop_left, crop_right, crop_top, crop_bottom)
+        crop_height, crop_width = rgb.shape[:2]
+        resized = Image.fromarray(rgb).resize((int(input_width), int(input_height)), Image.BILINEAR)
+        arr = np.asarray(resized, dtype=np.float32) / 255.0
+        tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
+        num_classes = int(checkpoint.get("num_classes", 1))
+        model = build_waveform_segmentation_model(checkpoint.get("model_type") or checkpoint.get("backbone"), out_channels=num_classes)
+        model.load_state_dict(checkpoint["model_state"])
+        model.eval()
+        with torch.no_grad():
+            logits = model(tensor)
+            if num_classes > 1:
+                probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+                prob = probs[1]
+                pred_class = np.argmax(probs, axis=0)
+                mask_small = pred_class == 1
+            else:
+                prob = torch.sigmoid(logits)[0, 0].cpu().numpy()
+                mask_small = prob >= float(probability_threshold)
+        mask = Image.fromarray((mask_small.astype(np.uint8) * 255), mode="L").resize((crop_width, crop_height), Image.NEAREST)
+        raw_mask_arr = np.asarray(mask, dtype=np.uint8) > 0
+        areas, area_summary = select_waveform_mask_areas(raw_mask_arr, pad=max(3, int(crop_height * 0.01)))
+        if not areas:
+            return {"tool": "Signal_digitize_waveform_image_unet_all", "error": "no waveform mask areas detected", "confidence": 0.0, "model_source": str(model_file)}
+        mean_probability = float(np.mean(prob[mask_small])) if np.any(mask_small) else 0.0
+    except Exception as exc:
+        return {"tool": "Signal_digitize_waveform_image_unet_all", "error": str(exc), "confidence": 0.0, "model_source": str(model_file)}
+
+    base_out = Path(out_csv) if out_csv else Path(image_path).with_suffix(".digitized.csv")
+    signals: list[dict[str, Any]] = []
+    for idx, (area_mask, bbox) in enumerate(areas[:max(1, int(max_panels))], 1):
+        if bbox and bbox.get("x_max", 0) > bbox.get("x_min", 0) and bbox.get("y_max", 0) > bbox.get("y_min", 0):
+            digitization_mask = area_mask[int(bbox["y_min"]):int(bbox["y_max"]), int(bbox["x_min"]):int(bbox["x_max"])]
+        else:
+            digitization_mask = area_mask
+        panel_out = base_out if len(areas) == 1 else base_out.with_name(f"{base_out.stem}_panel_{idx:02d}{base_out.suffix}")
+        panel = _signal_from_mask(
+            digitization_mask,
+            sampling_rate,
+            str(panel_out),
+            image_path,
+            value_min,
+            value_max,
+            smooth_window,
+            "Signal_digitize_waveform_image_unet",
+            f"{checkpoint.get('model_type', 'tiny_unet')}_waveform_segmentation_path_digitizer" if trace_method == "path" else f"{checkpoint.get('model_type', 'tiny_unet')}_waveform_segmentation_digitizer",
+            model_source=str(model_file),
+            confidence_scale=max(0.3, mean_probability),
+            trace_method=trace_method,
+        )
+        panel["panel_index"] = idx
+        panel["selected_mask_area"] = {"selected": bbox, "panel_policy": "all"}
+        panel["mask_pixel_fraction"] = float(np.mean(raw_mask_arr)) if raw_mask_arr.size else 0.0
+        panel["selected_mask_pixel_fraction"] = float(np.mean(area_mask)) if area_mask.size else 0.0
+        signals.append(panel)
+
+    ok = [item for item in signals if not item.get("error")]
+    primary = ok[0] if ok else signals[0]
+    result = {
+        **primary,
+        "tool": "Signal_digitize_waveform_image_unet_all",
+        "out_csv": primary.get("out_csv"),
+        "signals": signals,
+        "num_panels": len(signals),
+        "panel_csvs": [item.get("out_csv") for item in signals if item.get("out_csv")],
+        "multi_panel": len(signals) > 1,
+        "crop": {"left": crop[0], "right": crop[1], "top": crop[2], "bottom": crop[3]},
+        "probability_threshold": float(probability_threshold),
+        "mask_area_summary": area_summary,
+        "input_size": [int(input_height), int(input_width)],
+        "num_classes": int(checkpoint.get("num_classes", 1)),
+    }
+    result["confidence"] = float(np.mean([float(item.get("confidence") or 0.0) for item in ok])) if ok else 0.0
     return result

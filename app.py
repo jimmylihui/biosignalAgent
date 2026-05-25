@@ -22,7 +22,7 @@ from biosignal_agent.tools.digitize_tools import (
     Signal_estimate_image_scale,
     _crop_rgb_image,
 )
-from biosignal_agent.tools.digitize_unet_tools import Signal_digitize_waveform_image_unet, UNET_MODEL_PATH, build_waveform_segmentation_model, select_waveform_mask_area
+from biosignal_agent.tools.digitize_unet_tools import Signal_digitize_waveform_image_unet, Signal_digitize_waveform_image_unet_all, UNET_MODEL_PATH, build_waveform_segmentation_model, select_waveform_mask_area, select_waveform_mask_areas
 from biosignal_agent.tools.image_modality_tools import Signal_classify_modality_from_image
 from biosignal_agent.tools.modality_tools import Signal_classify_modality
 
@@ -217,6 +217,186 @@ def _select_trace_component(mask: np.ndarray, panel_policy: str = "auto") -> tup
     return selected, {"num_components": int(num), "candidates": components[:8], "selected": chosen, "panel_policy": panel_policy}
 
 
+def _signal_from_selected_color_mask(
+    selected: np.ndarray,
+    image_path: str,
+    sampling_rate: float | None,
+    out_csv: str,
+    value_min: float | None,
+    value_max: float | None,
+    component_info: dict[str, Any],
+    raw_fraction: float,
+    panel_index: int | None = None,
+) -> dict[str, Any]:
+    ys, xs = np.nonzero(selected)
+    if len(xs) == 0:
+        return {"tool": "Signal_digitize_plot_image_color_trace", "error": "empty selected trace mask", "confidence": 0.0}
+    x_min, x_max = int(xs.min()), int(xs.max())
+    y_min, y_max = int(ys.min()), int(ys.max())
+    crop = selected[y_min:y_max + 1, x_min:x_max + 1]
+    height, width = crop.shape
+    y_values = np.full(width, np.nan, dtype=float)
+    for x in range(width):
+        rows = np.flatnonzero(crop[:, x])
+        if len(rows):
+            y_values[x] = float(np.median(rows))
+    finite = np.isfinite(y_values)
+    coverage = float(finite.mean()) if len(y_values) else 0.0
+    if finite.sum() < max(8, int(width * 0.05)):
+        return {"tool": "Signal_digitize_plot_image_color_trace", "error": "too few trace columns after color segmentation", "confidence": 0.0, "pixel_coverage": coverage, "component_info": component_info}
+    x_idx = np.arange(width)
+    y_values[~finite] = np.interp(x_idx[~finite], x_idx[finite], y_values[finite])
+    normalized = 1.0 - 2.0 * (y_values / max(1, height - 1))
+    if value_min is not None and value_max is not None and float(value_max) != float(value_min):
+        values = float(value_min) + (normalized + 1.0) / 2.0 * (float(value_max) - float(value_min))
+        scale = "calibrated_from_user_y_bounds"
+    else:
+        values = normalized
+        scale = "normalized_within_selected_trace_panel"
+    frame = pd.DataFrame({"signal": values})
+    if sampling_rate is not None and sampling_rate > 0:
+        frame.insert(0, "time_s", np.arange(len(values), dtype=float) / float(sampling_rate))
+    Path(out_csv).parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(out_csv, index=False)
+    result = {
+        "tool": "Signal_digitize_plot_image_color_trace",
+        "image_path": str(image_path),
+        "out_csv": str(out_csv),
+        "num_points": int(len(values)),
+        "sampling_rate": float(sampling_rate) if sampling_rate else None,
+        "pixel_coverage": coverage,
+        "raw_mask_fraction": raw_fraction,
+        "selected_bbox": {"x_min": x_min, "x_max": x_max, "y_min": y_min, "y_max": y_max},
+        "component_info": component_info,
+        "value_min": float(np.nanmin(values)) if len(values) else None,
+        "value_max": float(np.nanmax(values)) if len(values) else None,
+        "scale": scale,
+        "confidence": min(0.97, max(0.35, coverage)),
+        "method": "color_trace_component_panel_digitizer",
+        "disclaimer": "Color-trace plot digitizer; verify selected panel, axes, and calibration before clinical use.",
+    }
+    if panel_index is not None:
+        result["panel_index"] = int(panel_index)
+    return result
+
+
+def _select_trace_components(mask: np.ndarray, max_panels: int = 8) -> tuple[list[tuple[np.ndarray, dict[str, Any]]], dict[str, Any]]:
+    from scipy import ndimage
+
+    h, w = mask.shape
+    row_counts = mask.sum(axis=1)
+    threshold = max(2, int(w * 0.004))
+    active_rows = row_counts >= threshold
+    active_rows = ndimage.binary_dilation(active_rows, iterations=max(2, int(h * 0.012)))
+    row_labels, row_num = ndimage.label(active_rows)
+    bands = []
+    for label_id in range(1, row_num + 1):
+        rows = np.flatnonzero(row_labels == label_id)
+        if len(rows) < max(4, int(h * 0.02)):
+            continue
+        y1, y2 = int(rows.min()), int(rows.max()) + 1
+        band = mask[y1:y2, :]
+        ys, xs = np.nonzero(band)
+        if len(xs) < 20:
+            continue
+        x_span = int(xs.max() - xs.min() + 1)
+        if x_span < max(20, int(w * 0.08)):
+            continue
+        bands.append({
+            "y_min": y1,
+            "y_max": y2,
+            "x_min": int(xs.min()),
+            "x_max": int(xs.max()),
+            "pixels": int(len(xs)),
+            "x_span": x_span,
+            "y_span": int(y2 - y1),
+            "y_center": float((y1 + y2) / 2.0),
+        })
+
+    selected: list[tuple[np.ndarray, dict[str, Any]]] = []
+    if len(bands) >= 2:
+        for idx, band in enumerate(sorted(bands, key=lambda b: b["y_center"])[:max(1, int(max_panels))], 1):
+            component_mask = np.zeros_like(mask, dtype=bool)
+            component_mask[int(band["y_min"]):int(band["y_max"]), :] = mask[int(band["y_min"]):int(band["y_max"]), :]
+            info = {"num_components": len(bands), "selected": band, "panel_policy": "all_row_bands", "panel_index": idx}
+            selected.append((component_mask, info))
+        return selected, {"num_components": len(bands), "candidate_components": bands, "selection_mode": "row_bands"}
+
+    labels, num = ndimage.label(mask)
+    if num <= 0:
+        return [], {"num_components": 0, "candidate_components": bands, "selection_mode": "none"}
+    components = []
+    for label_id in range(1, num + 1):
+        ys, xs = np.nonzero(labels == label_id)
+        if len(xs) < 20:
+            continue
+        x_span = int(xs.max() - xs.min() + 1)
+        y_span = int(ys.max() - ys.min() + 1)
+        if x_span < max(20, int(w * 0.08)):
+            continue
+        components.append({
+            "label": int(label_id),
+            "pixels": int(len(xs)),
+            "x_span": x_span,
+            "y_span": y_span,
+            "x_min": int(xs.min()),
+            "x_max": int(xs.max()),
+            "y_min": int(ys.min()),
+            "y_max": int(ys.max()),
+            "y_center": float(np.mean(ys)),
+        })
+    components = sorted(components, key=lambda c: (c["y_center"], c["x_min"]))
+    for idx, comp in enumerate(components[:max(1, int(max_panels))], 1):
+        component_mask = labels == int(comp["label"])
+        info = {"num_components": int(num), "selected": comp, "panel_policy": "all_components", "panel_index": idx}
+        selected.append((component_mask, info))
+    return selected, {"num_components": int(num), "candidate_components": components[:max_panels], "candidate_bands": bands, "selection_mode": "components"}
+
+
+def _digitize_color_trace_image_all(
+    image_path: str,
+    sampling_rate: float | None,
+    out_csv: str,
+    value_min: float | None = None,
+    value_max: float | None = None,
+    max_panels: int = 8,
+) -> dict[str, Any]:
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    rgb = np.asarray(image)
+    mask = _blue_trace_mask(rgb)
+    raw_fraction = float(mask.mean()) if mask.size else 0.0
+    components, component_summary = _select_trace_components(mask, max_panels=max_panels)
+    if not components:
+        return {"tool": "Signal_digitize_plot_image_color_trace_all", "error": "no blue/color trace component detected", "confidence": 0.0, "raw_mask_fraction": raw_fraction, "component_info": component_summary}
+    base_out = Path(out_csv)
+    signals = []
+    for idx, (selected, component_info) in enumerate(components, 1):
+        panel_out = base_out if len(components) == 1 else base_out.with_name(f"{base_out.stem}_panel_{idx:02d}{base_out.suffix}")
+        panel = _signal_from_selected_color_mask(selected, image_path, sampling_rate, str(panel_out), value_min, value_max, component_info, raw_fraction, panel_index=idx)
+        signals.append(panel)
+    ok = [item for item in signals if not item.get("error")]
+    if not ok:
+        result = signals[0]
+        result["tool"] = "Signal_digitize_plot_image_color_trace_all"
+        result["signals"] = signals
+        result["num_panels"] = len(signals)
+        return result
+    primary = ok[0]
+    return {
+        **primary,
+        "tool": "Signal_digitize_plot_image_color_trace_all",
+        "signals": signals,
+        "num_panels": len(signals),
+        "panel_csvs": [item.get("out_csv") for item in signals if item.get("out_csv")],
+        "multi_panel": len(signals) > 1,
+        "component_summary": component_summary,
+        "confidence": float(np.mean([float(item.get("confidence") or 0.0) for item in ok])),
+        "method": "color_trace_all_panel_digitizer",
+    }
+
+
 def _digitize_color_trace_image(
     image_path: str,
     sampling_rate: float | None,
@@ -339,7 +519,7 @@ def run_csv_demo(csv_file: str | None, question: str, sampling_rate: float, moda
 
 
 def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_csv: str, value_min: float | None, value_max: float | None, trace_method: str):
-    unet = Signal_digitize_waveform_image_unet(
+    unet = Signal_digitize_waveform_image_unet_all(
         image_path=image_path,
         sampling_rate=sampling_rate,
         out_csv=out_csv,
@@ -348,6 +528,7 @@ def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_cs
         probability_threshold=0.65,
         trace_method=trace_method,
         smooth_window=3,
+        max_panels=8,
     )
     if not unet.get("error") and float(unet.get("pixel_coverage") or 0.0) >= 0.15:
         unet["fallback_priority"] = "segmentation_unet_first"
@@ -422,13 +603,13 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
                 f"OCR status: `{scale.get('ocr_status')}`",
             ],
         })
-        color_digitized = _digitize_color_trace_image(
+        color_digitized = _digitize_color_trace_image_all(
             image_file,
             sr,
             str(out_csv),
             value_min=value_min,
             value_max=value_max,
-            panel_policy="auto",
+            max_panels=8,
         )
         if color_digitized.get("error"):
             digitized = _digitize_with_fallback(image_file, sr, str(out_csv), value_min, value_max, trace_method)
@@ -442,20 +623,22 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
             "title": "Panel and trace digitization",
             "items": [
                 f"Digitizer: `{digitizer_route}`",
-                f"Points: `{digitized.get('num_points')}`",
+                f"Panels processed: `{digitized.get('num_panels', 1)}`",
+                f"Points in primary panel: `{digitized.get('num_points')}`",
                 f"Pixel coverage: `{digitized.get('pixel_coverage')}`",
-                f"Selected box: `{digitized.get('selected_bbox')}`",
+                f"Selected box: `{digitized.get('selected_bbox') or (digitized.get('selected_mask_area') or {}).get('selected')}`",
                 f"Failure: `{digitized.get('error')}`" if digitized.get("error") else "Digitization completed.",
             ],
         })
         if digitized.get("error"):
             payload = {"ocr": ocr, "image_classifier": image_classifier, "scale": scale, "digitization": digitized, "disclaimer": DISCLAIMER}
             return _trajectory_md(steps), "Digitization failed. Inspect JSON details.", _jsonable(payload), None, None
-        values, used_column = _read_signal(str(out_csv), "signal")
+        primary_csv = digitized.get("out_csv") or str(out_csv)
+        values, used_column = _read_signal(str(primary_csv), "signal")
         planner = PlanningBioSignalAgent()
         plan = planner.plan(question, fallback)
         steps.append({"title": "Tool planning", "items": [f"Selected `{len(plan)}` tools for `{fallback}`: " + ", ".join(f"`{tool}`" for tool in plan)]})
-        report = planner.run(question, str(out_csv), float(sr or 100.0), used_column, fallback)
+        report = planner.run(question, str(primary_csv), float(sr or 100.0), used_column, fallback)
         tool_items = []
         for call in report.get("tool_calls", [])[:8]:
             compact = _compact_tool_result(call.get("result", {}))
@@ -471,7 +654,7 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
             "signal_report": report,
             "disclaimer": DISCLAIMER,
         }
-        return _trajectory_md(steps), _short_report(report), _jsonable(payload), _plot_signal(values, sr, "Digitized waveform"), str(out_csv)
+        return _trajectory_md(steps), _short_report(report), _jsonable(payload), _plot_signal(values, sr, "Digitized waveform"), str(primary_csv)
     except Exception as exc:
         steps.append({"title": "Failure", "status": "error", "detail": f"{type(exc).__name__}: {exc}"})
         return _trajectory_md(steps), f"Error: {type(exc).__name__}: {exc}", {"error": str(exc), "stage": "image_demo"}, None, None
@@ -567,8 +750,11 @@ def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0
         distractor_mask_img = Image.fromarray((distractor_small.astype(np.uint8) * 255), mode="L").resize((width, height), Image.NEAREST)
         raw_mask = np.asarray(target_mask_img, dtype=np.uint8) > 0
         distractor_mask = np.asarray(distractor_mask_img, dtype=np.uint8) > 0
-        selected_mask, area_info = select_waveform_mask_area(raw_mask, panel_policy="bottom", pad=max(3, int(height * 0.01)))
-        bbox = (area_info.get("selected") or {})
+        selected_areas, area_summary = select_waveform_mask_areas(raw_mask, pad=max(3, int(height * 0.01)))
+        selected_mask = np.zeros_like(raw_mask, dtype=bool)
+        for area_mask, _bbox in selected_areas:
+            selected_mask |= area_mask
+        bbox = selected_areas[0][1] if selected_areas else {}
         base = Image.fromarray(rgb).convert("RGBA")
         distractor_layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         distractor_alpha = distractor_mask.astype(np.uint8) * 85
@@ -582,12 +768,14 @@ def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0
         target_all_layer = Image.new("RGBA", (width, height), (255, 35, 35, 0))
         target_all_layer.putalpha(Image.fromarray(raw_mask.astype(np.uint8) * 70, mode="L"))
         area_layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        if bbox:
+        if selected_areas:
             from PIL import ImageDraw
 
             draw = ImageDraw.Draw(area_layer)
-            xy = [int(bbox["x_min"]), int(bbox["y_min"]), int(bbox["x_max"]), int(bbox["y_max"])]
-            draw.rectangle(xy, fill=(255, 193, 7, 45), outline=(255, 152, 0, 220), width=3)
+            for _area_mask, area_bbox in selected_areas:
+                xy = [int(area_bbox["x_min"]), int(area_bbox["y_min"]), int(area_bbox["x_max"]), int(area_bbox["y_max"])]
+                draw.rectangle(xy, fill=(255, 193, 7, 38), outline=(255, 152, 0, 220), width=3)
+                draw.text((xy[0] + 4, xy[1] + 4), f"panel {area_bbox.get('panel_index', '?')}", fill=(180, 90, 0, 255))
         selected_layer = Image.new("RGBA", (width, height), (255, 35, 35, 0))
         selected_layer.putalpha(Image.fromarray(selected_mask.astype(np.uint8) * 185, mode="L"))
         overlay = Image.alpha_composite(base, distractor_layer)
@@ -597,16 +785,16 @@ def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0
         target_fraction = float(raw_mask.mean()) if width and height else 0.0
         selected_fraction = float(selected_mask.mean()) if width and height else 0.0
         distractor_fraction = float(distractor_mask.mean()) if width and height else 0.0
-        area_fraction = bbox.get("area_fraction") if bbox else None
+        area_fractions = [float(area_bbox.get("area_fraction") or 0.0) for _area_mask, area_bbox in selected_areas]
         caption = (
-            "Blue = non-target/distractor class such as other panels, axes, text, or grid; "
-            "light red = all target-trace pixels; dark red = target pixels inside the selected digitization area; "
-            "amber = final area used for digitization. "
-            f"model={Path(UNET_MODEL_PATH).name}, classes={num_classes}, threshold={probability_threshold}, "
+            "Blue = non-target/distractor class such as axes, text, or grid; "
+            "light red = all target-trace pixels; dark red = target pixels inside every selected digitization area; "
+            "amber boxes = all plot areas that will be processed. "
+            f"model={Path(UNET_MODEL_PATH).name}, classes={num_classes}, threshold={probability_threshold}, panels={len(selected_areas)}, "
             f"target_fraction={target_fraction:.4f}, selected_target_fraction={selected_fraction:.4f}, distractor_fraction={distractor_fraction:.4f}"
-            + (f", area_fraction={float(area_fraction):.4f}." if area_fraction is not None else ".")
+            + (f", area_fractions={[round(v, 4) for v in area_fractions]}." if area_fractions else ".")
         )
-        return _visual_card("Segmentation classes and selected area", _pil_to_data_uri(overlay, fmt="JPEG"), caption)
+        return _visual_card("Segmentation classes and all selected areas", _pil_to_data_uri(overlay, fmt="JPEG"), caption)
     except Exception as exc:
         return f"<div style='border:1px solid #eee;border-radius:8px;padding:10px;margin:10px 0'><b>Segmentation overlay</b><br><span style='color:#999'>Unavailable: {exc}</span></div>"
 
@@ -635,7 +823,25 @@ def _image_pipeline_visuals(payload: dict[str, Any]) -> list[str]:
     if image_path:
         visuals.append(_image_preview_card("Uploaded image", image_path, "Original input seen by the image pipeline."))
         visuals.append(_segmentation_overlay_card(image_path, probability_threshold=0.65))
-    if out_csv:
+    signals = digitization.get("signals") or []
+    if signals:
+        for idx, signal in enumerate(signals[:8], 1):
+            panel_csv = signal.get("out_csv")
+            panel_sr = signal.get("sampling_rate") or sampling_rate
+            title = f"Digitized waveform preview - panel {signal.get('panel_index') or idx}"
+            caption_bits = []
+            if signal.get("selected_bbox"):
+                caption_bits.append(f"bbox={signal.get('selected_bbox')}")
+            if signal.get("selected_mask_area"):
+                selected = (signal.get("selected_mask_area") or {}).get("selected")
+                if selected:
+                    caption_bits.append(f"area={selected}")
+            caption = "; ".join(caption_bits) or f"Recovered signal from `{Path(panel_csv or '').name}`."
+            card = _signal_preview_card(panel_csv, panel_sr, title)
+            if caption and "</div>" in card:
+                card = card.replace("</div>", f"<div style='color:#777;font-size:0.85em;margin-top:4px'>{caption}</div></div>", 1)
+            visuals.append(card)
+    elif out_csv:
         visuals.append(_signal_preview_card(out_csv, sampling_rate, "Digitized waveform preview"))
     return visuals
 
