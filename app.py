@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -501,6 +502,15 @@ def _assistant_message_from_pipeline(kind: str, trajectory: str, report: str, pa
     return "\n".join(lines)
 
 
+def _chat_progress(stage: str, details: list[str] | None = None) -> str:
+    lines = ["### BioSignalAgent is working", "", f"**Current step:** {stage}"]
+    if details:
+        lines.append("")
+        for detail in details:
+            lines.append(f"- {detail}")
+    return "\n".join(lines)
+
+
 def biosignal_chat_response(
     message: str,
     history: list[dict[str, Any]] | None,
@@ -508,14 +518,20 @@ def biosignal_chat_response(
     sampling_rate: float,
     modality_hint: str,
     trace_method: str,
-) -> str:
+):
     question = (message or "").strip() or DEFAULT_CSV_QUESTION
     sampling_rate = float(sampling_rate or 250.0)
     modality_hint = modality_hint or "auto"
     trace_method = trace_method or "path"
     upload_path = _file_path_from_gradio(upload)
 
+    yield _chat_progress("Reading your request", [f"Question: `{question[:180]}`"])
+    time.sleep(0.08)
+
     if upload_path and _is_image_path(upload_path):
+        yield _chat_progress("Inspecting waveform image", ["Running OCR/title hints and image modality routing.", "Preparing image-to-signal digitization."])
+        time.sleep(0.08)
+        yield _chat_progress("Calling signal tools", ["Digitizing the visible trace, then running modality-specific analysis tools."])
         trajectory, report, payload, _plot, _csv = run_image_demo(
             upload_path,
             question,
@@ -525,11 +541,14 @@ def biosignal_chat_response(
             None,
             trace_method,
         )
-        return _assistant_message_from_pipeline("waveform image", trajectory, report, payload)
+        yield _assistant_message_from_pipeline("waveform image", trajectory, report, payload)
+        return
 
     if upload_path and _is_csv_path(upload_path):
+        yield _chat_progress("Inspecting signal CSV", ["Reading numeric columns and routing modality.", "Planning and executing suitable tools."])
         trajectory, report, payload, _plot = run_csv_demo(upload_path, question, sampling_rate, modality_hint, "")
-        return _assistant_message_from_pipeline("signal CSV", trajectory, report, payload)
+        yield _assistant_message_from_pipeline("signal CSV", trajectory, report, payload)
+        return
 
     planner = PlanningBioSignalAgent()
     guessed_modality, matched = _modality_from_text_hint(question, "")
@@ -552,8 +571,8 @@ def biosignal_chat_response(
             ],
         },
     ]
-    return "\n".join([
-        "Attach a waveform image or CSV and ask the question naturally; I will classify, digitize if needed, call tools, and ground the report in outputs.",
+    yield "\n".join([
+        "Attach a waveform image or CSV and ask naturally; I will classify, digitize if needed, call tools, and ground the report in outputs.",
         "",
         _trajectory_md(steps),
         "",
@@ -585,69 +604,84 @@ def summarize_tool_universe():
 
 
 def build_demo() -> gr.Blocks:
-    with gr.Blocks(title="BioSignalAgent Chat Demo") as demo:
+    placeholder = """
+# BioSignalAgent
+
+Upload a biosignal image or CSV, then ask a question.
+
+Try: Classify this waveform, digitize it, estimate heart rate/HRV, and explain which tools you used.
+"""
+    with gr.Blocks(title="BioSignalAgent", fill_height=True) as demo:
         gr.Markdown(
             "# BioSignalAgent\n"
-            "Ask a biosignal question like a TxAgent-style AI bot. Upload a waveform image or CSV, and the agent will route modality, extract scale/OCR when possible, digitize images, call tools, and return a grounded research-use report. "
-            "Advanced tabs remain available for debugging each pipeline stage."
+            "A TxAgent-style biosignal tool-use assistant for routing, digitization, tool calls, and grounded research-use reports."
         )
-        with gr.Tab("AI bot"):
-            gr.Markdown(
-                "Upload one file, then ask naturally: `What modality is this? Digitize it, estimate heart rate/HRV, and show which tools you used.`"
-            )
+        with gr.Accordion("Signal attachment", open=True):
             with gr.Row():
-                bot_upload = gr.File(label="Signal image or CSV", file_types=[".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".csv", ".tsv", ".txt"], type="filepath")
-                with gr.Column(scale=1):
-                    bot_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
-                    bot_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
-                    bot_trace_method = gr.Dropdown(label="Image trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
-            gr.ChatInterface(
-                fn=biosignal_chat_response,
-                chatbot=gr.Chatbot(label="BioSignalAgent", height=650, buttons=["copy", "copy_all"], layout="bubble"),
-                textbox=gr.Textbox(placeholder="Ask BioSignalAgent to analyze the uploaded biosignal...", lines=2),
-                additional_inputs=[bot_upload, bot_sampling_rate, bot_modality, bot_trace_method],
-                examples=[
-                    ["Classify this waveform image, digitize the trace, then estimate heart rate and explain the tools you used."],
-                    ["Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations."],
-                    ["This image may be low resolution. Recover the signal if possible and tell me whether the result is reliable."],
-                ],
-            )
+                bot_upload = gr.File(label="Signal image or CSV", file_types=[".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".csv", ".tsv", ".txt"], type="filepath", scale=2)
+                bot_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250, scale=1)
+                bot_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto", scale=1)
+                bot_trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path", scale=1)
+        chatbot = gr.Chatbot(
+            label="BioSignalAgent",
+            height=800,
+            placeholder=placeholder,
+            buttons=["copy", "copy_all"],
+            layout="bubble",
+            show_label=False,
+        )
+        gr.ChatInterface(
+            fn=biosignal_chat_response,
+            chatbot=chatbot,
+            fill_height=True,
+            fill_width=True,
+            stop_btn=True,
+            textbox=gr.Textbox(placeholder="Ask BioSignalAgent to analyze the uploaded biosignal...", lines=2, container=False),
+            additional_inputs=[bot_upload, bot_sampling_rate, bot_modality, bot_trace_method],
+            examples=[
+                ["Classify this waveform image, digitize the trace, then estimate heart rate and explain the tools you used."],
+                ["Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations."],
+                ["This image may be low resolution. Recover the signal if possible and tell me whether the result is reliable."],
+            ],
+            cache_examples=False,
+        )
 
-        with gr.Tab("Advanced: CSV signal"):
-            with gr.Row():
-                csv_file = gr.File(label="Signal CSV", file_types=[".csv"], type="filepath")
-                with gr.Column():
-                    csv_question = gr.Textbox(label="Question", value=DEFAULT_CSV_QUESTION, lines=3)
-                    csv_sampling_rate = gr.Number(label="Sampling rate (Hz)", value=250)
-                    csv_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
-                    csv_column = gr.Textbox(label="Column name (optional)", value="")
-                    csv_button = gr.Button("Run CSV analysis", variant="primary")
-            csv_trajectory = gr.Markdown(label="Agent trajectory")
-            csv_report = gr.Markdown(label="Report")
-            csv_plot = gr.Plot(label="Signal preview")
-            csv_json = gr.JSON(label="Tool trace JSON")
-            csv_button.click(run_csv_demo, [csv_file, csv_question, csv_sampling_rate, csv_modality, csv_column], [csv_trajectory, csv_report, csv_json, csv_plot])
+        with gr.Accordion("Advanced pipeline views", open=False):
+            with gr.Tab("CSV signal"):
+                with gr.Row():
+                    csv_file = gr.File(label="Signal CSV", file_types=[".csv"], type="filepath")
+                    with gr.Column():
+                        csv_question = gr.Textbox(label="Question", value=DEFAULT_CSV_QUESTION, lines=3)
+                        csv_sampling_rate = gr.Number(label="Sampling rate (Hz)", value=250)
+                        csv_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
+                        csv_column = gr.Textbox(label="Column name (optional)", value="")
+                        csv_button = gr.Button("Run CSV analysis", variant="primary")
+                csv_trajectory = gr.Markdown(label="Agent trajectory")
+                csv_report = gr.Markdown(label="Report")
+                csv_plot = gr.Plot(label="Signal preview")
+                csv_json = gr.JSON(label="Tool trace JSON")
+                csv_button.click(run_csv_demo, [csv_file, csv_question, csv_sampling_rate, csv_modality, csv_column], [csv_trajectory, csv_report, csv_json, csv_plot])
 
-        with gr.Tab("Advanced: waveform image"):
-            with gr.Row():
-                image_file = gr.Image(label="Waveform image", type="filepath")
-                with gr.Column():
-                    image_question = gr.Textbox(label="Question", value=DEFAULT_IMAGE_QUESTION, lines=3)
-                    image_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
-                    image_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
-                    value_min = gr.Number(label="Y-axis min if known", value=None)
-                    value_max = gr.Number(label="Y-axis max if known", value=None)
-                    trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
-                    image_button = gr.Button("Run image pipeline", variant="primary")
-            image_trajectory = gr.Markdown(label="Agent trajectory")
-            image_report = gr.Markdown(label="Report")
-            image_plot = gr.Plot(label="Digitized signal preview")
-            image_json = gr.JSON(label="Pipeline JSON")
-            digitized_file = gr.File(label="Digitized CSV")
-            image_button.click(run_image_demo, [image_file, image_question, image_sampling_rate, image_modality, value_min, value_max, trace_method], [image_trajectory, image_report, image_json, image_plot, digitized_file])
+            with gr.Tab("Waveform image"):
+                with gr.Row():
+                    image_file = gr.Image(label="Waveform image", type="filepath")
+                    with gr.Column():
+                        image_question = gr.Textbox(label="Question", value=DEFAULT_IMAGE_QUESTION, lines=3)
+                        image_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
+                        image_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
+                        value_min = gr.Number(label="Y-axis min if known", value=None)
+                        value_max = gr.Number(label="Y-axis max if known", value=None)
+                        trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
+                        image_button = gr.Button("Run image pipeline", variant="primary")
+                image_trajectory = gr.Markdown(label="Agent trajectory")
+                image_report = gr.Markdown(label="Report")
+                image_plot = gr.Plot(label="Digitized signal preview")
+                image_json = gr.JSON(label="Pipeline JSON")
+                digitized_file = gr.File(label="Digitized CSV")
+                image_button.click(run_image_demo, [image_file, image_question, image_sampling_rate, image_modality, value_min, value_max, trace_method], [image_trajectory, image_report, image_json, image_plot, digitized_file])
 
-        with gr.Tab("ToolUniverse"):
-            gr.Markdown(summarize_tool_universe())
+            with gr.Tab("ToolUniverse"):
+                gr.Markdown(summarize_tool_universe())
     return demo
 
 demo = build_demo()
