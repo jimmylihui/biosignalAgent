@@ -214,6 +214,19 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
     return None
 
 
+def _ollama_image_b64(path: str, max_side: int = 1400) -> str:
+    from PIL import Image
+
+    image = Image.open(path).convert("RGB")
+    width, height = image.size
+    scale = min(1.0, float(max_side) / float(max(width, height)))
+    if scale < 1.0:
+        image = image.resize((max(1, int(width * scale)), max(1, int(height * scale))))
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
 def _distill_axes_with_ollama(image_path: str, panels: list[dict[str, Any]], ocr_text: str = "") -> dict[str, Any]:
     api_key = os.getenv("OLLAMA_API_KEY", "").strip()
     model = os.getenv("OLLAMA_AXIS_MODEL", "qwen3.5:4b")
@@ -228,8 +241,9 @@ def _distill_axes_with_ollama(image_path: str, panels: list[dict[str, Any]], ocr
         "y_tick_values_ocr": p.get("y_tick_values"),
     } for p in panels[:4]]
     prompt = (
-        "You are an axis-label distiller for biomedical waveform plot screenshots. "
-        "You may receive noisy OCR output and plot/panel geometry. Your job is to infer the true x-axis and y-axis ticks for each panel. "
+        "You are a vision axis-label reader for biomedical waveform plot screenshots. "
+        "Look directly at the attached image first, then use noisy OCR output and plot/panel geometry only as hints. "
+        "Infer the true x-axis and y-axis ticks for each panel/subplot. "
         "Do not analyze the waveform. Ignore labels like (a), (b), grid fragments, and OCR duplicates. "
         "Return ONLY valid JSON with schema: "
         "{\"panels\":[{\"panel_index\":1,\"x_tick_values\":[...],\"y_tick_values\":[...],"
@@ -242,7 +256,7 @@ def _distill_axes_with_ollama(image_path: str, panels: list[dict[str, Any]], ocr
     bodies = [
         {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": [{"role": "user", "content": prompt, "images": [_ollama_image_b64(image_path)]}],
             "stream": False,
             "think": False,
             "format": "json",
