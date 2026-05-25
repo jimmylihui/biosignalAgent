@@ -518,6 +518,17 @@ def run_csv_demo(csv_file: str | None, question: str, sampling_rate: float, moda
         return _trajectory_md(steps), f"Error: {type(exc).__name__}: {exc}", {"error": str(exc), "stage": "csv_demo"}, None
 
 
+def _digitization_result_is_usable(result: dict[str, Any]) -> bool:
+    if not result or result.get("error"):
+        return False
+    signals = result.get("signals") or [result]
+    ok = [item for item in signals if not item.get("error") and int(item.get("num_points") or 0) >= 30]
+    if not ok:
+        return False
+    coverage = [float(item.get("pixel_coverage") or 0.0) for item in ok]
+    return max(coverage or [0.0]) >= 0.08
+
+
 def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_csv: str, value_min: float | None, value_max: float | None, trace_method: str):
     unet = Signal_digitize_waveform_image_unet_all(
         image_path=image_path,
@@ -530,9 +541,24 @@ def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_cs
         smooth_window=3,
         max_panels=8,
     )
-    if not unet.get("error") and float(unet.get("pixel_coverage") or 0.0) >= 0.15:
+    if _digitization_result_is_usable(unet):
         unet["fallback_priority"] = "segmentation_unet_first"
         return unet
+
+    color = _digitize_color_trace_image_all(
+        image_path,
+        sampling_rate,
+        out_csv,
+        value_min=value_min,
+        value_max=value_max,
+        max_panels=8,
+    )
+    if _digitization_result_is_usable(color):
+        color["fallback_priority"] = "color_trace_after_unet"
+        color["fallback_from_unet_error"] = unet.get("error")
+        color["fallback_from_unet_pixel_coverage"] = unet.get("pixel_coverage")
+        return color
+
     result = Signal_digitize_waveform_image_ml(
         image_path=image_path,
         sampling_rate=sampling_rate,
@@ -553,10 +579,12 @@ def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_cs
             smooth_window=3,
         )
         fallback["fallback_from_unet_error"] = unet.get("error")
+        fallback["fallback_from_color_error"] = color.get("error")
         fallback["fallback_from_ml_error"] = result.get("error")
         return fallback
     result["fallback_from_unet_error"] = unet.get("error")
     result["fallback_from_unet_pixel_coverage"] = unet.get("pixel_coverage")
+    result["fallback_from_color_error"] = color.get("error")
     return result
 
 
@@ -603,22 +631,10 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
                 f"OCR status: `{scale.get('ocr_status')}`",
             ],
         })
-        color_digitized = _digitize_color_trace_image_all(
-            image_file,
-            sr,
-            str(out_csv),
-            value_min=value_min,
-            value_max=value_max,
-            max_panels=8,
-        )
-        if color_digitized.get("error"):
-            digitized = _digitize_with_fallback(image_file, sr, str(out_csv), value_min, value_max, trace_method)
-            digitizer_route = "fallback_unet_or_ml_or_dark_trace"
-            if digitized.get("fallback_from_ml_error"):
-                digitizer_route += " after ML model unavailable"
-        else:
-            digitized = color_digitized
-            digitizer_route = "color_trace_panel_digitizer"
+        digitized = _digitize_with_fallback(image_file, sr, str(out_csv), value_min, value_max, trace_method)
+        digitizer_route = str(digitized.get("fallback_priority") or digitized.get("method") or digitized.get("tool") or "segmentation_or_fallback_digitizer")
+        if digitized.get("fallback_from_ml_error"):
+            digitizer_route += " after ML model unavailable"
         steps.append({
             "title": "Panel and trace digitization",
             "items": [
