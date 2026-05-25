@@ -1595,101 +1595,98 @@ def _clear_chat():
 
 CUSTOM_CSS = """
 :root {
-  --bs-bg: #f6f7f9;
+  --bs-bg: #ffffff;
   --bs-panel: #ffffff;
-  --bs-border: #dfe3e8;
-  --bs-border-strong: #c8d0da;
-  --bs-text: #22272f;
-  --bs-muted: #6b7280;
-  --bs-accent: #1768e8;
-  --bs-accent-soft: #eaf2ff;
-  --bs-tool: #f9fafb;
+  --bs-border: #e5e5e5;
+  --bs-text: #171717;
+  --bs-muted: #6f6f6f;
+  --bs-soft: #f7f7f8;
+  --bs-tool: #fafafa;
 }
 .gradio-container {
   background: var(--bs-bg) !important;
   color: var(--bs-text) !important;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
 }
 .bs-shell {
-  max-width: 1440px;
+  max-width: 1280px;
   margin: 0 auto;
+  padding: 20px 18px 30px;
 }
 .bs-topbar {
-  border: 1px solid var(--bs-border);
-  background: var(--bs-panel);
-  border-radius: 10px;
-  padding: 18px 22px;
-  margin-bottom: 14px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  background: transparent;
+  border: 0;
+  padding: 4px 0 18px;
+  margin-bottom: 6px;
 }
 .bs-title {
-  font-size: 24px;
-  font-weight: 760;
+  font-size: 22px;
+  font-weight: 650;
   letter-spacing: 0;
   margin: 0;
 }
 .bs-subtitle {
   color: var(--bs-muted);
   font-size: 14px;
-  line-height: 1.5;
-  margin-top: 4px;
+  line-height: 1.45;
+  margin-top: 5px;
+  max-width: 760px;
 }
-.bs-badge-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-.bs-badge {
-  border: 1px solid #d6e4ff;
-  background: var(--bs-accent-soft);
-  color: #174ea6;
-  border-radius: 999px;
-  padding: 4px 9px;
-  font-size: 12px;
-  font-weight: 650;
-}
+.bs-badge-row { display: none; }
 .bs-sidebar, .bs-chat-panel {
-  border: 1px solid var(--bs-border);
   background: var(--bs-panel);
-  border-radius: 10px;
-  padding: 14px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  border: 1px solid var(--bs-border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: none;
 }
 .bs-sidebar {
-  min-width: 300px;
+  min-width: 280px;
+}
+.bs-sidebar h3, .bs-chat-panel h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
 }
 .bs-sidebar .label-wrap span, .bs-chat-panel .label-wrap span {
   font-size: 12px !important;
   color: var(--bs-muted) !important;
-  font-weight: 650 !important;
+  font-weight: 500 !important;
 }
-.bs-chat-panel {
-  min-width: 0;
-}
+.bs-chat-panel { min-width: 0; }
 .bs-chat-panel .chatbot {
-  border: 1px solid var(--bs-border) !important;
+  border: 0 !important;
   border-radius: 10px !important;
-  background: #fbfcfe !important;
+  background: #ffffff !important;
 }
-.bs-chat-panel textarea, .bs-sidebar input, .bs-sidebar textarea {
-  border-radius: 8px !important;
+.bs-chat-panel textarea, .bs-sidebar input, .bs-sidebar textarea, .bs-sidebar select {
+  border-radius: 10px !important;
+  border-color: var(--bs-border) !important;
+  background: #ffffff !important;
 }
 .bs-composer {
   border: 1px solid var(--bs-border);
-  background: #fbfcfe;
-  border-radius: 10px;
-  padding: 10px;
-  margin-top: 10px;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 8px;
+  margin-top: 12px;
 }
-.bs-composer button.primary, button.primary {
-  background: var(--bs-accent) !important;
-  border-color: var(--bs-accent) !important;
+.bs-composer textarea {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+button.primary, .bs-composer button.primary {
+  background: #171717 !important;
+  border-color: #171717 !important;
+  color: #ffffff !important;
+  border-radius: 10px !important;
+}
+button.secondary, .bs-composer button {
+  border-radius: 10px !important;
 }
 .bs-tool-card {
   border: 1px solid var(--bs-border);
-  border-left: 3px solid var(--bs-accent);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px 12px;
   margin: 8px 0;
   background: var(--bs-tool);
@@ -1701,43 +1698,47 @@ CUSTOM_CSS = """
   min-width: 0;
 }
 .bs-tool-icon {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: var(--bs-accent-soft);
-  color: var(--bs-accent);
+  background: #eeeeef;
+  color: #4a4a4a;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: 11px;
+  font-weight: 650;
   flex: 0 0 auto;
 }
 .bs-tool-name {
-  font-weight: 720;
+  font-weight: 600;
   color: var(--bs-text);
 }
 .bs-tool-args {
-  color: #8a93a3;
+  color: #8a8a8a;
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 .bs-tool-result {
   color: var(--bs-muted);
   font-size: 13px;
-  padding-left: 32px;
+  padding-left: 30px;
   margin-top: 4px;
   overflow-wrap: anywhere;
 }
 .bs-advanced {
   margin-top: 14px;
 }
-.bs-examples .examples, .bs-examples table {
+.examples, table {
   font-size: 13px !important;
 }
+.message-wrap, .message, .prose {
+  line-height: 1.55 !important;
+}
 @media (max-width: 900px) {
+  .bs-shell { padding: 12px; }
   .bs-sidebar { min-width: 0; }
-  .bs-topbar { padding: 14px; }
+  .bs-topbar { padding-bottom: 10px; }
 }
 """
 
@@ -1778,13 +1779,7 @@ Try: Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.
             gr.HTML(
                 "<div class='bs-topbar'>"
                 "<div class='bs-title'>BioSignalAgent</div>"
-                "<div class='bs-subtitle'>A TxAgent-style biosignal assistant for routing, image digitization, tool calls, and grounded research-use reports.</div>"
-                "<div class='bs-badge-row'>"
-                "<span class='bs-badge'>VLM axis reading</span>"
-                "<span class='bs-badge'>Multi-panel digitization</span>"
-                "<span class='bs-badge'>Tool-use reports</span>"
-                "<span class='bs-badge'>Research use only</span>"
-                "</div>"
+                "<div class='bs-subtitle'>A clean biosignal assistant for image digitization, tool calls, and grounded research-use reports.</div>"
                 "</div>"
             )
             with gr.Row(equal_height=False):
@@ -1795,10 +1790,9 @@ Try: Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.
                     bot_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
                     bot_trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
                     gr.Markdown(
-                        "### Suggested prompts\n"
-                        "- Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.\n"
-                        "- Digitize the trace, estimate heart rate, and explain the tools used.\n"
-                        "- Recover the signal if possible and tell me whether the result is reliable."
+                        "### Prompts\n"
+                        "Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.\n\n"
+                        "Recover the waveform and explain whether the digitization is reliable."
                     )
                 with gr.Column(scale=9, elem_classes=["bs-chat-panel"]):
                     chatbot = gr.Chatbot(
