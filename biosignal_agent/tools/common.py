@@ -26,11 +26,26 @@ def load_csv_signal(signal_path: str, sampling_rate: float, column: str | None =
 
 
 def bandpass_filter(values: np.ndarray, sampling_rate: float, low_hz: float, high_hz: float, order: int = 3) -> np.ndarray:
-    nyquist = 0.5 * sampling_rate
+    values = np.asarray(values, dtype=float)
+    if len(values) == 0:
+        return values
+    centered = values - np.nanmedian(values)
+    if sampling_rate <= 0:
+        return centered
+    nyquist = 0.5 * float(sampling_rate)
+    high_hz = min(float(high_hz), nyquist * 0.90)
+    low_hz = max(float(low_hz), 1e-6)
+    if nyquist <= 0 or high_hz <= low_hz or len(values) < max(12, order * 6):
+        return centered
     low = max(low_hz / nyquist, 1e-5)
     high = min(high_hz / nyquist, 0.999)
+    if not (0 < low < high < 1):
+        return centered
     sos = scipy_signal.butter(order, [low, high], btype="bandpass", output="sos")
-    return scipy_signal.sosfiltfilt(sos, values)
+    try:
+        return scipy_signal.sosfiltfilt(sos, centered)
+    except ValueError:
+        return centered
 
 
 def signal_quality_summary(values: np.ndarray) -> dict:

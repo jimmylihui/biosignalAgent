@@ -828,7 +828,8 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
         axis_value_max = axis_ocr.get("value_max")
         calibrated_value_min = value_min if value_min is not None else axis_value_min
         calibrated_value_max = value_max if value_max is not None else axis_value_max
-        sr = axis_ocr.get("sampling_rate") or scale.get("sampling_rate") or (float(sampling_rate) if sampling_rate and sampling_rate > 0 else None)
+        user_sr = float(sampling_rate) if sampling_rate and sampling_rate > 0 else None
+        sr = user_sr or axis_ocr.get("sampling_rate") or scale.get("sampling_rate")
         axis_panel_summaries = []
         for panel in (axis_ocr.get("panels") or [])[:4]:
             axis_panel_summaries.append(
@@ -839,6 +840,7 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
             "title": "Scale/OCR extraction",
             "items": [
                 f"Sampling rate used: `{sr or 'default_for_tools_100Hz'}`",
+                f"Sampling-rate source: `{'user_input' if user_sr else 'axis_or_scale_ocr'}`",
                 f"Axis OCR confidence: `{axis_ocr.get('confidence')}`",
                 f"Scale confidence: `{scale.get('confidence')}`",
                 f"Legacy x-axis OCR status: `{scale.get('ocr_status')}`",
@@ -861,7 +863,7 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
             ],
         })
         if digitized.get("error"):
-            payload = {"ocr": ocr, "image_classifier": image_classifier, "scale": scale, "axis_ocr": axis_ocr, "digitization": digitized, "disclaimer": DISCLAIMER}
+            payload = {"image_path": image_file, "ocr": ocr, "image_classifier": image_classifier, "scale": scale, "axis_ocr": axis_ocr, "digitization": digitized, "disclaimer": DISCLAIMER}
             return _trajectory_md(steps), "Digitization failed. Inspect JSON details.", _jsonable(payload), None, None
         primary_csv = digitized.get("out_csv") or str(out_csv)
         values, used_column = _read_signal(str(primary_csv), "signal")
@@ -888,7 +890,8 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
         return _trajectory_md(steps), _short_report(report), _jsonable(payload), _plot_signal(values, sr, "Digitized waveform"), str(primary_csv)
     except Exception as exc:
         steps.append({"title": "Failure", "status": "error", "detail": f"{type(exc).__name__}: {exc}"})
-        return _trajectory_md(steps), f"Error: {type(exc).__name__}: {exc}", {"error": str(exc), "stage": "image_demo"}, None, None
+        payload = {"image_path": image_file, "error": str(exc), "error_type": type(exc).__name__, "stage": "image_demo", "disclaimer": DISCLAIMER}
+        return _trajectory_md(steps), f"Error: {type(exc).__name__}: {exc}", payload, None, None
 
 
 
@@ -1127,18 +1130,21 @@ def _human_answer_from_pipeline(kind: str, question: str, report: str, payload: 
     findings = signal_report.get("findings") or []
     cards = _tool_cards_from_payload(kind, payload if isinstance(payload, dict) else {})
     lines = [
-        "I’ll break this down the way I would in an agent run: first identify what the input is, then call the smallest set of tools needed, and only then give the answer.",
+        "I’ll inspect the image first, then show the tool calls I used before giving the result.",
         "",
     ]
     if kind == "waveform image":
         ocr = payload.get("ocr") or {}
         image_classifier = payload.get("image_classifier") or {}
-        final_modality = modality
-        lines.extend([
-            f"The image looks like a `{final_modality}` workflow target. I also checked text/OCR hints because plot screenshots can confuse the image classifier.",
-            "",
-        ])
-        if image_classifier.get("predicted_modality") and image_classifier.get("predicted_modality") != final_modality:
+        classifier_modality = image_classifier.get("predicted_modality")
+        final_modality = modality if modality and modality != "unknown" else classifier_modality
+        if final_modality and final_modality != "unknown":
+            lines.extend([f"This looks like a `{final_modality}` waveform image. I’ll still check OCR/axis text because screenshots can fool the image classifier.", ""])
+        else:
+            lines.extend(["I can see this is a waveform plot image, but the modality classifier did not produce a confident label yet. I’ll continue with image OCR, axis reading, and waveform digitization rather than pretending the route is known.", ""])
+        if payload.get("error"):
+            lines.extend([f"The run stopped during `{payload.get('stage', 'image_demo')}` with `{payload.get('error_type', 'error')}`: {payload.get('error')}", "I’ll still show the uploaded image when available so we can debug the failure visually.", ""])
+        if final_modality and image_classifier.get("predicted_modality") and image_classifier.get("predicted_modality") != final_modality:
             lines.extend([
                 f"One important detail: the image CNN leaned toward `{image_classifier.get('predicted_modality')}`, but the OCR/title context pointed to `{final_modality}`, so I used the text-grounded route for this case.",
                 "",
