@@ -42,7 +42,7 @@ For low-resolution or non-blue waveform plots, the demo now has a trained segmen
 
 A lightweight comparison on the rendered digitization benchmark favored an augmented U-Net over the current tiny DeepLabV3-style and SegFormer-lite prototypes. The current default model is a weighted 3-class target-aware U-Net trained on 648 synthetic rendered plots covering clean/grid/color/dark/low-resolution styles plus multi-trace and multi-panel screenshots. It predicts `background`, `target_trace`, and `distractor_trace_axes_text_grid`. On a source-record held-out validation split, it reached mean Dice 0.8337 and mean IoU 0.7201 for the target trace, with multi-panel + multi-trace Dice improving to 0.7777. This is still a research prototype; real screenshots with unusual axes, multiple traces, or severe compression should be verified visually.
 
-The chat demo also embeds visual checkpoints in image runs: the uploaded plot, an amber selected mask-area/panel overlay with red curve-mask pixels, and the recovered digitized waveform preview. These are included directly in the agent answer so users can inspect whether the correct mask area, panel, and trace were selected before trusting downstream measurements.
+The chat demo also embeds visual checkpoints in image runs: the uploaded plot, a multi-class segmentation overlay: blue non-target/distractor pixels, red target-trace pixels, and amber selected mask-area/panel, and the recovered digitized waveform preview. These are included directly in the agent answer so users can inspect whether the correct mask area, panel, and trace were selected before trusting downstream measurements.
 
 ## Target-aware segmentation experiment
 

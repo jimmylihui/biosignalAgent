@@ -556,15 +556,31 @@ def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0
             logits = model(tensor)
             if num_classes > 1:
                 probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
-                mask_small = np.argmax(probs, axis=0) == 1
+                pred_class = np.argmax(probs, axis=0)
+                target_small = pred_class == 1
+                distractor_small = pred_class == 2
             else:
                 prob = torch.sigmoid(logits)[0, 0].cpu().numpy()
-                mask_small = prob >= float(probability_threshold)
-        mask = Image.fromarray((mask_small.astype(np.uint8) * 255), mode="L").resize((width, height), Image.NEAREST)
-        raw_mask = np.asarray(mask, dtype=np.uint8) > 0
+                target_small = prob >= float(probability_threshold)
+                distractor_small = np.zeros_like(target_small, dtype=bool)
+        target_mask_img = Image.fromarray((target_small.astype(np.uint8) * 255), mode="L").resize((width, height), Image.NEAREST)
+        distractor_mask_img = Image.fromarray((distractor_small.astype(np.uint8) * 255), mode="L").resize((width, height), Image.NEAREST)
+        raw_mask = np.asarray(target_mask_img, dtype=np.uint8) > 0
+        distractor_mask = np.asarray(distractor_mask_img, dtype=np.uint8) > 0
         selected_mask, area_info = select_waveform_mask_area(raw_mask, panel_policy="bottom", pad=max(3, int(height * 0.01)))
         bbox = (area_info.get("selected") or {})
         base = Image.fromarray(rgb).convert("RGBA")
+        distractor_layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        distractor_alpha = distractor_mask.astype(np.uint8) * 85
+        distractor_layer.putalpha(Image.fromarray(distractor_alpha, mode="L"))
+        # Color must be applied after alpha for PIL RGBA layers.
+        distractor_arr = np.asarray(distractor_layer).copy()
+        distractor_arr[..., 0] = 0
+        distractor_arr[..., 1] = 145
+        distractor_arr[..., 2] = 255
+        distractor_layer = Image.fromarray(distractor_arr, mode="RGBA")
+        target_all_layer = Image.new("RGBA", (width, height), (255, 35, 35, 0))
+        target_all_layer.putalpha(Image.fromarray(raw_mask.astype(np.uint8) * 70, mode="L"))
         area_layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         if bbox:
             from PIL import ImageDraw
@@ -572,20 +588,25 @@ def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0
             draw = ImageDraw.Draw(area_layer)
             xy = [int(bbox["x_min"]), int(bbox["y_min"]), int(bbox["x_max"]), int(bbox["y_max"])]
             draw.rectangle(xy, fill=(255, 193, 7, 45), outline=(255, 152, 0, 220), width=3)
-        red = Image.new("RGBA", (width, height), (255, 35, 35, 0))
-        alpha = selected_mask.astype(np.uint8) * 165
-        red.putalpha(Image.fromarray(alpha, mode="L"))
-        overlay = Image.alpha_composite(Image.alpha_composite(base, area_layer), red).convert("RGB")
-        mask_fraction = float(raw_mask.mean()) if width and height else 0.0
+        selected_layer = Image.new("RGBA", (width, height), (255, 35, 35, 0))
+        selected_layer.putalpha(Image.fromarray(selected_mask.astype(np.uint8) * 185, mode="L"))
+        overlay = Image.alpha_composite(base, distractor_layer)
+        overlay = Image.alpha_composite(overlay, target_all_layer)
+        overlay = Image.alpha_composite(overlay, area_layer)
+        overlay = Image.alpha_composite(overlay, selected_layer).convert("RGB")
+        target_fraction = float(raw_mask.mean()) if width and height else 0.0
         selected_fraction = float(selected_mask.mean()) if width and height else 0.0
+        distractor_fraction = float(distractor_mask.mean()) if width and height else 0.0
         area_fraction = bbox.get("area_fraction") if bbox else None
         caption = (
-            f"Amber area = selected mask region/panel used for digitization; red pixels = curve mask inside that area. "
+            "Blue = non-target/distractor class such as other panels, axes, text, or grid; "
+            "light red = all target-trace pixels; dark red = target pixels inside the selected digitization area; "
+            "amber = final area used for digitization. "
             f"model={Path(UNET_MODEL_PATH).name}, classes={num_classes}, threshold={probability_threshold}, "
-            f"mask_fraction={mask_fraction:.4f}, selected_mask_fraction={selected_fraction:.4f}"
+            f"target_fraction={target_fraction:.4f}, selected_target_fraction={selected_fraction:.4f}, distractor_fraction={distractor_fraction:.4f}"
             + (f", area_fraction={float(area_fraction):.4f}." if area_fraction is not None else ".")
         )
-        return _visual_card("Segmentation mask area", _pil_to_data_uri(overlay, fmt="JPEG"), caption)
+        return _visual_card("Segmentation classes and selected area", _pil_to_data_uri(overlay, fmt="JPEG"), caption)
     except Exception as exc:
         return f"<div style='border:1px solid #eee;border-radius:8px;padding:10px;margin:10px 0'><b>Segmentation overlay</b><br><span style='color:#999'>Unavailable: {exc}</span></div>"
 
