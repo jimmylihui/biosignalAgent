@@ -342,7 +342,7 @@ def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_cs
         out_csv=out_csv,
         value_min=value_min,
         value_max=value_max,
-        probability_threshold=0.60,
+        probability_threshold=0.65,
         trace_method=trace_method,
         smooth_window=3,
     )

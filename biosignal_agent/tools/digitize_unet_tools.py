@@ -8,7 +8,7 @@ from PIL import Image
 
 from biosignal_agent.tools.digitize_tools import _crop_rgb_image, _signal_from_mask
 
-UNET_MODEL_PATH = Path("/data1/jiahui/biosignal-agent/outputs/waveform_digitization_tiny_unet_aug.pt")
+UNET_MODEL_PATH = Path("/data1/jiahui/biosignal-agent/outputs/waveform_digitization_tiny_unet_multistyle.pt")
 
 
 class TinyWaveformUNet:  # factory wrapper avoids importing torch until needed
