@@ -1567,6 +1567,28 @@ def biosignal_chat_response(
         cards,
     )
 
+def biosignal_chat_submit(
+    message: str,
+    history: list[dict[str, Any]] | None,
+    upload: Any,
+    sampling_rate: float,
+    modality_hint: str,
+    trace_method: str,
+):
+    question = (message or "").strip() or DEFAULT_CSV_QUESTION
+    history = list(history or [])
+    history.append({"role": "user", "content": question})
+    history.append({"role": "assistant", "content": ""})
+    yield history, ""
+    for chunk in biosignal_chat_response(question, history[:-1], upload, sampling_rate, modality_hint, trace_method):
+        history[-1] = {"role": "assistant", "content": chunk}
+        yield history, ""
+
+
+def _clear_chat():
+    return []
+
+
 def summarize_tool_universe():
     try:
         schemas = load_tool_schemas()
@@ -1612,28 +1634,36 @@ Try: Classify this waveform, digitize it, estimate heart rate/HRV, and explain w
                 bot_trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path", scale=1)
         chatbot = gr.Chatbot(
             label="BioSignalAgent",
-            height=800,
+            height=720,
             placeholder=placeholder,
             buttons=["copy", "copy_all"],
             layout="bubble",
             show_label=False,
             sanitize_html=False,
+            type="messages",
         )
-        gr.ChatInterface(
-            fn=biosignal_chat_response,
-            chatbot=chatbot,
-            fill_height=True,
-            fill_width=True,
-            stop_btn=True,
-            textbox=gr.Textbox(placeholder="Ask BioSignalAgent to analyze the uploaded biosignal...", lines=2, container=False),
-            additional_inputs=[bot_upload, bot_sampling_rate, bot_modality, bot_trace_method],
+        with gr.Row():
+            chat_question = gr.Textbox(
+                label="Question",
+                placeholder="Ask your own question, e.g. Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.",
+                lines=2,
+                scale=8,
+                autofocus=True,
+            )
+            chat_send = gr.Button("Send", variant="primary", scale=1)
+            chat_clear = gr.Button("Clear", scale=1)
+        gr.Examples(
             examples=[
-                ["Classify this waveform image, digitize the trace, then estimate heart rate and explain the tools you used."],
-                ["Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations."],
-                ["This image may be low resolution. Recover the signal if possible and tell me whether the result is reliable."],
+                "Classify this waveform image, digitize the trace, then estimate heart rate and explain the tools you used.",
+                "Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.",
+                "This image may be low resolution. Recover the signal if possible and tell me whether the result is reliable.",
             ],
-            cache_examples=False,
+            inputs=chat_question,
         )
+        chat_inputs = [chat_question, chatbot, bot_upload, bot_sampling_rate, bot_modality, bot_trace_method]
+        chat_question.submit(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
+        chat_send.click(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
+        chat_clear.click(_clear_chat, outputs=chatbot)
 
         with gr.Accordion("Advanced pipeline views", open=False):
             with gr.Tab("CSV signal"):
