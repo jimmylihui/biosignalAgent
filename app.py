@@ -480,34 +480,106 @@ def _is_csv_path(path: str) -> bool:
     return Path(path).suffix.lower() in {".csv", ".txt", ".tsv"}
 
 
-def _assistant_message_from_pipeline(kind: str, trajectory: str, report: str, payload: dict[str, Any]) -> str:
-    compact_payload = _compact_tool_result(payload, max_items=8) if isinstance(payload, dict) else payload
+def _tool_call_card(name: str, args: dict[str, Any] | None = None, result: dict[str, Any] | None = None, icon: str = "🛠️") -> str:
+    args = args or {}
+    result = result or {}
+    compact = _compact_tool_result(result, max_items=6) if result else {}
+    arg_text = " ".join(f"{key}={json.dumps(_jsonable(value))}" for key, value in list(args.items())[:5])
+    result_bits = []
+    for key, value in list(compact.items())[:5]:
+        if isinstance(value, dict) and "count" in value:
+            result_bits.append(f"{key}: {value.get('count')}")
+        elif isinstance(value, (str, int, float, bool)) or value is None:
+            result_bits.append(f"{key}: {value}")
+    result_text = " | ".join(result_bits)
+    if result_text:
+        result_text = f"<br><span style='color:#777'>↳ {result_text}</span>"
+    return (
+        "<div style='border:1px solid #e0e0e0;border-radius:7px;padding:10px 12px;"
+        "margin:8px 0;background:#fbfbfb'>"
+        f"<span style='opacity:.75'>⌄</span> {icon} <b>{name}</b> "
+        f"<span style='color:#999'>{arg_text}</span>{result_text}</div>"
+    )
+
+
+def _tool_cards_from_payload(kind: str, payload: dict[str, Any]) -> list[str]:
+    cards: list[str] = []
+    if kind == "waveform image":
+        ocr = payload.get("ocr") or {}
+        cards.append(_tool_call_card("Signal_read_image_text_ocr", {"image": "uploaded"}, {"available": ocr.get("available"), "text": (ocr.get("text") or "")[:120]}, "🧾"))
+        cards.append(_tool_call_card("Signal_classify_modality_from_image_cnn", {"image": "uploaded"}, payload.get("image_classifier") or {}, "🧭"))
+        cards.append(_tool_call_card("Signal_estimate_image_scale", {"use_ocr": True}, payload.get("scale") or {}, "📏"))
+        cards.append(_tool_call_card("Signal_digitize_waveform_image", {"trace": "visible waveform"}, payload.get("digitization") or {}, "🔧"))
+        report = payload.get("signal_report") or {}
+    else:
+        report = payload or {}
+        classifier = payload.get("modality_classifier") if isinstance(payload, dict) else None
+        if classifier:
+            cards.append(_tool_call_card("Signal_classify_modality", {"input": "csv"}, classifier, "🧭"))
+    for call in (report.get("tool_calls") or [])[:6]:
+        cards.append(_tool_call_card(str(call.get("tool") or "tool"), {}, call.get("result") or {}, "🛠️"))
+    return cards
+
+
+def _human_answer_from_pipeline(kind: str, question: str, report: str, payload: dict[str, Any]) -> str:
+    signal_report = payload.get("signal_report") if kind == "waveform image" else payload
+    signal_report = signal_report or {}
+    modality = signal_report.get("modality") or "unknown"
+    plan = signal_report.get("plan") or []
+    findings = signal_report.get("findings") or []
+    cards = _tool_cards_from_payload(kind, payload if isinstance(payload, dict) else {})
     lines = [
-        "I treated this as a live BioSignalAgent request, not a static form run.",
+        "I’ll break this down the way I would in an agent run: first identify what the input is, then call the smallest set of tools needed, and only then give the answer.",
         "",
-        f"**Input type:** `{kind}`",
+    ]
+    if kind == "waveform image":
+        ocr = payload.get("ocr") or {}
+        image_classifier = payload.get("image_classifier") or {}
+        final_modality = modality
+        lines.extend([
+            f"The image looks like a `{final_modality}` workflow target. I also checked text/OCR hints because plot screenshots can confuse the image classifier.",
+            "",
+        ])
+        if image_classifier.get("predicted_modality") and image_classifier.get("predicted_modality") != final_modality:
+            lines.extend([
+                f"One important detail: the image CNN leaned toward `{image_classifier.get('predicted_modality')}`, but the OCR/title context pointed to `{final_modality}`, so I used the text-grounded route for this case.",
+                "",
+            ])
+        if ocr.get("text"):
+            lines.extend([f"OCR picked up: `{str(ocr.get('text'))[:180]}`", ""])
+    else:
+        lines.extend([f"I read the uploaded CSV and routed it as `{modality}` before selecting tools.", ""])
+    if cards:
+        lines.append("I’m going to call these tools:")
+        lines.extend(cards)
+        lines.append("")
+    if plan:
+        lines.append("The final tool route is: " + ", ".join(f"`{tool}`" for tool in plan) + ".")
+        lines.append("")
+    lines.append("**Answer:**")
+    if findings:
+        for finding in findings[:8]:
+            lines.append(f"- {finding}")
+    else:
+        lines.append(report or "I could not produce a confident finding from this input.")
+    lines.extend([
         "",
-        trajectory,
+        f"I would treat this as research/prototype output, not a clinical diagnosis. {DISCLAIMER}",
         "",
-        report or "No report was produced.",
-        "",
-        "<details><summary>Compact tool trace JSON</summary>",
+        "<details><summary>Raw compact trace</summary>",
         "",
         "```json",
-        json.dumps(_jsonable(compact_payload), indent=2)[:6000],
+        json.dumps(_jsonable(_compact_tool_result(payload, max_items=8)), indent=2)[:6000],
         "```",
-        "",
         "</details>",
-    ]
+    ])
     return "\n".join(lines)
 
 
-def _chat_progress(stage: str, details: list[str] | None = None) -> str:
-    lines = ["### BioSignalAgent is working", "", f"**Current step:** {stage}"]
-    if details:
-        lines.append("")
-        for detail in details:
-            lines.append(f"- {detail}")
+def _chat_progress(text: str, tool_cards: list[str] | None = None) -> str:
+    lines = [text]
+    if tool_cards:
+        lines.extend(["", *tool_cards])
     return "\n".join(lines)
 
 
@@ -525,13 +597,19 @@ def biosignal_chat_response(
     trace_method = trace_method or "path"
     upload_path = _file_path_from_gradio(upload)
 
-    yield _chat_progress("Reading your request", [f"Question: `{question[:180]}`"])
-    time.sleep(0.08)
+    yield "I’ll take this step by step. First I need to understand the input and decide which biosignal route makes sense."
+    time.sleep(0.35)
 
     if upload_path and _is_image_path(upload_path):
-        yield _chat_progress("Inspecting waveform image", ["Running OCR/title hints and image modality routing.", "Preparing image-to-signal digitization."])
-        time.sleep(0.08)
-        yield _chat_progress("Calling signal tools", ["Digitizing the visible trace, then running modality-specific analysis tools."])
+        yield _chat_progress(
+            "This is an image input, so I’ll inspect text/axes first and then recover the waveform before using signal tools.",
+            [_tool_call_card("Signal_read_image_text_ocr", {"image": "uploaded"}, {}, "🧾"), _tool_call_card("Signal_classify_modality_from_image_cnn", {"image": "uploaded"}, {}, "🧭")],
+        )
+        time.sleep(0.35)
+        yield _chat_progress(
+            "Next I’ll estimate the plot scale and digitize the visible trace. If the image classifier disagrees with OCR/title text, I’ll explain which route I trust more.",
+            [_tool_call_card("Signal_estimate_image_scale", {"use_ocr": True}, {}, "📏"), _tool_call_card("Signal_digitize_waveform_image", {"trace": trace_method}, {}, "🔧")],
+        )
         trajectory, report, payload, _plot, _csv = run_image_demo(
             upload_path,
             question,
@@ -541,43 +619,29 @@ def biosignal_chat_response(
             None,
             trace_method,
         )
-        yield _assistant_message_from_pipeline("waveform image", trajectory, report, payload)
+        time.sleep(0.2)
+        yield _human_answer_from_pipeline("waveform image", question, report, payload)
         return
 
     if upload_path and _is_csv_path(upload_path):
-        yield _chat_progress("Inspecting signal CSV", ["Reading numeric columns and routing modality.", "Planning and executing suitable tools."])
+        yield _chat_progress(
+            "This is a signal table, so I’ll read the numeric channel, classify the modality, and then choose the relevant tools.",
+            [_tool_call_card("Signal_classify_modality", {"input": "csv", "sampling_rate": sampling_rate}, {}, "🧭")],
+        )
         trajectory, report, payload, _plot = run_csv_demo(upload_path, question, sampling_rate, modality_hint, "")
-        yield _assistant_message_from_pipeline("signal CSV", trajectory, report, payload)
+        time.sleep(0.2)
+        yield _human_answer_from_pipeline("signal CSV", question, report, payload)
         return
 
     planner = PlanningBioSignalAgent()
     guessed_modality, matched = _modality_from_text_hint(question, "")
     route = modality_hint if modality_hint != "auto" else (guessed_modality or "unknown")
     plan = planner.plan(question, None if route == "unknown" else route)
-    steps = [
-        {
-            "title": "Conversation understanding",
-            "items": [
-                f"User request: `{question[:180]}`",
-                f"Modality inferred from text: `{guessed_modality or 'unknown'}`" + (f" via `{matched}`" if matched else ""),
-                f"Final route: `{route}`",
-            ],
-        },
-        {
-            "title": "Tool planning",
-            "items": [
-                "No signal file was attached, so I can only plan and explain the tool route.",
-                "Candidate tools: " + (", ".join(f"`{tool}`" for tool in plan) if plan else "none"),
-            ],
-        },
-    ]
-    yield "\n".join([
-        "Attach a waveform image or CSV and ask naturally; I will classify, digitize if needed, call tools, and ground the report in outputs.",
-        "",
-        _trajectory_md(steps),
-        "",
-        f"**Safety note:** {DISCLAIMER}",
-    ])
+    cards = [_tool_call_card(tool, {"planned_only": True}, {}, "🛠️") for tool in plan[:6]]
+    yield _chat_progress(
+        "I can plan the tool route from your question, but I need an image or CSV before I can execute the tools and give grounded measurements.",
+        cards,
+    )
 
 def summarize_tool_universe():
     try:
@@ -629,6 +693,7 @@ Try: Classify this waveform, digitize it, estimate heart rate/HRV, and explain w
             buttons=["copy", "copy_all"],
             layout="bubble",
             show_label=False,
+            sanitize_html=False,
         )
         gr.ChatInterface(
             fn=biosignal_chat_response,
