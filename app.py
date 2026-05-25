@@ -195,6 +195,143 @@ def _clean_y_tick_values(values: list[float]) -> list[float]:
     return vals
 
 
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    cleaned = str(text or "").strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?", "", cleaned).strip()
+        cleaned = re.sub(r"```$", "", cleaned).strip()
+    candidates = [cleaned]
+    match = re.search(r"\{.*\}", cleaned, flags=re.S)
+    if match:
+        candidates.append(match.group(0))
+    for candidate in candidates:
+        try:
+            value = json.loads(candidate)
+            if isinstance(value, dict):
+                return value
+        except Exception:
+            continue
+    return None
+
+
+def _distill_axes_with_ollama(image_path: str, panels: list[dict[str, Any]], ocr_text: str = "") -> dict[str, Any]:
+    api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+    model = os.getenv("OLLAMA_AXIS_MODEL", "qwen3.5:4b")
+    panel_hint = [{
+        "panel_index": p.get("panel_index"),
+        "plot_area": p.get("plot_area"),
+        "x_axis_crop": p.get("x_axis_crop"),
+        "y_axis_crop": p.get("y_axis_crop"),
+        "x_ocr_text": p.get("x_ocr_text"),
+        "y_ocr_text": p.get("y_ocr_text"),
+        "x_tick_values_ocr": p.get("x_tick_values"),
+        "y_tick_values_ocr": p.get("y_tick_values"),
+    } for p in panels[:4]]
+    prompt = (
+        "You are an axis-label distiller for biomedical waveform plot screenshots. "
+        "You may receive noisy OCR output and plot/panel geometry. Your job is to infer the true x-axis and y-axis ticks for each panel. "
+        "Do not analyze the waveform. Ignore labels like (a), (b), grid fragments, and OCR duplicates. "
+        "Return ONLY valid JSON with schema: "
+        "{\"panels\":[{\"panel_index\":1,\"x_tick_values\":[...],\"y_tick_values\":[...],"
+        "\"x_min\":number|null,\"x_max\":number|null,\"y_min\":number|null,\"y_max\":number|null,"
+        "\"x_units\":string|null,\"y_units\":string|null,\"confidence\":0-1,\"reason\":string}],\"global_confidence\":0-1}. "
+        "Hints: x-axis tick labels often appear along the bottom of each panel, e.g. 0, 500, 1000. "
+        "y-axis tick labels often appear at the left side, e.g. -2, 0, 2. If OCR says 1 near a right edge after 0,500, infer 1000 only when visually/positionally consistent. "
+        f"\nNoisy OCR/global text: {ocr_text[:900]}\nPanel OCR and geometry hints: {json.dumps(_jsonable(panel_hint))[:2200]}"
+    )
+    bodies = [
+        {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "think": False,
+            "format": "json",
+            "options": {"temperature": 0, "num_predict": 900},
+        }
+    ]
+    endpoints = [
+        os.getenv("OLLAMA_HOST", "").rstrip("/") + "/api/chat" if os.getenv("OLLAMA_HOST") else "",
+        "http://127.0.0.1:11434/api/chat",
+        # Cloud endpoint intentionally omitted by default; use local Ollama or set OLLAMA_HOST.
+    ]
+    endpoints = [endpoint for endpoint in endpoints if endpoint]
+    last_error = None
+    for endpoint in endpoints:
+        for body in bodies:
+            try:
+                import requests
+
+                headers = {"Content-Type": "application/json"}
+                if api_key:
+                    headers["Authorization"] = f"Bearer {api_key}"
+                response = requests.post(
+                    endpoint,
+                    headers=headers,
+                    json=body,
+                    timeout=float(os.getenv("OLLAMA_AXIS_TIMEOUT", "20")),
+                )
+                if response.status_code >= 400:
+                    last_error = f"{endpoint}_http_{response.status_code}:{response.text[:180]}"
+                    continue
+                data = response.json()
+                content = data.get("message", {}).get("content") or data.get("response") or ""
+                parsed = _extract_json_object(content)
+                if parsed:
+                    parsed["available"] = True
+                    parsed["status"] = "ok"
+                    parsed["model"] = model
+                    parsed["provider"] = "ollama"
+                    parsed["endpoint"] = endpoint.replace(api_key, "***")
+                    return parsed
+                last_error = f"{endpoint}_no_json_in_response:{content[:220]!r}"
+            except Exception as exc:
+                last_error = f"{type(exc).__name__}:{str(exc)[:180]}"
+                continue
+    return {"available": False, "status": "failed", "error": last_error, "model": model, "provider": "ollama"}
+
+
+def _merge_llm_axis_panels(panels: list[dict[str, Any]], llm_axis: dict[str, Any]) -> list[dict[str, Any]]:
+    if not llm_axis.get("available"):
+        return panels
+    llm_panels = llm_axis.get("panels") or []
+    by_index = {}
+    for item in llm_panels:
+        try:
+            by_index[int(item.get("panel_index"))] = item
+        except Exception:
+            continue
+    merged = []
+    for idx, panel in enumerate(panels, 1):
+        item = by_index.get(int(panel.get("panel_index") or idx)) or (llm_panels[idx - 1] if idx - 1 < len(llm_panels) and isinstance(llm_panels[idx - 1], dict) else {})
+        panel = dict(panel)
+        llm_conf = float(item.get("confidence") or llm_axis.get("global_confidence") or 0.0) if item else 0.0
+        if item and llm_conf >= 0.35:
+            x_ticks = item.get("x_tick_values") or []
+            y_ticks = item.get("y_tick_values") or []
+            if len(x_ticks) >= 2:
+                panel["x_tick_values"] = [float(v) for v in x_ticks]
+            if len(y_ticks) >= 2:
+                panel["y_tick_values"] = [float(v) for v in y_ticks]
+            x_min = item.get("x_min") if item.get("x_min") is not None else (min(panel.get("x_tick_values") or []) if panel.get("x_tick_values") else None)
+            x_max = item.get("x_max") if item.get("x_max") is not None else (max(panel.get("x_tick_values") or []) if panel.get("x_tick_values") else None)
+            y_min = item.get("y_min") if item.get("y_min") is not None else (min(panel.get("y_tick_values") or []) if panel.get("y_tick_values") else None)
+            y_max = item.get("y_max") if item.get("y_max") is not None else (max(panel.get("y_tick_values") or []) if panel.get("y_tick_values") else None)
+            if x_min is not None and x_max is not None and float(x_max) > float(x_min):
+                panel["duration_s"] = float(x_max) - float(x_min)
+                width = max(1, int(panel.get("plot_area", {}).get("x_max", 1)) - int(panel.get("plot_area", {}).get("x_min", 0)))
+                panel["sampling_rate"] = float(width) / float(panel["duration_s"])
+            if y_min is not None and y_max is not None and float(y_max) > float(y_min):
+                panel["value_min"] = float(y_min)
+                panel["value_max"] = float(y_max)
+            panel["x_units"] = item.get("x_units")
+            panel["y_units"] = item.get("y_units")
+            panel["llm_axis_reason"] = item.get("reason")
+            panel["llm_axis_confidence"] = llm_conf
+            panel["axis_status"] = "calibrated_xy_llm" if panel.get("duration_s") and panel.get("value_min") is not None and panel.get("value_max") is not None else "partial_llm"
+        merged.append(panel)
+    return merged
+
+
 def _ocr_axis_crop(image, psm: int = 6) -> dict[str, Any]:
     try:
         import pytesseract
@@ -328,7 +465,25 @@ def _extract_plot_axes_ocr(image_path: str, max_panels: int = 8) -> dict[str, An
             "axis_status": "calibrated_xy" if sampling_rate and y_min_value is not None and y_max_value is not None else "partial_or_unreadable",
         })
 
+    needs_llm = any(
+        len(panel.get("x_tick_values") or []) < 2 or len(panel.get("y_tick_values") or []) < 2
+        for panel in panels
+    )
+    llm_axis = {"available": False, "status": "not_needed"}
+    if needs_llm or os.getenv("BIOSIGNAL_ALWAYS_LLM_AXIS", "0").lower() in {"1", "true", "yes"}:
+        full_image_ocr = _ocr_axis_crop(image, psm=11)
+        llm_ocr_text = (full_image_ocr.get("text", "") + " " + " ".join(
+            str(panel.get(key, ""))
+            for panel in panels
+            for key in ("x_ocr_text", "y_ocr_text")
+        )).strip()
+        llm_axis = _distill_axes_with_ollama(image_path, panels, ocr_text=llm_ocr_text)
+        panels = _merge_llm_axis_panels(panels, llm_axis)
+
     primary = panels[0] if panels else {}
+    confidence = 0.75 if str(primary.get("axis_status", "")).startswith("calibrated_xy") else 0.55 if primary.get("duration_s") else 0.35 if panels else 0.0
+    if llm_axis.get("available") and llm_axis.get("global_confidence") is not None:
+        confidence = max(confidence, min(0.85, float(llm_axis.get("global_confidence") or 0.0)))
     return {
         "tool": "Signal_extract_plot_axes_ocr",
         "image_path": str(image_path),
@@ -338,8 +493,13 @@ def _extract_plot_axes_ocr(image_path: str, max_panels: int = 8) -> dict[str, An
         "sampling_rate": primary.get("sampling_rate"),
         "value_min": primary.get("value_min"),
         "value_max": primary.get("value_max"),
-        "confidence": 0.75 if primary.get("axis_status") == "calibrated_xy" else 0.55 if primary.get("duration_s") else 0.35 if panels else 0.0,
-        "disclaimer": "OCR axis extraction is heuristic; verify tick labels and units before using calibrated measurements.",
+        "llm_axis_status": llm_axis.get("status"),
+        "llm_axis_available": bool(llm_axis.get("available")),
+        "llm_axis_model": llm_axis.get("model"),
+        "llm_axis_provider": llm_axis.get("provider"),
+        "llm_axis": llm_axis,
+        "confidence": confidence,
+        "disclaimer": "OCR/LLM axis extraction is heuristic; verify tick labels and units before using calibrated measurements.",
     }
 
 
