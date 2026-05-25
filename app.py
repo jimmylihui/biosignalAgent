@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from biosignal_agent.agent.framework import BioSignalAgentConfig, BioSignalAgentFramework
 from biosignal_agent.agent.planning_agent import PlanningBioSignalAgent
 from biosignal_agent.agent.schema_loader import load_tool_schemas
 from biosignal_agent.tools.digitize_tools import (
@@ -26,11 +27,59 @@ from biosignal_agent.tools.digitize_tools import (
 from biosignal_agent.tools.digitize_unet_tools import Signal_digitize_waveform_image_unet, Signal_digitize_waveform_image_unet_all, UNET_MODEL_PATH, build_waveform_segmentation_model, select_waveform_mask_area, select_waveform_mask_areas
 from biosignal_agent.tools.image_modality_tools import Signal_classify_modality_from_image
 from biosignal_agent.tools.modality_tools import Signal_classify_modality
+from biosignal_agent.session.schema import BioSignalSession, SignalInput
 
 DISCLAIMER = "Prototype output for research use only; not a clinical diagnosis."
 MODALITIES = ["auto", "ecg", "ppg", "bcg", "scg", "resp", "spo2", "abp", "pcg", "acc", "eda", "eeg", "emg"]
 DEFAULT_CSV_QUESTION = "Analyze this biosignal, choose suitable tools, estimate core rates/features, and produce a concise research-use report."
 DEFAULT_IMAGE_QUESTION = "Classify this waveform image, digitize the trace, then analyze the recovered signal with suitable tools."
+BIOSIGNALBENCH_PATH = Path(os.environ.get("BIOSIGNALBENCH_PATH", "/data1/jiahui/biosignal-agent/outputs/biosignalbench_v1.jsonl"))
+BENCHMARK_NONE = "No benchmark default"
+
+
+def _load_multimodal_benchmark_cases(limit: int = 8) -> dict[str, dict[str, Any]]:
+    if not BIOSIGNALBENCH_PATH.exists():
+        return {}
+    cases: dict[str, dict[str, Any]] = {}
+    try:
+        with BIOSIGNALBENCH_PATH.open() as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if row.get("benchmark_task") != "multimodal_session_reasoning" or row.get("input_type") != "session":
+                    continue
+                signals = [sig for sig in row.get("signals", []) if sig.get("path") and Path(str(sig.get("path"))).exists()]
+                if len(signals) < 2:
+                    continue
+                row = dict(row)
+                row["signals"] = signals
+                modality = str(row.get("modality") or "multimodal").upper()
+                short_question = re.sub(r"\s+", " ", str(row.get("question") or "Multimodal benchmark task")).strip()
+                if len(short_question) > 78:
+                    short_question = short_question[:75].rstrip() + "..."
+                label = f"{modality} | {short_question}"
+                cases[label] = row
+                if len(cases) >= limit:
+                    break
+    except Exception:
+        return {}
+    return cases
+
+
+MULTIMODAL_BENCHMARK_CASES = _load_multimodal_benchmark_cases()
+MULTIMODAL_BENCHMARK_CHOICES = [BENCHMARK_NONE, *MULTIMODAL_BENCHMARK_CASES.keys()]
+
+
+def _selected_benchmark_case(label: str | None) -> dict[str, Any] | None:
+    if not label or label == BENCHMARK_NONE:
+        return None
+    return MULTIMODAL_BENCHMARK_CASES.get(label)
+
+
+def _benchmark_question(label: str | None) -> str:
+    case = _selected_benchmark_case(label)
+    return str(case.get("question") or DEFAULT_CSV_QUESTION) if case else ""
 
 
 def _jsonable(value: Any) -> Any:
@@ -853,6 +902,116 @@ def _short_report(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _session_from_benchmark_case(case: dict[str, Any], question: str | None = None) -> BioSignalSession:
+    signals = []
+    for item in case.get("signals", []):
+        signals.append(
+            SignalInput(
+                modality=str(item.get("modality") or "").lower(),
+                path=str(item.get("path") or ""),
+                sampling_rate=float(item.get("sampling_rate") or 0),
+                column=item.get("column"),
+                label=item.get("label"),
+            )
+        )
+    return BioSignalSession(question=(question or case.get("question") or DEFAULT_CSV_QUESTION).strip(), signals=signals)
+
+
+def _session_measurement_findings(trace: dict[str, Any]) -> list[str]:
+    findings: list[str] = []
+    for run in trace.get("runs", []):
+        label = run.get("signal_label") or (run.get("signal") or {}).get("label") or run.get("modality") or "signal"
+        modality = str(run.get("modality") or (run.get("signal") or {}).get("modality") or "signal").upper()
+        for call in run.get("tool_results", [])[:8]:
+            result = call.get("result") or {}
+            tool = call.get("tool") or "tool"
+            bits = []
+            for key in ["heart_rate_bpm", "respiratory_rate_bpm", "mean_spo2", "rmssd_ms", "quality_label", "activity_label", "stress_index", "confidence"]:
+                if key in result and result.get(key) is not None:
+                    bits.append(f"{key}={result.get(key)}")
+            if bits:
+                findings.append(f"{modality} `{label}` via `{tool}`: " + ", ".join(bits) + ".")
+    for item in trace.get("session_tool_results", [])[:4]:
+        result = item.get("result") or {}
+        bits = []
+        for key in ["median_pulse_arrival_time_ms", "paired_pulses", "sleep_apnea_session_risk", "confidence"]:
+            if key in result and result.get(key) is not None:
+                bits.append(f"{key}={result.get(key)}")
+        if bits:
+            findings.append(f"Session tool `{item.get('tool')}`: " + ", ".join(bits) + ".")
+    return findings[:12]
+
+
+def run_multimodal_benchmark_demo(label: str | None, question: str | None = None) -> dict[str, Any]:
+    case = _selected_benchmark_case(label)
+    if not case:
+        return {"error": "Select a BioSignalBench multimodal task first.", "stage": "benchmark_session_selection"}
+    session = _session_from_benchmark_case(case, question or case.get("question"))
+    agent = BioSignalAgentFramework(BioSignalAgentConfig(planner="rule", save_traces=False))
+    trace = agent.run_session(session)
+    trace["benchmark_case"] = {k: v for k, v in case.items() if k not in {"signals"}}
+    trace["benchmark_case"]["signals"] = case.get("signals", [])
+    trace["disclaimer"] = DISCLAIMER
+    return trace
+
+
+def _human_answer_from_session(label: str | None, question: str, trace: dict[str, Any]) -> str:
+    if trace.get("error"):
+        return f"I could not run the selected multimodal benchmark task: `{trace.get('error')}`"
+    case = trace.get("benchmark_case") or {}
+    session = trace.get("session") or {}
+    signals = session.get("signals") or []
+    lines = [
+        "I’ll use the selected BioSignalBench multimodal case as the input data, then run one tool route per signal and any session-level fusion tools.",
+        "",
+        f"Benchmark case: `{case.get('case_id', label or 'selected')}`",
+        f"Question: {session.get('question') or question}",
+        "",
+        "Signals from the benchmark:",
+    ]
+    for sig in signals:
+        lines.append(f"- `{sig.get('label') or Path(str(sig.get('path') or '')).name}`: `{sig.get('modality')}` at `{sig.get('sampling_rate')}` Hz")
+    lines.append("")
+    for run in trace.get("runs", []):
+        sig = run.get("signal") or {}
+        label_text = run.get("signal_label") or sig.get("label") or sig.get("modality") or "signal"
+        lines.append(f"Tools for `{label_text}`:")
+        for call in run.get("tool_results", [])[:8]:
+            lines.append(_tool_call_card(str(call.get("tool") or "tool"), call.get("arguments") or {}, call.get("result") or {}, "T"))
+        lines.append("")
+    if trace.get("session_tool_results"):
+        lines.append("Session-level fusion tools:")
+        for item in trace.get("session_tool_results", [])[:6]:
+            lines.append(_tool_call_card(str(item.get("tool") or "session_tool"), {"signals": len(signals)}, item.get("result") or {}, "T"))
+        lines.append("")
+    plan = []
+    for run in trace.get("runs", []):
+        plan.extend([item.get("name") for item in run.get("tool_plan", []) if item.get("name")])
+    plan.extend(trace.get("session_tool_plan") or [])
+    if plan:
+        lines.append("The final multimodal route is: " + ", ".join(f"`{tool}`" for tool in dict.fromkeys(plan)) + ".")
+        lines.append("")
+    lines.append("**Answer:**")
+    findings = _session_measurement_findings(trace)
+    if findings:
+        for finding in findings:
+            lines.append(f"- {finding}")
+    else:
+        lines.append("The tools ran, but no compact numeric finding was available from the selected benchmark task. Inspect the tool cards above for raw outputs.")
+    lines.extend([
+        "",
+        f"This uses benchmark data for a demo/research workflow, not a clinical diagnosis. {DISCLAIMER}",
+        "",
+        "<details><summary>Raw compact trace</summary>",
+        "",
+        "```json",
+        json.dumps(_jsonable(_compact_tool_result(trace, max_items=8)), indent=2)[:6000],
+        "```",
+        "</details>",
+    ])
+    return "\n".join(lines)
+
+
 def run_csv_demo(csv_file: str | None, question: str, sampling_rate: float, modality_hint: str, column: str | None):
     steps: list[dict[str, Any]] = []
     if not csv_file:
@@ -1548,8 +1707,10 @@ def biosignal_chat_response(
     sampling_rate: float,
     modality_hint: str,
     trace_method: str,
+    benchmark_task: str | None = None,
 ):
-    question = (message or "").strip() or DEFAULT_CSV_QUESTION
+    benchmark_case = _selected_benchmark_case(benchmark_task)
+    question = (message or "").strip() or (_benchmark_question(benchmark_task) if benchmark_case else DEFAULT_CSV_QUESTION)
     sampling_rate = float(sampling_rate or 250.0)
     modality_hint = modality_hint or "auto"
     trace_method = trace_method or "path"
@@ -1584,11 +1745,22 @@ def biosignal_chat_response(
     if upload_path and _is_csv_path(upload_path):
         yield _chat_progress(
             "This is a signal table, so I’ll read the numeric channel, classify the modality, and then choose the relevant tools.",
-            [_tool_call_card("Signal_classify_modality", {"input": "csv", "sampling_rate": sampling_rate}, {}, "🧭")],
+            [_tool_call_card("Signal_classify_modality", {"input": "csv", "sampling_rate": sampling_rate}, {}, "T")],
         )
         trajectory, report, payload, _plot = run_csv_demo(upload_path, question, sampling_rate, modality_hint, "")
         time.sleep(0.2)
         yield _human_answer_from_pipeline("signal CSV", question, report, payload)
+        return
+
+    if benchmark_case:
+        signals = benchmark_case.get("signals") or []
+        yield _chat_progress(
+            f"I’ll use the selected BioSignalBench multimodal task with {len(signals)} benchmark signals, then run per-signal tools and any fusion tools.",
+            [_tool_call_card("BioSignalBench_load_multimodal_case", {"case_id": benchmark_case.get("case_id")}, {"modality": benchmark_case.get("modality"), "signals": len(signals)}, "T")],
+        )
+        time.sleep(0.25)
+        trace = run_multimodal_benchmark_demo(benchmark_task, question)
+        yield _human_answer_from_session(benchmark_task, question, trace)
         return
 
     planner = PlanningBioSignalAgent()
@@ -1608,19 +1780,25 @@ def biosignal_chat_submit(
     sampling_rate: float,
     modality_hint: str,
     trace_method: str,
+    benchmark_task: str | None = None,
 ):
-    question = (message or "").strip() or DEFAULT_CSV_QUESTION
+    benchmark_case = _selected_benchmark_case(benchmark_task)
+    question = (message or "").strip() or (_benchmark_question(benchmark_task) if benchmark_case else DEFAULT_CSV_QUESTION)
     history = list(history or [])
     history.append({"role": "user", "content": question})
     history.append({"role": "assistant", "content": ""})
     yield history, ""
-    for chunk in biosignal_chat_response(question, history[:-1], upload, sampling_rate, modality_hint, trace_method):
+    for chunk in biosignal_chat_response(question, history[:-1], upload, sampling_rate, modality_hint, trace_method, benchmark_task):
         history[-1] = {"role": "assistant", "content": chunk}
         yield history, ""
 
 
 def _clear_chat():
     return []
+
+
+def _load_benchmark_question(label: str | None):
+    return gr.update(value=_benchmark_question(label) or "")
 
 
 
@@ -1884,6 +2062,8 @@ Upload a biosignal image or CSV, then ask a question.
                     bot_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
                     bot_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
                     bot_trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
+                    bot_benchmark_task = gr.Dropdown(label="Benchmark multimodal task", choices=MULTIMODAL_BENCHMARK_CHOICES, value=BENCHMARK_NONE)
+                    bot_load_benchmark = gr.Button("Load benchmark question")
             with gr.Column(scale=1, elem_classes=["bs-main"]):
                 with gr.Column(elem_classes=["bs-main-inner"]):
                     gr.HTML(
@@ -1913,7 +2093,9 @@ Upload a biosignal image or CSV, then ask a question.
                         )
                         chat_clear = gr.Button("Clear", scale=1)
                         chat_send = gr.Button("↑", variant="primary", scale=1)
-                    chat_inputs = [chat_question, chatbot, bot_upload, bot_sampling_rate, bot_modality, bot_trace_method]
+                    chat_inputs = [chat_question, chatbot, bot_upload, bot_sampling_rate, bot_modality, bot_trace_method, bot_benchmark_task]
+                    bot_load_benchmark.click(_load_benchmark_question, bot_benchmark_task, chat_question)
+                    bot_benchmark_task.change(_load_benchmark_question, bot_benchmark_task, chat_question)
                     chat_question.submit(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
                     chat_send.click(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
                     chat_clear.click(_clear_chat, outputs=chatbot)
