@@ -1387,7 +1387,7 @@ def _image_pipeline_visuals(payload: dict[str, Any]) -> list[str]:
     return visuals
 
 
-def _tool_call_card(name: str, args: dict[str, Any] | None = None, result: dict[str, Any] | None = None, icon: str = "🛠️") -> str:
+def _tool_call_card(name: str, args: dict[str, Any] | None = None, result: dict[str, Any] | None = None, icon: str = "T") -> str:
     args = args or {}
     result = result or {}
     compact = _compact_tool_result(result, max_items=6) if result else {}
@@ -1399,13 +1399,17 @@ def _tool_call_card(name: str, args: dict[str, Any] | None = None, result: dict[
         elif isinstance(value, (str, int, float, bool)) or value is None:
             result_bits.append(f"{key}: {value}")
     result_text = " | ".join(result_bits)
-    if result_text:
-        result_text = f"<br><span style='color:#777'>↳ {result_text}</span>"
+    result_html = f"<div class='bs-tool-result'>{result_text}</div>" if result_text else ""
+    icon_text = re.sub(r"[^A-Za-z0-9]", "", str(icon or "T"))[:2].upper() or "T"
     return (
-        "<div style='border:1px solid #e0e0e0;border-radius:7px;padding:10px 12px;"
-        "margin:8px 0;background:#fbfbfb'>"
-        f"<span style='opacity:.75'>⌄</span> {icon} <b>{name}</b> "
-        f"<span style='color:#999'>{arg_text}</span>{result_text}</div>"
+        "<div class='bs-tool-card'>"
+        "<div class='bs-tool-row'>"
+        f"<span class='bs-tool-icon'>{icon_text}</span>"
+        f"<span class='bs-tool-name'>{name}</span>"
+        f"<span class='bs-tool-args'>{arg_text}</span>"
+        "</div>"
+        f"{result_html}"
+        "</div>"
     )
 
 
@@ -1588,6 +1592,155 @@ def _clear_chat():
     return []
 
 
+
+CUSTOM_CSS = """
+:root {
+  --bs-bg: #f6f7f9;
+  --bs-panel: #ffffff;
+  --bs-border: #dfe3e8;
+  --bs-border-strong: #c8d0da;
+  --bs-text: #22272f;
+  --bs-muted: #6b7280;
+  --bs-accent: #1768e8;
+  --bs-accent-soft: #eaf2ff;
+  --bs-tool: #f9fafb;
+}
+.gradio-container {
+  background: var(--bs-bg) !important;
+  color: var(--bs-text) !important;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+.bs-shell {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+.bs-topbar {
+  border: 1px solid var(--bs-border);
+  background: var(--bs-panel);
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+.bs-title {
+  font-size: 24px;
+  font-weight: 760;
+  letter-spacing: 0;
+  margin: 0;
+}
+.bs-subtitle {
+  color: var(--bs-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.bs-badge-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.bs-badge {
+  border: 1px solid #d6e4ff;
+  background: var(--bs-accent-soft);
+  color: #174ea6;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.bs-sidebar, .bs-chat-panel {
+  border: 1px solid var(--bs-border);
+  background: var(--bs-panel);
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+.bs-sidebar {
+  min-width: 300px;
+}
+.bs-sidebar .label-wrap span, .bs-chat-panel .label-wrap span {
+  font-size: 12px !important;
+  color: var(--bs-muted) !important;
+  font-weight: 650 !important;
+}
+.bs-chat-panel {
+  min-width: 0;
+}
+.bs-chat-panel .chatbot {
+  border: 1px solid var(--bs-border) !important;
+  border-radius: 10px !important;
+  background: #fbfcfe !important;
+}
+.bs-chat-panel textarea, .bs-sidebar input, .bs-sidebar textarea {
+  border-radius: 8px !important;
+}
+.bs-composer {
+  border: 1px solid var(--bs-border);
+  background: #fbfcfe;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 10px;
+}
+.bs-composer button.primary, button.primary {
+  background: var(--bs-accent) !important;
+  border-color: var(--bs-accent) !important;
+}
+.bs-tool-card {
+  border: 1px solid var(--bs-border);
+  border-left: 3px solid var(--bs-accent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  background: var(--bs-tool);
+}
+.bs-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.bs-tool-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bs-accent-soft);
+  color: var(--bs-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 750;
+  flex: 0 0 auto;
+}
+.bs-tool-name {
+  font-weight: 720;
+  color: var(--bs-text);
+}
+.bs-tool-args {
+  color: #8a93a3;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.bs-tool-result {
+  color: var(--bs-muted);
+  font-size: 13px;
+  padding-left: 32px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.bs-advanced {
+  margin-top: 14px;
+}
+.bs-examples .examples, .bs-examples table {
+  font-size: 13px !important;
+}
+@media (max-width: 900px) {
+  .bs-sidebar { min-width: 0; }
+  .bs-topbar { padding: 14px; }
+}
+"""
+
 def summarize_tool_universe():
     try:
         schemas = load_tool_schemas()
@@ -1618,91 +1771,108 @@ def build_demo() -> gr.Blocks:
 
 Upload a biosignal image or CSV, then ask a question.
 
-Try: Classify this waveform, digitize it, estimate heart rate/HRV, and explain which tools you used.
+Try: Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.
 """
     with gr.Blocks(title="BioSignalAgent", fill_height=True) as demo:
-        gr.Markdown(
-            "# BioSignalAgent\n"
-            "A TxAgent-style biosignal tool-use assistant for routing, digitization, tool calls, and grounded research-use reports."
-        )
-        with gr.Accordion("Signal attachment", open=True):
-            with gr.Row():
-                bot_upload = gr.File(label="Signal image or CSV", file_types=[".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".csv", ".tsv", ".txt"], type="filepath", scale=2)
-                bot_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250, scale=1)
-                bot_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto", scale=1)
-                bot_trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path", scale=1)
-        chatbot = gr.Chatbot(
-            label="BioSignalAgent",
-            height=720,
-            placeholder=placeholder,
-            buttons=["copy", "copy_all"],
-            layout="bubble",
-            show_label=False,
-            sanitize_html=False,
-        )
-        with gr.Row():
-            chat_question = gr.Textbox(
-                label="Question",
-                placeholder="Ask your own question, e.g. Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.",
-                lines=2,
-                scale=8,
-                autofocus=True,
+        with gr.Column(elem_classes=["bs-shell"]):
+            gr.HTML(
+                "<div class='bs-topbar'>"
+                "<div class='bs-title'>BioSignalAgent</div>"
+                "<div class='bs-subtitle'>A TxAgent-style biosignal assistant for routing, image digitization, tool calls, and grounded research-use reports.</div>"
+                "<div class='bs-badge-row'>"
+                "<span class='bs-badge'>VLM axis reading</span>"
+                "<span class='bs-badge'>Multi-panel digitization</span>"
+                "<span class='bs-badge'>Tool-use reports</span>"
+                "<span class='bs-badge'>Research use only</span>"
+                "</div>"
+                "</div>"
             )
-            chat_send = gr.Button("Send", variant="primary", scale=1)
-            chat_clear = gr.Button("Clear", scale=1)
-        gr.Examples(
-            examples=[
-                "Classify this waveform image, digitize the trace, then estimate heart rate and explain the tools you used.",
-                "Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.",
-                "This image may be low resolution. Recover the signal if possible and tell me whether the result is reliable.",
-            ],
-            inputs=chat_question,
-        )
-        chat_inputs = [chat_question, chatbot, bot_upload, bot_sampling_rate, bot_modality, bot_trace_method]
-        chat_question.submit(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
-        chat_send.click(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
-        chat_clear.click(_clear_chat, outputs=chatbot)
+            with gr.Row(equal_height=False):
+                with gr.Column(scale=3, min_width=300, elem_classes=["bs-sidebar"]):
+                    gr.Markdown("### Input")
+                    bot_upload = gr.File(label="Signal image or CSV", file_types=[".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".csv", ".tsv", ".txt"], type="filepath")
+                    bot_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
+                    bot_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
+                    bot_trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
+                    gr.Markdown(
+                        "### Suggested prompts\n"
+                        "- Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.\n"
+                        "- Digitize the trace, estimate heart rate, and explain the tools used.\n"
+                        "- Recover the signal if possible and tell me whether the result is reliable."
+                    )
+                with gr.Column(scale=9, elem_classes=["bs-chat-panel"]):
+                    chatbot = gr.Chatbot(
+                        label="BioSignalAgent",
+                        height=680,
+                        placeholder=placeholder,
+                        buttons=["copy", "copy_all"],
+                        layout="bubble",
+                        show_label=False,
+                        sanitize_html=False,
+                    )
+                    with gr.Row(elem_classes=["bs-composer"]):
+                        chat_question = gr.Textbox(
+                            label="Question",
+                            placeholder="Ask your own question, e.g. Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.",
+                            lines=2,
+                            scale=8,
+                            autofocus=True,
+                        )
+                        chat_send = gr.Button("Send", variant="primary", scale=1)
+                        chat_clear = gr.Button("Clear", scale=1)
+                    gr.Examples(
+                        examples=[
+                            "Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.",
+                            "Recover the waveform, show the segmentation steps, and explain whether the digitization is reliable.",
+                            "Which tools did you use, and what limitations should I know before trusting the result?",
+                        ],
+                        inputs=chat_question,
+                    )
+                    chat_inputs = [chat_question, chatbot, bot_upload, bot_sampling_rate, bot_modality, bot_trace_method]
+                    chat_question.submit(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
+                    chat_send.click(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
+                    chat_clear.click(_clear_chat, outputs=chatbot)
 
-        with gr.Accordion("Advanced pipeline views", open=False):
-            with gr.Tab("CSV signal"):
-                with gr.Row():
-                    csv_file = gr.File(label="Signal CSV", file_types=[".csv"], type="filepath")
-                    with gr.Column():
-                        csv_question = gr.Textbox(label="Question", value=DEFAULT_CSV_QUESTION, lines=3)
-                        csv_sampling_rate = gr.Number(label="Sampling rate (Hz)", value=250)
-                        csv_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
-                        csv_column = gr.Textbox(label="Column name (optional)", value="")
-                        csv_button = gr.Button("Run CSV analysis", variant="primary")
-                csv_trajectory = gr.Markdown(label="Agent trajectory")
-                csv_report = gr.Markdown(label="Report")
-                csv_plot = gr.Plot(label="Signal preview")
-                csv_json = gr.JSON(label="Tool trace JSON")
-                csv_button.click(run_csv_demo, [csv_file, csv_question, csv_sampling_rate, csv_modality, csv_column], [csv_trajectory, csv_report, csv_json, csv_plot])
+            with gr.Accordion("Advanced pipeline views", open=False, elem_classes=["bs-advanced"]):
+                with gr.Tab("CSV signal"):
+                    with gr.Row():
+                        csv_file = gr.File(label="Signal CSV", file_types=[".csv"], type="filepath")
+                        with gr.Column():
+                            csv_question = gr.Textbox(label="Question", value=DEFAULT_CSV_QUESTION, lines=3)
+                            csv_sampling_rate = gr.Number(label="Sampling rate (Hz)", value=250)
+                            csv_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
+                            csv_column = gr.Textbox(label="Column name (optional)", value="")
+                            csv_button = gr.Button("Run CSV analysis", variant="primary")
+                    csv_trajectory = gr.Markdown(label="Agent trajectory")
+                    csv_report = gr.Markdown(label="Report")
+                    csv_plot = gr.Plot(label="Signal preview")
+                    csv_json = gr.JSON(label="Tool trace JSON")
+                    csv_button.click(run_csv_demo, [csv_file, csv_question, csv_sampling_rate, csv_modality, csv_column], [csv_trajectory, csv_report, csv_json, csv_plot])
 
-            with gr.Tab("Waveform image"):
-                with gr.Row():
-                    image_file = gr.Image(label="Waveform image", type="filepath")
-                    with gr.Column():
-                        image_question = gr.Textbox(label="Question", value=DEFAULT_IMAGE_QUESTION, lines=3)
-                        image_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
-                        image_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
-                        value_min = gr.Number(label="Y-axis min if known", value=None)
-                        value_max = gr.Number(label="Y-axis max if known", value=None)
-                        trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
-                        image_button = gr.Button("Run image pipeline", variant="primary")
-                image_trajectory = gr.Markdown(label="Agent trajectory")
-                image_report = gr.Markdown(label="Report")
-                image_plot = gr.Plot(label="Digitized signal preview")
-                image_json = gr.JSON(label="Pipeline JSON")
-                digitized_file = gr.File(label="Digitized CSV")
-                image_button.click(run_image_demo, [image_file, image_question, image_sampling_rate, image_modality, value_min, value_max, trace_method], [image_trajectory, image_report, image_json, image_plot, digitized_file])
+                with gr.Tab("Waveform image"):
+                    with gr.Row():
+                        image_file = gr.Image(label="Waveform image", type="filepath")
+                        with gr.Column():
+                            image_question = gr.Textbox(label="Question", value=DEFAULT_IMAGE_QUESTION, lines=3)
+                            image_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
+                            image_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
+                            value_min = gr.Number(label="Y-axis min if known", value=None)
+                            value_max = gr.Number(label="Y-axis max if known", value=None)
+                            trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
+                            image_button = gr.Button("Run image pipeline", variant="primary")
+                    image_trajectory = gr.Markdown(label="Agent trajectory")
+                    image_report = gr.Markdown(label="Report")
+                    image_plot = gr.Plot(label="Digitized signal preview")
+                    image_json = gr.JSON(label="Pipeline JSON")
+                    digitized_file = gr.File(label="Digitized CSV")
+                    image_button.click(run_image_demo, [image_file, image_question, image_sampling_rate, image_modality, value_min, value_max, trace_method], [image_trajectory, image_report, image_json, image_plot, digitized_file])
 
-            with gr.Tab("ToolUniverse"):
-                gr.Markdown(summarize_tool_universe())
+                with gr.Tab("ToolUniverse"):
+                    gr.Markdown(summarize_tool_universe())
     return demo
 
 demo = build_demo()
 
 if __name__ == "__main__":
     share = os.environ.get("GRADIO_SHARE", "0").lower() in {"1", "true", "yes"}
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=share)
+    demo.launch(server_name="0.0.0.0", server_port=7860, share=share, css=CUSTOM_CSS)
