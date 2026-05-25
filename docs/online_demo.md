@@ -35,3 +35,9 @@ The Gradio app opens on an AI bot tab rather than a form-only pipeline. The user
 For image inputs, the trajectory shows OCR/title hints, image-classifier output, final modality route, scale/OCR status, panel-aware color-trace digitization, selected tools, and tool execution summaries. This is intentionally closer to the TxAgent demo pattern: users can inspect why a tool route was selected and where the pipeline may have failed.
 
 For Matplotlib-style waveform screenshots with blue traces and multiple panels, the demo first tries `Signal_digitize_plot_image_color_trace`, which extracts the colored waveform component and prefers the lower filtered panel when multiple similarly wide panels are present. If no colored trace is detected, it falls back to the existing dark/ML trace digitizers.
+
+## Waveform segmentation digitizer
+
+For low-resolution or non-blue waveform plots, the demo now has a trained segmentation fallback: `Signal_digitize_waveform_image_unet`. The model predicts a curve mask from the plot image, then converts the mask to a one-dimensional waveform with the same path/median/lazy extraction options used by the classical digitizers.
+
+A lightweight comparison on the rendered digitization benchmark favored an augmented U-Net over the current tiny DeepLabV3-style and SegFormer-lite prototypes. With crop-aligned mask evaluation, the augmented U-Net reached mean Dice 0.8595 and mean IoU 0.7563 at threshold 0.60 on 43 rendered benchmark images. This is still a research prototype; real screenshots with unusual axes, multiple traces, or severe compression should be verified visually.

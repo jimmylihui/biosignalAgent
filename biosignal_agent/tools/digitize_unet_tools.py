@@ -8,7 +8,7 @@ from PIL import Image
 
 from biosignal_agent.tools.digitize_tools import _crop_rgb_image, _signal_from_mask
 
-UNET_MODEL_PATH = Path("/data1/jiahui/biosignal-agent/outputs/waveform_digitization_unet.pt")
+UNET_MODEL_PATH = Path("/data1/jiahui/biosignal-agent/outputs/waveform_digitization_tiny_unet_aug.pt")
 
 
 class TinyWaveformUNet:  # factory wrapper avoids importing torch until needed
@@ -59,6 +59,87 @@ class TinyWaveformUNet:  # factory wrapper avoids importing torch until needed
         return Model()
 
 
+class TinyWaveformDeepLabV3:
+    @staticmethod
+    def build():
+        from torch import nn
+        import torch.nn.functional as F
+
+        class ASPP(nn.Module):
+            def __init__(self, channels: int) -> None:
+                super().__init__()
+                self.branches = nn.ModuleList([
+                    nn.Conv2d(channels, 32, 1),
+                    nn.Conv2d(channels, 32, 3, padding=2, dilation=2),
+                    nn.Conv2d(channels, 32, 3, padding=4, dilation=4),
+                    nn.Conv2d(channels, 32, 3, padding=8, dilation=8),
+                ])
+                self.project = nn.Sequential(nn.Conv2d(128, 64, 1), nn.BatchNorm2d(64), nn.ReLU(inplace=True))
+
+            def forward(self, x):
+                return self.project(__import__('torch').cat([branch(x) for branch in self.branches], dim=1))
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.stem = nn.Sequential(
+                    nn.Conv2d(3, 24, 3, stride=2, padding=1), nn.BatchNorm2d(24), nn.ReLU(inplace=True),
+                    nn.Conv2d(24, 48, 3, stride=2, padding=1), nn.BatchNorm2d(48), nn.ReLU(inplace=True),
+                    nn.Conv2d(48, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU(inplace=True),
+                )
+                self.aspp = ASPP(64)
+                self.head = nn.Sequential(nn.Conv2d(64, 32, 3, padding=1), nn.ReLU(inplace=True), nn.Conv2d(32, 1, 1))
+
+            def forward(self, x):
+                size = x.shape[-2:]
+                y = self.head(self.aspp(self.stem(x)))
+                return F.interpolate(y, size=size, mode="bilinear", align_corners=False)
+
+        return Model()
+
+
+class TinyWaveformSegFormer:
+    @staticmethod
+    def build():
+        from torch import nn
+        import torch.nn.functional as F
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.patch1 = nn.Sequential(nn.Conv2d(3, 24, 7, stride=4, padding=3), nn.BatchNorm2d(24), nn.GELU())
+                self.patch2 = nn.Sequential(nn.Conv2d(24, 48, 3, stride=2, padding=1), nn.BatchNorm2d(48), nn.GELU())
+                encoder_layer = nn.TransformerEncoderLayer(d_model=48, nhead=4, dim_feedforward=128, batch_first=True, activation="gelu")
+                self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=2)
+                self.decode = nn.Sequential(
+                    nn.Conv2d(48, 48, 3, padding=1), nn.BatchNorm2d(48), nn.GELU(),
+                    nn.Conv2d(48, 24, 3, padding=1), nn.GELU(),
+                    nn.Conv2d(24, 1, 1),
+                )
+
+            def forward(self, x):
+                size = x.shape[-2:]
+                y = self.patch2(self.patch1(x))
+                b, c, h, w = y.shape
+                tokens = y.flatten(2).transpose(1, 2)
+                tokens = self.transformer(tokens)
+                y = tokens.transpose(1, 2).reshape(b, c, h, w)
+                y = self.decode(y)
+                return F.interpolate(y, size=size, mode="bilinear", align_corners=False)
+
+        return Model()
+
+
+def build_waveform_segmentation_model(model_type: str | None = None):
+    name = (model_type or "tiny_unet").lower()
+    if name in {"tiny_unet", "unet", "tinywaveformunet"}:
+        return TinyWaveformUNet.build()
+    if name in {"tiny_deeplabv3", "deeplabv3", "deeplab"}:
+        return TinyWaveformDeepLabV3.build()
+    if name in {"tiny_segformer", "segformer", "segformer_lite"}:
+        return TinyWaveformSegFormer.build()
+    raise ValueError(f"unknown waveform segmentation model_type: {model_type}")
+
 def Signal_digitize_waveform_image_unet(
     image_path: str,
     sampling_rate: float | None = None,
@@ -87,7 +168,7 @@ def Signal_digitize_waveform_image_unet(
         resized = Image.fromarray(rgb).resize((int(input_width), int(input_height)), Image.BILINEAR)
         arr = np.asarray(resized, dtype=np.float32) / 255.0
         tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
-        model = TinyWaveformUNet.build()
+        model = build_waveform_segmentation_model(checkpoint.get("model_type") or checkpoint.get("backbone"))
         model.load_state_dict(checkpoint["model_state"])
         model.eval()
         with torch.no_grad():
@@ -108,7 +189,7 @@ def Signal_digitize_waveform_image_unet(
         value_max,
         smooth_window,
         "Signal_digitize_waveform_image_unet",
-        "tiny_unet_waveform_segmentation_path_digitizer" if trace_method == "path" else "tiny_unet_waveform_segmentation_digitizer",
+        f"{checkpoint.get('model_type', 'tiny_unet')}_waveform_segmentation_path_digitizer" if trace_method == "path" else f"{checkpoint.get('model_type', 'tiny_unet')}_waveform_segmentation_digitizer",
         model_source=str(model_file),
         confidence_scale=max(0.3, mean_probability),
         trace_method=trace_method,

@@ -19,6 +19,7 @@ from biosignal_agent.tools.digitize_tools import (
     Signal_digitize_waveform_image_ml,
     Signal_estimate_image_scale,
 )
+from biosignal_agent.tools.digitize_unet_tools import Signal_digitize_waveform_image_unet
 from biosignal_agent.tools.image_modality_tools import Signal_classify_modality_from_image
 from biosignal_agent.tools.modality_tools import Signal_classify_modality
 
@@ -335,6 +336,19 @@ def run_csv_demo(csv_file: str | None, question: str, sampling_rate: float, moda
 
 
 def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_csv: str, value_min: float | None, value_max: float | None, trace_method: str):
+    unet = Signal_digitize_waveform_image_unet(
+        image_path=image_path,
+        sampling_rate=sampling_rate,
+        out_csv=out_csv,
+        value_min=value_min,
+        value_max=value_max,
+        probability_threshold=0.60,
+        trace_method=trace_method,
+        smooth_window=3,
+    )
+    if not unet.get("error") and float(unet.get("pixel_coverage") or 0.0) >= 0.15:
+        unet["fallback_priority"] = "segmentation_unet_first"
+        return unet
     result = Signal_digitize_waveform_image_ml(
         image_path=image_path,
         sampling_rate=sampling_rate,
@@ -354,8 +368,11 @@ def _digitize_with_fallback(image_path: str, sampling_rate: float | None, out_cs
             trace_method=trace_method,
             smooth_window=3,
         )
+        fallback["fallback_from_unet_error"] = unet.get("error")
         fallback["fallback_from_ml_error"] = result.get("error")
         return fallback
+    result["fallback_from_unet_error"] = unet.get("error")
+    result["fallback_from_unet_pixel_coverage"] = unet.get("pixel_coverage")
     return result
 
 
@@ -412,7 +429,7 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
         )
         if color_digitized.get("error"):
             digitized = _digitize_with_fallback(image_file, sr, str(out_csv), value_min, value_max, trace_method)
-            digitizer_route = "fallback_dark_or_ml_trace"
+            digitizer_route = "fallback_unet_or_ml_or_dark_trace"
             if digitized.get("fallback_from_ml_error"):
                 digitizer_route += " after ML model unavailable"
         else:

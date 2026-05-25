@@ -11,10 +11,10 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from biosignal_agent.tools.digitize_unet_tools import TinyWaveformUNet
+from biosignal_agent.tools.digitize_unet_tools import build_waveform_segmentation_model
 
 
-def load_pair(record: dict[str, Any], height: int, width: int):
+def load_pair(record: dict[str, Any], height: int, width: int, augment: bool = False):
     import torch
 
     left, right, top, bottom = int(record["crop_left"]), int(record["crop_right"]), int(record["crop_top"]), int(record["crop_bottom"])
@@ -25,20 +25,36 @@ def load_pair(record: dict[str, Any], height: int, width: int):
     mask = mask.crop((left, top, w - right, h - bottom)).resize((width, height), Image.NEAREST)
     x = np.asarray(image, dtype=np.float32) / 255.0
     y = (np.asarray(mask, dtype=np.float32) > 0).astype(np.float32)
+    if augment:
+        rng = np.random.default_rng()
+        if rng.random() < 0.7:
+            gain = rng.uniform(0.75, 1.25)
+            bias = rng.uniform(-0.08, 0.08)
+            x = np.clip(x * gain + bias, 0.0, 1.0)
+        if rng.random() < 0.35:
+            x = np.clip(x + rng.normal(0.0, rng.uniform(0.005, 0.025), size=x.shape), 0.0, 1.0)
+        if rng.random() < 0.25:
+            # Randomly fade colored traces toward gray, mimicking compression/screenshots.
+            gray = np.mean(x, axis=2, keepdims=True)
+            alpha = rng.uniform(0.15, 0.45)
+            x = np.clip((1 - alpha) * x + alpha * gray, 0.0, 1.0)
+    x = x.astype(np.float32, copy=False)
+    y = y.astype(np.float32, copy=False)
     return torch.from_numpy(x.transpose(2, 0, 1)), torch.from_numpy(y[None, :, :])
 
 
 class WaveformMaskDataset:
-    def __init__(self, records: list[dict[str, Any]], height: int, width: int) -> None:
+    def __init__(self, records: list[dict[str, Any]], height: int, width: int, augment: bool = False) -> None:
         self.records = records
         self.height = height
         self.width = width
+        self.augment = augment
 
     def __len__(self) -> int:
         return len(self.records)
 
     def __getitem__(self, idx: int):
-        return load_pair(self.records[idx], self.height, self.width)
+        return load_pair(self.records[idx], self.height, self.width, self.augment)
 
 
 def dice_iou_from_logits(logits, target, threshold: float = 0.5) -> tuple[float, float]:
@@ -66,10 +82,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         records = [row for row in records if row.get("variant") in allowed]
     if not records:
         raise ValueError("No records selected for U-Net training.")
-    dataset = WaveformMaskDataset(records, args.height, args.width)
+    dataset = WaveformMaskDataset(records, args.height, args.width, augment=args.augment)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
     device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else "cpu")
-    model = TinyWaveformUNet.build().to(device)
+    model = build_waveform_segmentation_model(args.backbone).to(device)
     pos_pixels = 0.0
     total_pixels = 0.0
     for _, y in loader:
@@ -109,7 +125,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "num_records": len(records),
         "pos_weight": float(pos_weight.item()),
         "history": history,
-        "model_type": "TinyWaveformUNet",
+        "model_type": args.backbone,
+        "backbone": args.backbone,
+        "augment": bool(args.augment),
     }
     torch.save(checkpoint, out)
     report = {"model_path": str(out), **{k: v for k, v in checkpoint.items() if k != "model_state"}, "final": history[-1] if history else {}}
@@ -126,9 +144,11 @@ def main() -> None:
     parser.add_argument("--train-variant", action="append", default=None)
     parser.add_argument("--height", type=int, default=128)
     parser.add_argument("--width", type=int, default=384)
+    parser.add_argument("--backbone", choices=["tiny_unet", "tiny_deeplabv3", "tiny_segformer"], default="tiny_unet")
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--augment", action="store_true", help="Apply lightweight screenshot/plot appearance augmentation during training.")
     parser.add_argument("--cpu", action="store_true")
     args = parser.parse_args()
     report = train(args)

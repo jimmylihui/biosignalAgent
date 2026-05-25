@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from biosignal_agent.tools.artifact_tools import Signal_detect_artifacts
 from biosignal_agent.tools.digitize_tools import Signal_digitize_waveform_image_ml, Signal_estimate_image_scale, Signal_predict_image_scale_prior
+from biosignal_agent.tools.digitize_unet_tools import Signal_digitize_waveform_image_unet
 from biosignal_agent.tools.image_cnn_tools import Signal_classify_modality_from_image_cnn
 from biosignal_agent.tools.modality_tools import Signal_classify_modality
 from biosignal_agent.tools.multimodal_tools import Multimodal_estimate_ecg_ppg_pat_bp_proxy, Multimodal_screen_sleep_apnea_report
@@ -27,6 +28,7 @@ TOOLS = {
     "Signal_extract_spectrogram_features": Signal_extract_spectrogram_features,
     "Signal_render_spectrogram_image": Signal_render_spectrogram_image,
     "Signal_digitize_waveform_image_ml": Signal_digitize_waveform_image_ml,
+    "Signal_digitize_waveform_image_unet": Signal_digitize_waveform_image_unet,
     "Signal_estimate_image_scale": Signal_estimate_image_scale,
     "Signal_predict_image_scale_prior": Signal_predict_image_scale_prior,
     "Signal_detect_artifacts": Signal_detect_artifacts,

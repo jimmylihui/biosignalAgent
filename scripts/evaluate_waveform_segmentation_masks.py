@@ -16,7 +16,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from biosignal_agent.tools.digitize_tools import _crop_rgb_image
-from biosignal_agent.tools.digitize_unet_tools import TinyWaveformUNet, UNET_MODEL_PATH
+from biosignal_agent.tools.digitize_unet_tools import UNET_MODEL_PATH, build_waveform_segmentation_model
 
 
 def predict_unet_mask(image_path: str, model_path: str, threshold: float, crop: dict[str, int]) -> np.ndarray:
@@ -35,7 +35,7 @@ def predict_unet_mask(image_path: str, model_path: str, threshold: float, crop: 
     resized = Image.fromarray(rgb).resize((int(input_width), int(input_height)), Image.BILINEAR)
     arr = np.asarray(resized, dtype=np.float32) / 255.0
     tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
-    model = TinyWaveformUNet.build()
+    model = build_waveform_segmentation_model(checkpoint.get('model_type') or checkpoint.get('backbone'))
     model.load_state_dict(checkpoint['model_state'])
     model.eval()
     with torch.no_grad():
@@ -97,7 +97,13 @@ def main() -> None:
                 'bottom': int(rec.get('crop_bottom', 0)),
             }
             pred = predict_unet_mask(rec['image_path'], args.model_path, args.probability_threshold, crop)
-            truth = np.asarray(Image.open(mask_path).convert('L'), dtype=np.uint8) > 0
+            truth_img = Image.open(mask_path).convert('L')
+            w, h = truth_img.size
+            left = crop.get('left', 0)
+            right = w - crop.get('right', 0)
+            top = crop.get('top', 0)
+            bottom = h - crop.get('bottom', 0)
+            truth = np.asarray(truth_img.crop((left, top, right, bottom)), dtype=np.uint8) > 0
             row.update(metrics(pred, truth))
         except Exception as exc:
             row['error'] = str(exc)

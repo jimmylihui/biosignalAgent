@@ -135,6 +135,88 @@
     ]
   },
   {
+    "name": "Signal_digitize_waveform_image_unet",
+    "description": "Digitize a waveform plot image into CSV using a trained lightweight segmentation model such as U-Net, DeepLabV3-style, or SegFormer-lite followed by mask-to-signal extraction.",
+    "modality": "generic",
+    "parameters": {
+      "image_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "out_csv": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "value_min": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "value_max": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "crop_left": {
+        "type": "integer"
+      },
+      "crop_right": {
+        "type": "integer"
+      },
+      "crop_top": {
+        "type": "integer"
+      },
+      "crop_bottom": {
+        "type": "integer"
+      },
+      "model_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "probability_threshold": {
+        "type": "number"
+      },
+      "smooth_window": {
+        "type": "integer"
+      },
+      "trace_method": {
+        "type": "string",
+        "enum": [
+          "median",
+          "path",
+          "lazy",
+          "fragmented",
+          "momentum",
+          "full"
+        ]
+      }
+    },
+    "returns": [
+      "out_csv",
+      "num_points",
+      "pixel_coverage",
+      "model_source",
+      "mask_pixel_fraction",
+      "confidence",
+      "method",
+      "disclaimer",
+      "input_size",
+      "probability_threshold",
+      "trace_method"
+    ]
+  },
+  {
     "name": "Signal_estimate_image_scale",
     "description": "Estimate plot area, grid spacing, and optional physical x/y scale from a waveform image before digitization.",
     "modality": "image",
