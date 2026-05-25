@@ -1581,10 +1581,11 @@ def biosignal_chat_submit(
 ):
     question = (message or "").strip() or DEFAULT_CSV_QUESTION
     history = list(history or [])
-    history.append((question, ""))
+    history.append({"role": "user", "content": question})
+    history.append({"role": "assistant", "content": ""})
     yield history, ""
     for chunk in biosignal_chat_response(question, history[:-1], upload, sampling_rate, modality_hint, trace_method):
-        history[-1] = (question, chunk)
+        history[-1] = {"role": "assistant", "content": chunk}
         yield history, ""
 
 
