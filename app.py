@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import tempfile
 import time
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +20,9 @@ from biosignal_agent.tools.digitize_tools import (
     Signal_digitize_waveform_image,
     Signal_digitize_waveform_image_ml,
     Signal_estimate_image_scale,
+    _crop_rgb_image,
 )
-from biosignal_agent.tools.digitize_unet_tools import Signal_digitize_waveform_image_unet
+from biosignal_agent.tools.digitize_unet_tools import Signal_digitize_waveform_image_unet, UNET_MODEL_PATH, build_waveform_segmentation_model
 from biosignal_agent.tools.image_modality_tools import Signal_classify_modality_from_image
 from biosignal_agent.tools.modality_tools import Signal_classify_modality
 
@@ -460,6 +463,7 @@ def run_image_demo(image_file: str | None, question: str, sampling_rate: float |
         steps.append({"title": "Tool execution", "items": tool_items or ["No tools executed."]})
         steps.append({"title": "Grounded report", "detail": "Report is grounded in the digitized signal and local tool outputs. Verify image calibration before use."})
         payload = {
+            "image_path": image_file,
             "ocr": ocr,
             "image_classifier": image_classifier,
             "scale": scale,
@@ -495,6 +499,102 @@ def _is_image_path(path: str) -> bool:
 
 def _is_csv_path(path: str) -> bool:
     return Path(path).suffix.lower() in {".csv", ".txt", ".tsv"}
+
+
+
+def _pil_to_data_uri(image, fmt: str = "PNG", max_width: int = 780) -> str:
+    from PIL import Image
+
+    image = image.convert("RGB")
+    if image.width > max_width:
+        ratio = max_width / float(image.width)
+        image = image.resize((max_width, max(1, int(image.height * ratio))), Image.BILINEAR)
+    buf = BytesIO()
+    save_kwargs = {"quality": 86} if fmt.upper() in {"JPEG", "JPG"} else {}
+    image.save(buf, format=fmt, **save_kwargs)
+    mime = "jpeg" if fmt.upper() in {"JPEG", "JPG"} else fmt.lower()
+    return f"data:image/{mime};base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _image_preview_card(title: str, image_path: str, caption: str = "") -> str:
+    try:
+        from PIL import Image
+
+        uri = _pil_to_data_uri(Image.open(image_path), fmt="JPEG")
+        return _visual_card(title, uri, caption)
+    except Exception as exc:
+        return f"<div><b>{title}</b><br><span style='color:#999'>preview unavailable: {exc}</span></div>"
+
+
+def _visual_card(title: str, data_uri: str, caption: str = "") -> str:
+    caption_html = f"<div style='color:#777;font-size:0.9em;margin-top:4px'>{caption}</div>" if caption else ""
+    return (
+        "<div style='border:1px solid #e3e3e3;border-radius:8px;padding:10px;margin:10px 0;background:#fff'>"
+        f"<div style='font-weight:600;margin-bottom:6px'>{title}</div>"
+        f"<img src='{data_uri}' style='max-width:100%;height:auto;border-radius:6px;border:1px solid #eee'/>"
+        f"{caption_html}</div>"
+    )
+
+
+def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0.65) -> str:
+    try:
+        import torch
+        from PIL import Image
+
+        checkpoint = torch.load(UNET_MODEL_PATH, map_location="cpu", weights_only=False)
+        input_height, input_width = checkpoint.get("input_size", [160, 384])
+        rgb, _crop, _size = _crop_rgb_image(image_path, 0, 0, 0, 0)
+        height, width = rgb.shape[:2]
+        resized = Image.fromarray(rgb).resize((int(input_width), int(input_height)), Image.BILINEAR)
+        arr = np.asarray(resized, dtype=np.float32) / 255.0
+        tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
+        model = build_waveform_segmentation_model(checkpoint.get("model_type") or checkpoint.get("backbone"))
+        model.load_state_dict(checkpoint["model_state"])
+        model.eval()
+        with torch.no_grad():
+            prob = torch.sigmoid(model(tensor))[0, 0].cpu().numpy()
+        mask_small = prob >= float(probability_threshold)
+        mask = Image.fromarray((mask_small.astype(np.uint8) * 255), mode="L").resize((width, height), Image.NEAREST)
+        base = Image.fromarray(rgb).convert("RGBA")
+        red = Image.new("RGBA", (width, height), (255, 35, 35, 0))
+        alpha = np.asarray(mask, dtype=np.uint8)
+        alpha = (alpha > 0).astype(np.uint8) * 120
+        red.putalpha(Image.fromarray(alpha, mode="L"))
+        overlay = Image.alpha_composite(base, red).convert("RGB")
+        mask_fraction = float((np.asarray(mask) > 0).mean()) if width and height else 0.0
+        caption = f"Red overlay = predicted curve mask. model={Path(UNET_MODEL_PATH).name}, threshold={probability_threshold}, mask_fraction={mask_fraction:.4f}."
+        return _visual_card("Segmentation overlay", _pil_to_data_uri(overlay, fmt="JPEG"), caption)
+    except Exception as exc:
+        return f"<div style='border:1px solid #eee;border-radius:8px;padding:10px;margin:10px 0'><b>Segmentation overlay</b><br><span style='color:#999'>Unavailable: {exc}</span></div>"
+
+
+def _signal_preview_card(csv_path: str | None, sampling_rate: float | None, title: str = "Digitized waveform") -> str:
+    if not csv_path:
+        return ""
+    try:
+        values, _column = _read_signal(csv_path, "signal")
+        fig = _plot_signal(values, sampling_rate, title)
+        buf = BytesIO()
+        fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
+        plt.close(fig)
+        uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+        return _visual_card(title, uri, f"Preview of the recovered one-dimensional signal from `{Path(csv_path).name}`.")
+    except Exception as exc:
+        return f"<div><b>{title}</b><br><span style='color:#999'>preview unavailable: {exc}</span></div>"
+
+
+def _image_pipeline_visuals(payload: dict[str, Any]) -> list[str]:
+    digitization = payload.get("digitization") or {}
+    image_path = digitization.get("image_path") or payload.get("image_path")
+    out_csv = digitization.get("out_csv")
+    sampling_rate = digitization.get("sampling_rate")
+    visuals: list[str] = []
+    if image_path:
+        visuals.append(_image_preview_card("Uploaded image", image_path, "Original input seen by the image pipeline."))
+        visuals.append(_segmentation_overlay_card(image_path, probability_threshold=0.65))
+    if out_csv:
+        visuals.append(_signal_preview_card(out_csv, sampling_rate, "Digitized waveform preview"))
+    return visuals
 
 
 def _tool_call_card(name: str, args: dict[str, Any] | None = None, result: dict[str, Any] | None = None, icon: str = "🛠️") -> str:
@@ -564,6 +664,11 @@ def _human_answer_from_pipeline(kind: str, question: str, report: str, payload: 
             ])
         if ocr.get("text"):
             lines.extend([f"OCR picked up: `{str(ocr.get('text'))[:180]}`", ""])
+        visuals = _image_pipeline_visuals(payload)
+        if visuals:
+            lines.append("Here are the visual checkpoints I used:")
+            lines.extend(visuals)
+            lines.append("")
     else:
         lines.extend([f"I read the uploaded CSV and routed it as `{modality}` before selecting tools.", ""])
     if cards:
