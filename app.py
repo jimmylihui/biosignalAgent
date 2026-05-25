@@ -1596,149 +1596,209 @@ def _clear_chat():
 CUSTOM_CSS = """
 :root {
   --bs-bg: #ffffff;
-  --bs-panel: #ffffff;
-  --bs-border: #e5e5e5;
+  --bs-sidebar: #f7f7f8;
+  --bs-border: #ececec;
   --bs-text: #171717;
-  --bs-muted: #6f6f6f;
-  --bs-soft: #f7f7f8;
-  --bs-tool: #fafafa;
+  --bs-muted: #777777;
+  --bs-hover: #ededee;
+  --bs-active: #e8e8e9;
 }
 .gradio-container {
-  background: var(--bs-bg) !important;
+  background: #ffffff !important;
   color: var(--bs-text) !important;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
 }
+.contain { max-width: none !important; padding: 0 !important; }
 .bs-shell {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 20px 18px 30px;
-}
-.bs-topbar {
-  background: transparent;
-  border: 0;
-  padding: 4px 0 18px;
-  margin-bottom: 6px;
-}
-.bs-title {
-  font-size: 22px;
-  font-weight: 650;
-  letter-spacing: 0;
+  width: 100%;
+  height: 100vh;
   margin: 0;
+  padding: 0;
 }
-.bs-subtitle {
-  color: var(--bs-muted);
-  font-size: 14px;
-  line-height: 1.45;
-  margin-top: 5px;
-  max-width: 760px;
-}
-.bs-badge-row { display: none; }
-.bs-sidebar, .bs-chat-panel {
-  background: var(--bs-panel);
-  border: 1px solid var(--bs-border);
-  border-radius: 12px;
-  padding: 16px;
+.bs-app-row { gap: 0 !important; height: 100vh; }
+.bs-sidebar {
+  width: 280px;
+  max-width: 280px;
+  min-width: 260px;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--bs-sidebar);
+  border-right: 1px solid var(--bs-border);
+  border-radius: 0;
+  padding: 18px 14px;
   box-shadow: none;
 }
-.bs-sidebar {
-  min-width: 280px;
+.bs-brand {
+  font-size: 20px;
+  font-weight: 650;
+  padding: 0 8px 22px;
 }
-.bs-sidebar h3, .bs-chat-panel h3 {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 8px;
-}
-.bs-sidebar .label-wrap span, .bs-chat-panel .label-wrap span {
-  font-size: 12px !important;
-  color: var(--bs-muted) !important;
-  font-weight: 500 !important;
-}
-.bs-chat-panel { min-width: 0; }
-.bs-chat-panel .chatbot {
-  border: 0 !important;
-  border-radius: 10px !important;
-  background: #ffffff !important;
-}
-.bs-chat-panel textarea, .bs-sidebar input, .bs-sidebar textarea, .bs-sidebar select {
-  border-radius: 10px !important;
-  border-color: var(--bs-border) !important;
-  background: #ffffff !important;
-}
-.bs-composer {
-  border: 1px solid var(--bs-border);
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 8px;
-  margin-top: 12px;
-}
-.bs-composer textarea {
-  border: 0 !important;
-  box-shadow: none !important;
-}
-button.primary, .bs-composer button.primary {
-  background: #171717 !important;
-  border-color: #171717 !important;
-  color: #ffffff !important;
-  border-radius: 10px !important;
-}
-button.secondary, .bs-composer button {
-  border-radius: 10px !important;
-}
-.bs-tool-card {
-  border: 1px solid var(--bs-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  margin: 8px 0;
-  background: var(--bs-tool);
-}
-.bs-tool-row {
+.bs-nav-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
+  gap: 10px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 9px;
+  color: #222;
+  font-size: 14px;
+  margin-bottom: 4px;
 }
-.bs-tool-icon {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #eeeeef;
-  color: #4a4a4a;
+.bs-nav-item.active { background: var(--bs-active); }
+.bs-nav-item:hover { background: var(--bs-hover); }
+.bs-nav-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1px solid #222;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
+}
+.bs-section-label {
+  color: #555;
+  font-size: 12px;
   font-weight: 650;
-  flex: 0 0 auto;
+  margin: 22px 8px 8px;
 }
-.bs-tool-name {
+.bs-history-item {
+  padding: 9px 10px;
+  border-radius: 9px;
+  color: #222;
+  font-size: 14px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bs-history-item.active { background: var(--bs-active); }
+.bs-history-item:hover { background: var(--bs-hover); }
+.bs-settings {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--bs-border);
+}
+.bs-settings .label-wrap span {
+  font-size: 11px !important;
+  color: var(--bs-muted) !important;
+  font-weight: 500 !important;
+}
+.bs-settings input, .bs-settings textarea, .bs-settings select {
+  border-radius: 10px !important;
+  border-color: #dedede !important;
+  background: #ffffff !important;
+}
+.bs-main {
+  height: 100vh;
+  min-width: 0;
+  background: #ffffff;
+  padding: 0;
+}
+.bs-main-inner {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 34px 32px 22px;
+}
+.bs-topbar {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0 0 18px;
+}
+.bs-title {
+  font-size: 18px;
   font-weight: 600;
-  color: var(--bs-text);
+  margin: 0;
 }
-.bs-tool-args {
-  color: #8a8a8a;
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-.bs-tool-result {
+.bs-subtitle {
   color: var(--bs-muted);
   font-size: 13px;
-  padding-left: 30px;
+  line-height: 1.45;
   margin-top: 4px;
-  overflow-wrap: anywhere;
+  max-width: 640px;
 }
+.bs-chat-panel {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+}
+.bs-chat-panel .chatbot {
+  border: 0 !important;
+  background: #ffffff !important;
+  height: calc(100vh - 230px) !important;
+}
+.bs-chat-panel .message, .bs-chat-panel .prose, .bs-chat-panel p, .bs-chat-panel li {
+  font-size: 15px !important;
+  line-height: 1.65 !important;
+}
+.bs-composer {
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 8px 10px 8px 16px;
+  margin: 16px auto 0;
+  width: min(860px, 100%);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.08);
+}
+.bs-composer textarea {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  font-size: 15px !important;
+}
+.bs-composer button.primary {
+  min-width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  background: #111 !important;
+  border-color: #111 !important;
+  color: #fff !important;
+  padding: 0 !important;
+}
+.bs-composer button:not(.primary) {
+  height: 44px !important;
+  border-radius: 22px !important;
+  background: #f4f4f4 !important;
+  border-color: transparent !important;
+  color: #555 !important;
+}
+.bs-tool-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  background: #fafafa;
+}
+.bs-tool-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bs-tool-icon {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #eeeeef; color: #444;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 650; flex: 0 0 auto;
+}
+.bs-tool-name { font-weight: 600; color: var(--bs-text); }
+.bs-tool-args { color: #8a8a8a; font-size: 13px; overflow-wrap: anywhere; }
+.bs-tool-result { color: var(--bs-muted); font-size: 13px; padding-left: 30px; margin-top: 4px; overflow-wrap: anywhere; }
 .bs-advanced {
-  margin-top: 14px;
+  max-width: 980px;
+  margin: 12px auto 0;
+  border-top: 1px solid var(--bs-border);
+  padding-top: 8px;
 }
-.examples, table {
-  font-size: 13px !important;
-}
-.message-wrap, .message, .prose {
-  line-height: 1.55 !important;
-}
+.examples { display: none !important; }
 @media (max-width: 900px) {
-  .bs-shell { padding: 12px; }
-  .bs-sidebar { min-width: 0; }
-  .bs-topbar { padding-bottom: 10px; }
+  .bs-app-row { flex-direction: column !important; height: auto; }
+  .bs-sidebar { width: 100%; max-width: none; height: auto; border-right: 0; border-bottom: 1px solid var(--bs-border); }
+  .bs-main-inner { height: auto; min-height: 80vh; padding: 18px 14px; }
+  .bs-chat-panel .chatbot { height: 560px !important; }
 }
 """
 
@@ -1771,98 +1831,98 @@ def build_demo() -> gr.Blocks:
 # BioSignalAgent
 
 Upload a biosignal image or CSV, then ask a question.
-
-Try: Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.
 """
     with gr.Blocks(title="BioSignalAgent", fill_height=True) as demo:
-        with gr.Column(elem_classes=["bs-shell"]):
-            gr.HTML(
-                "<div class='bs-topbar'>"
-                "<div class='bs-title'>BioSignalAgent</div>"
-                "<div class='bs-subtitle'>A clean biosignal assistant for image digitization, tool calls, and grounded research-use reports.</div>"
-                "</div>"
-            )
-            with gr.Row(equal_height=False):
-                with gr.Column(scale=3, min_width=300, elem_classes=["bs-sidebar"]):
+        with gr.Row(elem_classes=["bs-app-row"]):
+            with gr.Column(scale=0, min_width=280, elem_classes=["bs-sidebar"]):
+                gr.HTML(
+                    "<div class='bs-brand'>BioSignalAgent</div>"
+                    "<div class='bs-nav-item active'><span class='bs-nav-dot'>+</span><span>New analysis</span></div>"
+                    "<div class='bs-nav-item'><span class='bs-nav-dot'>⌕</span><span>Search runs</span></div>"
+                    "<div class='bs-nav-item'><span class='bs-nav-dot'>□</span><span>ToolUniverse</span></div>"
+                    "<div class='bs-section-label'>Recent</div>"
+                    "<div class='bs-history-item active'>ECG image digitization</div>"
+                    "<div class='bs-history-item'>Segmenting line plot</div>"
+                    "<div class='bs-history-item'>PPG peak analysis</div>"
+                    "<div class='bs-history-item'>PCG murmur screening</div>"
+                    "<div class='bs-history-item'>Low-resolution recovery</div>"
+                )
+                with gr.Column(elem_classes=["bs-settings"]):
                     gr.Markdown("### Input")
                     bot_upload = gr.File(label="Signal image or CSV", file_types=[".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".csv", ".tsv", ".txt"], type="filepath")
                     bot_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
                     bot_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
                     bot_trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
-                    gr.Markdown(
-                        "### Prompts\n"
-                        "Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.\n\n"
-                        "Recover the waveform and explain whether the digitization is reliable."
+            with gr.Column(scale=1, elem_classes=["bs-main"]):
+                with gr.Column(elem_classes=["bs-main-inner"]):
+                    gr.HTML(
+                        "<div class='bs-topbar'>"
+                        "<div class='bs-title'>BioSignalAgent</div>"
+                        "<div class='bs-subtitle'>Upload a signal image or CSV, then ask for routing, digitization, tool calls, and a grounded report.</div>"
+                        "</div>"
                     )
-                with gr.Column(scale=9, elem_classes=["bs-chat-panel"]):
-                    chatbot = gr.Chatbot(
-                        label="BioSignalAgent",
-                        height=680,
-                        placeholder=placeholder,
-                        buttons=["copy", "copy_all"],
-                        layout="bubble",
-                        show_label=False,
-                        sanitize_html=False,
-                    )
+                    with gr.Column(elem_classes=["bs-chat-panel"]):
+                        chatbot = gr.Chatbot(
+                            label="BioSignalAgent",
+                            height=680,
+                            placeholder=placeholder,
+                            buttons=["copy", "copy_all"],
+                            layout="bubble",
+                            show_label=False,
+                            sanitize_html=False,
+                        )
                     with gr.Row(elem_classes=["bs-composer"]):
                         chat_question = gr.Textbox(
                             label="Question",
-                            placeholder="Ask your own question, e.g. Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.",
+                            placeholder="Ask anything about the uploaded biosignal",
                             lines=2,
-                            scale=8,
+                            scale=10,
                             autofocus=True,
+                            container=False,
                         )
-                        chat_send = gr.Button("Send", variant="primary", scale=1)
                         chat_clear = gr.Button("Clear", scale=1)
-                    gr.Examples(
-                        examples=[
-                            "Analyze this ECG signal for R peaks, HRV, rhythm quality, and limitations.",
-                            "Recover the waveform, show the segmentation steps, and explain whether the digitization is reliable.",
-                            "Which tools did you use, and what limitations should I know before trusting the result?",
-                        ],
-                        inputs=chat_question,
-                    )
+                        chat_send = gr.Button("↑", variant="primary", scale=1)
                     chat_inputs = [chat_question, chatbot, bot_upload, bot_sampling_rate, bot_modality, bot_trace_method]
                     chat_question.submit(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
                     chat_send.click(biosignal_chat_submit, chat_inputs, [chatbot, chat_question])
                     chat_clear.click(_clear_chat, outputs=chatbot)
 
-            with gr.Accordion("Advanced pipeline views", open=False, elem_classes=["bs-advanced"]):
-                with gr.Tab("CSV signal"):
-                    with gr.Row():
-                        csv_file = gr.File(label="Signal CSV", file_types=[".csv"], type="filepath")
-                        with gr.Column():
-                            csv_question = gr.Textbox(label="Question", value=DEFAULT_CSV_QUESTION, lines=3)
-                            csv_sampling_rate = gr.Number(label="Sampling rate (Hz)", value=250)
-                            csv_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
-                            csv_column = gr.Textbox(label="Column name (optional)", value="")
-                            csv_button = gr.Button("Run CSV analysis", variant="primary")
-                    csv_trajectory = gr.Markdown(label="Agent trajectory")
-                    csv_report = gr.Markdown(label="Report")
-                    csv_plot = gr.Plot(label="Signal preview")
-                    csv_json = gr.JSON(label="Tool trace JSON")
-                    csv_button.click(run_csv_demo, [csv_file, csv_question, csv_sampling_rate, csv_modality, csv_column], [csv_trajectory, csv_report, csv_json, csv_plot])
+                    with gr.Accordion("Advanced pipeline views", open=False, elem_classes=["bs-advanced"]):
+                        with gr.Tab("CSV signal"):
+                            with gr.Row():
+                                csv_file = gr.File(label="Signal CSV", file_types=[".csv"], type="filepath")
+                                with gr.Column():
+                                    csv_question = gr.Textbox(label="Question", value=DEFAULT_CSV_QUESTION, lines=3)
+                                    csv_sampling_rate = gr.Number(label="Sampling rate (Hz)", value=250)
+                                    csv_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
+                                    csv_column = gr.Textbox(label="Column name (optional)", value="")
+                                    csv_button = gr.Button("Run CSV analysis", variant="primary")
+                            csv_trajectory = gr.Markdown(label="Agent trajectory")
+                            csv_report = gr.Markdown(label="Report")
+                            csv_plot = gr.Plot(label="Signal preview")
+                            csv_json = gr.JSON(label="Tool trace JSON")
+                            csv_button.click(run_csv_demo, [csv_file, csv_question, csv_sampling_rate, csv_modality, csv_column], [csv_trajectory, csv_report, csv_json, csv_plot])
 
-                with gr.Tab("Waveform image"):
-                    with gr.Row():
-                        image_file = gr.Image(label="Waveform image", type="filepath")
-                        with gr.Column():
-                            image_question = gr.Textbox(label="Question", value=DEFAULT_IMAGE_QUESTION, lines=3)
-                            image_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
-                            image_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
-                            value_min = gr.Number(label="Y-axis min if known", value=None)
-                            value_max = gr.Number(label="Y-axis max if known", value=None)
-                            trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
-                            image_button = gr.Button("Run image pipeline", variant="primary")
-                    image_trajectory = gr.Markdown(label="Agent trajectory")
-                    image_report = gr.Markdown(label="Report")
-                    image_plot = gr.Plot(label="Digitized signal preview")
-                    image_json = gr.JSON(label="Pipeline JSON")
-                    digitized_file = gr.File(label="Digitized CSV")
-                    image_button.click(run_image_demo, [image_file, image_question, image_sampling_rate, image_modality, value_min, value_max, trace_method], [image_trajectory, image_report, image_json, image_plot, digitized_file])
+                        with gr.Tab("Waveform image"):
+                            with gr.Row():
+                                image_file = gr.Image(label="Waveform image", type="filepath")
+                                with gr.Column():
+                                    image_question = gr.Textbox(label="Question", value=DEFAULT_IMAGE_QUESTION, lines=3)
+                                    image_sampling_rate = gr.Number(label="Sampling rate if known (Hz)", value=250)
+                                    image_modality = gr.Dropdown(label="Modality hint", choices=MODALITIES, value="auto")
+                                    value_min = gr.Number(label="Y-axis min if known", value=None)
+                                    value_max = gr.Number(label="Y-axis max if known", value=None)
+                                    trace_method = gr.Dropdown(label="Trace extraction", choices=["median", "path", "lazy", "fragmented", "momentum", "full"], value="path")
+                                    image_button = gr.Button("Run image pipeline", variant="primary")
+                            image_trajectory = gr.Markdown(label="Agent trajectory")
+                            image_report = gr.Markdown(label="Report")
+                            image_plot = gr.Plot(label="Digitized signal preview")
+                            image_json = gr.JSON(label="Pipeline JSON")
+                            digitized_file = gr.File(label="Digitized CSV")
+                            image_button.click(run_image_demo, [image_file, image_question, image_sampling_rate, image_modality, value_min, value_max, trace_method], [image_trajectory, image_report, image_json, image_plot, digitized_file])
 
-                with gr.Tab("ToolUniverse"):
-                    gr.Markdown(summarize_tool_universe())
+                        with gr.Tab("ToolUniverse"):
+                            gr.Markdown(summarize_tool_universe())
     return demo
 
 demo = build_demo()
