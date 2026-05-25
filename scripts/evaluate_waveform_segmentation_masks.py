@@ -35,12 +35,18 @@ def predict_unet_mask(image_path: str, model_path: str, threshold: float, crop: 
     resized = Image.fromarray(rgb).resize((int(input_width), int(input_height)), Image.BILINEAR)
     arr = np.asarray(resized, dtype=np.float32) / 255.0
     tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
-    model = build_waveform_segmentation_model(checkpoint.get('model_type') or checkpoint.get('backbone'))
+    num_classes = int(checkpoint.get('num_classes', 1))
+    model = build_waveform_segmentation_model(checkpoint.get('model_type') or checkpoint.get('backbone'), out_channels=num_classes)
     model.load_state_dict(checkpoint['model_state'])
     model.eval()
     with torch.no_grad():
-        prob = torch.sigmoid(model(tensor))[0, 0].cpu().numpy()
-    pred_small = prob >= float(threshold)
+        logits = model(tensor)
+        if num_classes > 1:
+            probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+            pred_small = np.argmax(probs, axis=0) == 1
+        else:
+            prob = torch.sigmoid(logits)[0, 0].cpu().numpy()
+            pred_small = prob >= float(threshold)
     pred = Image.fromarray((pred_small.astype(np.uint8) * 255), mode='L').resize((width, height), Image.NEAREST)
     return np.asarray(pred, dtype=np.uint8) > 0
 
@@ -103,7 +109,8 @@ def main() -> None:
             right = w - crop.get('right', 0)
             top = crop.get('top', 0)
             bottom = h - crop.get('bottom', 0)
-            truth = np.asarray(truth_img.crop((left, top, right, bottom)), dtype=np.uint8) > 0
+            truth_raw = np.asarray(truth_img.crop((left, top, right, bottom)), dtype=np.uint8)
+            truth = truth_raw == 1
             row.update(metrics(pred, truth))
         except Exception as exc:
             row['error'] = str(exc)

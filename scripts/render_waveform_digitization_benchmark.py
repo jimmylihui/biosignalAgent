@@ -140,6 +140,7 @@ def render_trace(values: np.ndarray, out_png: Path, out_mask: Path, width: int, 
     mask = Image.new("L", (width, height), 0)
     draw = ImageDraw.Draw(image)
     mask_draw = ImageDraw.Draw(mask)
+    distractor_draw = ImageDraw.Draw(mask)
     rng = _rng_for(out_png, variant)
     plot_width = width - 2 * margin
     plot_height = height - 2 * margin
@@ -161,6 +162,8 @@ def render_trace(values: np.ndarray, out_png: Path, out_mask: Path, width: int, 
         for idx, panel in enumerate(panels):
             if cfg.get("grid"):
                 _draw_grid(draw, panel, cfg["grid_color"], nx=9, ny=4)
+                _draw_grid(distractor_draw, panel, 2, nx=9, ny=4)
+            distractor_draw.rectangle(panel, outline=2, width=2)
             panel_values = values
             if idx != target_panel:
                 panel_values = np.roll(values, int((idx + 1) * len(values) * 0.07)) * rng.uniform(0.65, 1.15)
@@ -169,18 +172,25 @@ def render_trace(values: np.ndarray, out_png: Path, out_mask: Path, width: int, 
             color = cfg["trace_color"] if idx == target_panel else (160, 160, 160)
             draw.line(points, fill=color, width=int(cfg["line_width"]), joint="curve")
             if idx == target_panel:
-                mask_draw.line(points, fill=255, width=max(3, int(cfg["line_width"])), joint="curve")
+                mask_draw.line(points, fill=1, width=max(3, int(cfg["line_width"])), joint="curve")
+            else:
+                distractor_draw.line(points, fill=2, width=max(3, int(cfg["line_width"])), joint="curve")
             if variant == "multi_panel_multitrace" and idx == target_panel:
                 decoy = np.roll(values, int(len(values) * 0.13)) * 0.75
                 decoy_points, _, _ = _panel_points(decoy, panel, margin, y_min, y_max)
                 draw.line(decoy_points, fill=(210, 80, 80), width=max(1, int(cfg["line_width"]) - 1), joint="curve")
+                distractor_draw.line(decoy_points, fill=2, width=max(2, int(cfg["line_width"])), joint="curve")
             if cfg.get("axis_text"):
-                draw.text((panel[0] + 4, panel[1] + 2), f"lead {idx + 1}" if idx != target_panel else "target", fill=(100, 100, 100))
+                label = f"lead {idx + 1}" if idx != target_panel else "target"
+                draw.text((panel[0] + 4, panel[1] + 2), label, fill=(100, 100, 100))
+                distractor_draw.rectangle((panel[0] + 2, panel[1], panel[0] + 70, panel[1] + 16), fill=2)
         target_box = panels[target_panel]
     else:
         target_box = (margin, margin, width - margin, height - margin)
         if cfg.get("grid"):
             _draw_grid(draw, target_box, cfg["grid_color"])
+            _draw_grid(distractor_draw, target_box, 2)
+        distractor_draw.rectangle(target_box, outline=2, width=2)
         points, y_min, y_max = _panel_points(values, target_box, margin)
         if variant == "multi_trace":
             for decoy_idx, color in enumerate([(220, 80, 80), (120, 120, 120)]):
@@ -188,13 +198,17 @@ def render_trace(values: np.ndarray, out_png: Path, out_mask: Path, width: int, 
                 decoy = decoy + rng.normal(0.0, np.std(values) * 0.03 if np.std(values) else 0.01, len(values))
                 decoy_points, _, _ = _panel_points(decoy, target_box, margin, y_min, y_max)
                 draw.line(decoy_points, fill=color, width=max(1, int(cfg["line_width"]) - 1), joint="curve")
+                distractor_draw.line(decoy_points, fill=2, width=max(2, int(cfg["line_width"])), joint="curve")
         draw.line(points, fill=cfg["trace_color"], width=int(cfg["line_width"]), joint="curve")
-        mask_draw.line(points, fill=255, width=max(3, int(cfg["line_width"])), joint="curve")
+        mask_draw.line(points, fill=1, width=max(3, int(cfg["line_width"])), joint="curve")
         if cfg.get("axis_text"):
             text_color = (230, 230, 230) if variant == "dark_theme" else (80, 80, 80)
             draw.text((margin + 4, 4), "Filtered ECG Signal" if rng.random() < 0.5 else "Original signal", fill=text_color)
             draw.text((width // 2 - 25, height - margin + 3), "time (s)", fill=text_color)
             draw.text((2, height // 2 - 7), "amp", fill=text_color)
+            distractor_draw.rectangle((margin + 2, 0, margin + 170, 18), fill=2)
+            distractor_draw.rectangle((width // 2 - 30, height - margin, width // 2 + 45, height), fill=2)
+            distractor_draw.rectangle((0, height // 2 - 12, 38, height // 2 + 14), fill=2)
 
     image = _apply_degradation(image, variant, cfg, out_png)
     out_png.parent.mkdir(parents=True, exist_ok=True)
@@ -221,6 +235,7 @@ def render_trace(values: np.ndarray, out_png: Path, out_mask: Path, width: int, 
         "style": variant,
         "is_multi_panel": variant in {"multi_panel", "multi_panel_multitrace"},
         "has_decoy_trace": variant in {"multi_trace", "multi_panel_multitrace"},
+        "mask_encoding": {"0": "background", "1": "target_trace", "2": "distractor_trace_axes_text_grid"},
     }
 
 def main() -> None:

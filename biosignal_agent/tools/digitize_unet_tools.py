@@ -13,7 +13,7 @@ UNET_MODEL_PATH = Path("/data1/jiahui/biosignal-agent/outputs/waveform_digitizat
 
 class TinyWaveformUNet:  # factory wrapper avoids importing torch until needed
     @staticmethod
-    def build():
+    def build(out_channels: int = 1):
         import torch
         from torch import nn
 
@@ -44,7 +44,7 @@ class TinyWaveformUNet:  # factory wrapper avoids importing torch until needed
                 self.dec2 = ConvBlock(64, 32)
                 self.up1 = nn.ConvTranspose2d(32, 16, 2, stride=2)
                 self.dec1 = ConvBlock(32, 16)
-                self.out = nn.Conv2d(16, 1, 1)
+                self.out = nn.Conv2d(16, out_channels, 1)
 
             def forward(self, x):
                 e1 = self.enc1(x)
@@ -61,7 +61,7 @@ class TinyWaveformUNet:  # factory wrapper avoids importing torch until needed
 
 class TinyWaveformDeepLabV3:
     @staticmethod
-    def build():
+    def build(out_channels: int = 1):
         from torch import nn
         import torch.nn.functional as F
 
@@ -88,7 +88,7 @@ class TinyWaveformDeepLabV3:
                     nn.Conv2d(48, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU(inplace=True),
                 )
                 self.aspp = ASPP(64)
-                self.head = nn.Sequential(nn.Conv2d(64, 32, 3, padding=1), nn.ReLU(inplace=True), nn.Conv2d(32, 1, 1))
+                self.head = nn.Sequential(nn.Conv2d(64, 32, 3, padding=1), nn.ReLU(inplace=True), nn.Conv2d(32, out_channels, 1))
 
             def forward(self, x):
                 size = x.shape[-2:]
@@ -100,7 +100,7 @@ class TinyWaveformDeepLabV3:
 
 class TinyWaveformSegFormer:
     @staticmethod
-    def build():
+    def build(out_channels: int = 1):
         from torch import nn
         import torch.nn.functional as F
 
@@ -114,7 +114,7 @@ class TinyWaveformSegFormer:
                 self.decode = nn.Sequential(
                     nn.Conv2d(48, 48, 3, padding=1), nn.BatchNorm2d(48), nn.GELU(),
                     nn.Conv2d(48, 24, 3, padding=1), nn.GELU(),
-                    nn.Conv2d(24, 1, 1),
+                    nn.Conv2d(24, out_channels, 1),
                 )
 
             def forward(self, x):
@@ -130,14 +130,14 @@ class TinyWaveformSegFormer:
         return Model()
 
 
-def build_waveform_segmentation_model(model_type: str | None = None):
+def build_waveform_segmentation_model(model_type: str | None = None, out_channels: int = 1):
     name = (model_type or "tiny_unet").lower()
     if name in {"tiny_unet", "unet", "tinywaveformunet"}:
-        return TinyWaveformUNet.build()
+        return TinyWaveformUNet.build(out_channels=out_channels)
     if name in {"tiny_deeplabv3", "deeplabv3", "deeplab"}:
-        return TinyWaveformDeepLabV3.build()
+        return TinyWaveformDeepLabV3.build(out_channels=out_channels)
     if name in {"tiny_segformer", "segformer", "segformer_lite"}:
-        return TinyWaveformSegFormer.build()
+        return TinyWaveformSegFormer.build(out_channels=out_channels)
     raise ValueError(f"unknown waveform segmentation model_type: {model_type}")
 
 
@@ -147,71 +147,157 @@ def select_waveform_mask_area(mask: np.ndarray, panel_policy: str = "bottom", pa
     if mask.ndim != 2 or not np.any(mask):
         return mask, {"selected": None, "reason": "empty_mask"}
     height, width = mask.shape
-    row_counts = mask.sum(axis=1)
-    threshold = max(2, int(width * 0.006))
-    active_rows = row_counts >= threshold
+
+    def _bbox_from_component(component: np.ndarray, extra_pad: int) -> dict[str, Any]:
+        ys, xs = np.nonzero(component)
+        return {
+            "x_min": max(0, int(xs.min()) - extra_pad),
+            "x_max": min(width, int(xs.max()) + 1 + extra_pad),
+            "y_min": max(0, int(ys.min()) - extra_pad),
+            "y_max": min(height, int(ys.max()) + 1 + extra_pad),
+        }
+
+    components: list[dict[str, Any]] = []
+    labels = None
     try:
         from scipy import ndimage
 
-        active_rows = ndimage.binary_dilation(active_rows, iterations=max(2, int(height * 0.015)))
-        labels, num = ndimage.label(active_rows)
-        bands = []
+        labels, num = ndimage.label(mask)
         for label_id in range(1, num + 1):
-            rows = np.flatnonzero(labels == label_id)
-            if len(rows) < max(3, int(height * 0.015)):
-                continue
-            y1, y2 = int(rows.min()), int(rows.max()) + 1
-            band_mask = mask[y1:y2, :]
-            ys, xs = np.nonzero(band_mask)
-            if len(xs) < 10:
+            ys, xs = np.nonzero(labels == label_id)
+            if len(xs) < 12:
                 continue
             x_span = int(xs.max() - xs.min() + 1)
-            y_span = int(y2 - y1)
-            pixels = int(len(xs))
-            if x_span < max(20, int(width * 0.08)):
+            y_span = int(ys.max() - ys.min() + 1)
+            if x_span < max(30, int(width * 0.12)):
                 continue
-            bands.append({
-                "y_min": y1,
-                "y_max": y2,
+            # Text and axes tend to be compact or straight frame lines; real traces
+            # span horizontally and have enough vertical morphology.
+            vertical_var = float(np.std(ys))
+            if vertical_var < max(1.5, height * 0.006):
+                continue
+            components.append({
+                "label": int(label_id),
                 "x_min": int(xs.min()),
                 "x_max": int(xs.max()) + 1,
-                "pixels": pixels,
+                "y_min": int(ys.min()),
+                "y_max": int(ys.max()) + 1,
+                "pixels": int(len(xs)),
                 "x_span": x_span,
                 "y_span": y_span,
-                "y_center": float((y1 + y2) / 2.0),
-                "score": float(x_span * np.sqrt(max(1, pixels)) / max(1.0, np.sqrt(y_span))),
+                "y_center": float(np.mean(ys)),
+                "vertical_std": vertical_var,
+                "score": float(x_span * np.sqrt(max(1, len(xs))) * max(1.0, vertical_var) / max(1.0, np.sqrt(y_span))),
             })
     except Exception:
-        bands = []
-    if not bands:
-        ys, xs = np.nonzero(mask)
-        bbox = {
-            "x_min": max(0, int(xs.min()) - pad),
-            "x_max": min(width, int(xs.max()) + 1 + pad),
-            "y_min": max(0, int(ys.min()) - pad),
-            "y_max": min(height, int(ys.max()) + 1 + pad),
-            "fallback": True,
-        }
-    else:
+        labels = None
+        components = []
+
+    if components and labels is not None:
         if panel_policy == "top":
-            chosen = min(bands, key=lambda b: b["y_center"])
+            chosen = min(components, key=lambda c: c["y_center"])
         elif panel_policy == "largest":
-            chosen = max(bands, key=lambda b: b["score"])
+            chosen = max(components, key=lambda c: c["score"])
         else:
-            max_score = max(b["score"] for b in bands)
-            candidates = [b for b in bands if b["score"] >= 0.35 * max_score]
-            chosen = max(candidates, key=lambda b: (b["y_center"], b["score"]))
-        bbox = {
-            "x_min": max(0, int(chosen["x_min"]) - pad),
-            "x_max": min(width, int(chosen["x_max"]) + pad),
-            "y_min": max(0, int(chosen["y_min"]) - pad),
-            "y_max": min(height, int(chosen["y_max"]) + pad),
+            max_score = max(c["score"] for c in components)
+            candidates = [c for c in components if c["score"] >= 0.25 * max_score]
+            chosen = max(candidates, key=lambda c: (c["y_center"], c["score"]))
+        y_margin = max(8, int(height * 0.08))
+        panel_y_min = max(0, int(chosen["y_min"]) - y_margin)
+        panel_y_max = min(height, int(chosen["y_max"]) + y_margin)
+        same_panel = []
+        for comp in components:
+            overlap = max(0, min(panel_y_max, int(comp["y_max"])) - max(panel_y_min, int(comp["y_min"])))
+            near_center = panel_y_min <= float(comp["y_center"]) <= panel_y_max
+            if near_center or overlap >= max(3, int(0.15 * int(comp["y_span"]))):
+                same_panel.append(comp)
+        if not same_panel:
+            same_panel = [chosen]
+        component = np.zeros_like(mask, dtype=bool)
+        for comp in same_panel:
+            component |= labels == int(comp["label"])
+        bbox = _bbox_from_component(component, pad)
+        bbox.update({
             "fallback": False,
-            "chosen_band": chosen,
-            "num_bands": len(bands),
-        }
-    selected = np.zeros_like(mask, dtype=bool)
-    selected[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]] = mask[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]]
+            "selection_mode": "same_panel_trace_components",
+            "chosen_component": chosen,
+            "merged_components": same_panel,
+            "num_components": len(components),
+            "num_merged_components": len(same_panel),
+        })
+        selected = np.zeros_like(mask, dtype=bool)
+        selected[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]] = component[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]]
+    else:
+        # Fallback: select a horizontal active band. This is intentionally a
+        # fallback because it can include labels/axes if the mask model fires on text.
+        row_counts = mask.sum(axis=1)
+        threshold = max(2, int(width * 0.006))
+        active_rows = row_counts >= threshold
+        bands = []
+        try:
+            from scipy import ndimage
+
+            active_rows = ndimage.binary_dilation(active_rows, iterations=max(2, int(height * 0.015)))
+            row_labels, num = ndimage.label(active_rows)
+            for label_id in range(1, num + 1):
+                rows = np.flatnonzero(row_labels == label_id)
+                if len(rows) < max(3, int(height * 0.015)):
+                    continue
+                y1, y2 = int(rows.min()), int(rows.max()) + 1
+                band_mask = mask[y1:y2, :]
+                ys, xs = np.nonzero(band_mask)
+                if len(xs) < 10:
+                    continue
+                x_span = int(xs.max() - xs.min() + 1)
+                if x_span < max(20, int(width * 0.08)):
+                    continue
+                y_span = int(y2 - y1)
+                pixels = int(len(xs))
+                bands.append({
+                    "y_min": y1,
+                    "y_max": y2,
+                    "x_min": int(xs.min()),
+                    "x_max": int(xs.max()) + 1,
+                    "pixels": pixels,
+                    "x_span": x_span,
+                    "y_span": y_span,
+                    "y_center": float((y1 + y2) / 2.0),
+                    "score": float(x_span * np.sqrt(max(1, pixels)) / max(1.0, np.sqrt(y_span))),
+                })
+        except Exception:
+            bands = []
+        if bands:
+            if panel_policy == "top":
+                chosen_band = min(bands, key=lambda b: b["y_center"])
+            elif panel_policy == "largest":
+                chosen_band = max(bands, key=lambda b: b["score"])
+            else:
+                max_score = max(b["score"] for b in bands)
+                candidates = [b for b in bands if b["score"] >= 0.35 * max_score]
+                chosen_band = max(candidates, key=lambda b: (b["y_center"], b["score"]))
+            bbox = {
+                "x_min": max(0, int(chosen_band["x_min"]) - pad),
+                "x_max": min(width, int(chosen_band["x_max"]) + pad),
+                "y_min": max(0, int(chosen_band["y_min"]) - pad),
+                "y_max": min(height, int(chosen_band["y_max"]) + pad),
+                "fallback": True,
+                "selection_mode": "row_band_fallback",
+                "chosen_band": chosen_band,
+                "num_bands": len(bands),
+            }
+        else:
+            ys, xs = np.nonzero(mask)
+            bbox = {
+                "x_min": max(0, int(xs.min()) - pad),
+                "x_max": min(width, int(xs.max()) + 1 + pad),
+                "y_min": max(0, int(ys.min()) - pad),
+                "y_max": min(height, int(ys.max()) + 1 + pad),
+                "fallback": True,
+                "selection_mode": "global_mask_bbox_fallback",
+            }
+        selected = np.zeros_like(mask, dtype=bool)
+        selected[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]] = mask[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]]
+
     bbox["mask_pixel_fraction_full"] = float(mask.mean()) if mask.size else 0.0
     bbox["mask_pixel_fraction_selected"] = float(selected.mean()) if selected.size else 0.0
     bbox["area_fraction"] = float(((bbox["y_max"] - bbox["y_min"]) * (bbox["x_max"] - bbox["x_min"])) / max(1, height * width))
@@ -245,13 +331,20 @@ def Signal_digitize_waveform_image_unet(
         resized = Image.fromarray(rgb).resize((int(input_width), int(input_height)), Image.BILINEAR)
         arr = np.asarray(resized, dtype=np.float32) / 255.0
         tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
-        model = build_waveform_segmentation_model(checkpoint.get("model_type") or checkpoint.get("backbone"))
+        num_classes = int(checkpoint.get("num_classes", 1))
+        model = build_waveform_segmentation_model(checkpoint.get("model_type") or checkpoint.get("backbone"), out_channels=num_classes)
         model.load_state_dict(checkpoint["model_state"])
         model.eval()
         with torch.no_grad():
             logits = model(tensor)
-            prob = torch.sigmoid(logits)[0, 0].cpu().numpy()
-        mask_small = prob >= float(probability_threshold)
+            if num_classes > 1:
+                probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+                prob = probs[1]
+                pred_class = np.argmax(probs, axis=0)
+                mask_small = pred_class == 1
+            else:
+                prob = torch.sigmoid(logits)[0, 0].cpu().numpy()
+                mask_small = prob >= float(probability_threshold)
         mask = Image.fromarray((mask_small.astype(np.uint8) * 255), mode="L").resize((crop_width, crop_height), Image.NEAREST)
         raw_mask_arr = np.asarray(mask, dtype=np.uint8) > 0
         mask_arr, selected_area = select_waveform_mask_area(raw_mask_arr, panel_policy="bottom", pad=max(3, int(crop_height * 0.01)))
@@ -283,4 +376,5 @@ def Signal_digitize_waveform_image_unet(
     result["mask_pixel_fraction"] = float(np.mean(raw_mask_arr)) if raw_mask_arr.size else 0.0
     result["selected_mask_pixel_fraction"] = float(np.mean(mask_arr)) if mask_arr.size else 0.0
     result["input_size"] = [int(input_height), int(input_width)]
+    result["num_classes"] = int(checkpoint.get("num_classes", 1))
     return result
