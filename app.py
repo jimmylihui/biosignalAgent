@@ -1577,11 +1577,10 @@ def biosignal_chat_submit(
 ):
     question = (message or "").strip() or DEFAULT_CSV_QUESTION
     history = list(history or [])
-    history.append({"role": "user", "content": question})
-    history.append({"role": "assistant", "content": ""})
+    history.append((question, ""))
     yield history, ""
     for chunk in biosignal_chat_response(question, history[:-1], upload, sampling_rate, modality_hint, trace_method):
-        history[-1] = {"role": "assistant", "content": chunk}
+        history[-1] = (question, chunk)
         yield history, ""
 
 
@@ -1640,7 +1639,6 @@ Try: Classify this waveform, digitize it, estimate heart rate/HRV, and explain w
             layout="bubble",
             show_label=False,
             sanitize_html=False,
-            type="messages",
         )
         with gr.Row():
             chat_question = gr.Textbox(
