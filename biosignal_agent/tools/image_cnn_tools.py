@@ -4,30 +4,40 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import torch
 from PIL import Image
-from torch import nn
+
+try:
+    import torch
+    from torch import nn
+except Exception:  # Torch is optional for lightweight web demos.
+    torch = None
+    nn = None
 
 CNN_MODEL_PATH = Path('/data1/jiahui/biosignal-agent/outputs/image_modality_classifier_cnn_80e.pt')
 
 
-class SmallImageModalityCNN(nn.Module):
-    def __init__(self, num_classes: int):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=5, padding=2), nn.BatchNorm2d(16), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(16, 32, kernel_size=3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(64, 96, kernel_size=3, padding=1), nn.BatchNorm2d(96), nn.ReLU(),
-            nn.AdaptiveAvgPool2d((1, 1)), nn.Flatten(),
-            nn.Dropout(0.25), nn.Linear(96, num_classes),
-        )
+if nn is not None:
+    class SmallImageModalityCNN(nn.Module):
+        def __init__(self, num_classes: int):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Conv2d(1, 16, kernel_size=5, padding=2), nn.BatchNorm2d(16), nn.ReLU(), nn.MaxPool2d(2),
+                nn.Conv2d(16, 32, kernel_size=3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2),
+                nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(), nn.MaxPool2d(2),
+                nn.Conv2d(64, 96, kernel_size=3, padding=1), nn.BatchNorm2d(96), nn.ReLU(),
+                nn.AdaptiveAvgPool2d((1, 1)), nn.Flatten(),
+                nn.Dropout(0.25), nn.Linear(96, num_classes),
+            )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x)
+        def forward(self, x):
+            return self.net(x)
+else:
+    SmallImageModalityCNN = None
 
 
-def image_to_cnn_tensor(image_path: str, image_size: tuple[int, int], crop_left: int = 0, crop_right: int = 0, crop_top: int = 0, crop_bottom: int = 0) -> torch.Tensor:
+def image_to_cnn_tensor(image_path: str, image_size: tuple[int, int], crop_left: int = 0, crop_right: int = 0, crop_top: int = 0, crop_bottom: int = 0):
+    if torch is None:
+        raise RuntimeError("torch is not installed; CNN image classifier is unavailable")
     image = Image.open(image_path).convert('L')
     width, height = image.size
     left = max(0, int(crop_left))
@@ -43,6 +53,8 @@ def image_to_cnn_tensor(image_path: str, image_size: tuple[int, int], crop_left:
 
 
 def load_cnn_bundle(model_path: str | None = None) -> dict[str, Any]:
+    if torch is None:
+        raise RuntimeError("torch is not installed; CNN image classifier is unavailable")
     path = Path(model_path) if model_path else CNN_MODEL_PATH
     return torch.load(path, map_location='cpu', weights_only=False)
 
@@ -56,6 +68,8 @@ def Signal_classify_modality_from_image_cnn(
     model_path: str | None = None,
 ) -> dict[str, Any]:
     model_file = Path(model_path) if model_path else CNN_MODEL_PATH
+    if torch is None or SmallImageModalityCNN is None:
+        return {'tool': 'Signal_classify_modality_from_image_cnn', 'error': 'torch is not installed; CNN image classifier is unavailable', 'confidence': 0.0}
     if not model_file.exists():
         return {'tool': 'Signal_classify_modality_from_image_cnn', 'error': f'model not found: {model_file}', 'confidence': 0.0}
     try:

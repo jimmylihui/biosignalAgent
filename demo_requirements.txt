@@ -1,10 +1,10 @@
+gradio>=4.44.0
 numpy
 pandas
 scipy
 matplotlib
 wfdb
 neurokit2
-gradio>=4.44.0
 pillow
 joblib
 scikit-learn

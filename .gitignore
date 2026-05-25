@@ -8,3 +8,4 @@ wget-log*
 external/**/.git/
 external/**/__pycache__/
 *.log
+.gradio/
