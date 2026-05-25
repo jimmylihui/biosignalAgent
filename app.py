@@ -22,7 +22,7 @@ from biosignal_agent.tools.digitize_tools import (
     Signal_estimate_image_scale,
     _crop_rgb_image,
 )
-from biosignal_agent.tools.digitize_unet_tools import Signal_digitize_waveform_image_unet, UNET_MODEL_PATH, build_waveform_segmentation_model
+from biosignal_agent.tools.digitize_unet_tools import Signal_digitize_waveform_image_unet, UNET_MODEL_PATH, build_waveform_segmentation_model, select_waveform_mask_area
 from biosignal_agent.tools.image_modality_tools import Signal_classify_modality_from_image
 from biosignal_agent.tools.modality_tools import Signal_classify_modality
 
@@ -555,15 +555,31 @@ def _segmentation_overlay_card(image_path: str, probability_threshold: float = 0
             prob = torch.sigmoid(model(tensor))[0, 0].cpu().numpy()
         mask_small = prob >= float(probability_threshold)
         mask = Image.fromarray((mask_small.astype(np.uint8) * 255), mode="L").resize((width, height), Image.NEAREST)
+        raw_mask = np.asarray(mask, dtype=np.uint8) > 0
+        selected_mask, area_info = select_waveform_mask_area(raw_mask, panel_policy="bottom", pad=max(3, int(height * 0.01)))
+        bbox = (area_info.get("selected") or {})
         base = Image.fromarray(rgb).convert("RGBA")
+        area_layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        if bbox:
+            from PIL import ImageDraw
+
+            draw = ImageDraw.Draw(area_layer)
+            xy = [int(bbox["x_min"]), int(bbox["y_min"]), int(bbox["x_max"]), int(bbox["y_max"])]
+            draw.rectangle(xy, fill=(255, 193, 7, 45), outline=(255, 152, 0, 220), width=3)
         red = Image.new("RGBA", (width, height), (255, 35, 35, 0))
-        alpha = np.asarray(mask, dtype=np.uint8)
-        alpha = (alpha > 0).astype(np.uint8) * 120
+        alpha = selected_mask.astype(np.uint8) * 165
         red.putalpha(Image.fromarray(alpha, mode="L"))
-        overlay = Image.alpha_composite(base, red).convert("RGB")
-        mask_fraction = float((np.asarray(mask) > 0).mean()) if width and height else 0.0
-        caption = f"Red overlay = predicted curve mask. model={Path(UNET_MODEL_PATH).name}, threshold={probability_threshold}, mask_fraction={mask_fraction:.4f}."
-        return _visual_card("Segmentation overlay", _pil_to_data_uri(overlay, fmt="JPEG"), caption)
+        overlay = Image.alpha_composite(Image.alpha_composite(base, area_layer), red).convert("RGB")
+        mask_fraction = float(raw_mask.mean()) if width and height else 0.0
+        selected_fraction = float(selected_mask.mean()) if width and height else 0.0
+        area_fraction = bbox.get("area_fraction") if bbox else None
+        caption = (
+            f"Amber area = selected mask region/panel used for digitization; red pixels = curve mask inside that area. "
+            f"model={Path(UNET_MODEL_PATH).name}, threshold={probability_threshold}, "
+            f"mask_fraction={mask_fraction:.4f}, selected_mask_fraction={selected_fraction:.4f}"
+            + (f", area_fraction={float(area_fraction):.4f}." if area_fraction is not None else ".")
+        )
+        return _visual_card("Segmentation mask area", _pil_to_data_uri(overlay, fmt="JPEG"), caption)
     except Exception as exc:
         return f"<div style='border:1px solid #eee;border-radius:8px;padding:10px;margin:10px 0'><b>Segmentation overlay</b><br><span style='color:#999'>Unavailable: {exc}</span></div>"
 

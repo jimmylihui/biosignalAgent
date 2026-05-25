@@ -140,6 +140,83 @@ def build_waveform_segmentation_model(model_type: str | None = None):
         return TinyWaveformSegFormer.build()
     raise ValueError(f"unknown waveform segmentation model_type: {model_type}")
 
+
+
+def select_waveform_mask_area(mask: np.ndarray, panel_policy: str = "bottom", pad: int = 4) -> tuple[np.ndarray, dict[str, Any]]:
+    mask = np.asarray(mask, dtype=bool)
+    if mask.ndim != 2 or not np.any(mask):
+        return mask, {"selected": None, "reason": "empty_mask"}
+    height, width = mask.shape
+    row_counts = mask.sum(axis=1)
+    threshold = max(2, int(width * 0.006))
+    active_rows = row_counts >= threshold
+    try:
+        from scipy import ndimage
+
+        active_rows = ndimage.binary_dilation(active_rows, iterations=max(2, int(height * 0.015)))
+        labels, num = ndimage.label(active_rows)
+        bands = []
+        for label_id in range(1, num + 1):
+            rows = np.flatnonzero(labels == label_id)
+            if len(rows) < max(3, int(height * 0.015)):
+                continue
+            y1, y2 = int(rows.min()), int(rows.max()) + 1
+            band_mask = mask[y1:y2, :]
+            ys, xs = np.nonzero(band_mask)
+            if len(xs) < 10:
+                continue
+            x_span = int(xs.max() - xs.min() + 1)
+            y_span = int(y2 - y1)
+            pixels = int(len(xs))
+            if x_span < max(20, int(width * 0.08)):
+                continue
+            bands.append({
+                "y_min": y1,
+                "y_max": y2,
+                "x_min": int(xs.min()),
+                "x_max": int(xs.max()) + 1,
+                "pixels": pixels,
+                "x_span": x_span,
+                "y_span": y_span,
+                "y_center": float((y1 + y2) / 2.0),
+                "score": float(x_span * np.sqrt(max(1, pixels)) / max(1.0, np.sqrt(y_span))),
+            })
+    except Exception:
+        bands = []
+    if not bands:
+        ys, xs = np.nonzero(mask)
+        bbox = {
+            "x_min": max(0, int(xs.min()) - pad),
+            "x_max": min(width, int(xs.max()) + 1 + pad),
+            "y_min": max(0, int(ys.min()) - pad),
+            "y_max": min(height, int(ys.max()) + 1 + pad),
+            "fallback": True,
+        }
+    else:
+        if panel_policy == "top":
+            chosen = min(bands, key=lambda b: b["y_center"])
+        elif panel_policy == "largest":
+            chosen = max(bands, key=lambda b: b["score"])
+        else:
+            max_score = max(b["score"] for b in bands)
+            candidates = [b for b in bands if b["score"] >= 0.35 * max_score]
+            chosen = max(candidates, key=lambda b: (b["y_center"], b["score"]))
+        bbox = {
+            "x_min": max(0, int(chosen["x_min"]) - pad),
+            "x_max": min(width, int(chosen["x_max"]) + pad),
+            "y_min": max(0, int(chosen["y_min"]) - pad),
+            "y_max": min(height, int(chosen["y_max"]) + pad),
+            "fallback": False,
+            "chosen_band": chosen,
+            "num_bands": len(bands),
+        }
+    selected = np.zeros_like(mask, dtype=bool)
+    selected[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]] = mask[bbox["y_min"]:bbox["y_max"], bbox["x_min"]:bbox["x_max"]]
+    bbox["mask_pixel_fraction_full"] = float(mask.mean()) if mask.size else 0.0
+    bbox["mask_pixel_fraction_selected"] = float(selected.mean()) if selected.size else 0.0
+    bbox["area_fraction"] = float(((bbox["y_max"] - bbox["y_min"]) * (bbox["x_max"] - bbox["x_min"])) / max(1, height * width))
+    return selected, {"selected": bbox, "panel_policy": panel_policy}
+
 def Signal_digitize_waveform_image_unet(
     image_path: str,
     sampling_rate: float | None = None,
@@ -176,12 +253,18 @@ def Signal_digitize_waveform_image_unet(
             prob = torch.sigmoid(logits)[0, 0].cpu().numpy()
         mask_small = prob >= float(probability_threshold)
         mask = Image.fromarray((mask_small.astype(np.uint8) * 255), mode="L").resize((crop_width, crop_height), Image.NEAREST)
-        mask_arr = np.asarray(mask, dtype=np.uint8) > 0
+        raw_mask_arr = np.asarray(mask, dtype=np.uint8) > 0
+        mask_arr, selected_area = select_waveform_mask_area(raw_mask_arr, panel_policy="bottom", pad=max(3, int(crop_height * 0.01)))
+        bbox = (selected_area.get("selected") or {})
+        if bbox and bbox.get("x_max", 0) > bbox.get("x_min", 0) and bbox.get("y_max", 0) > bbox.get("y_min", 0):
+            digitization_mask = mask_arr[int(bbox["y_min"]):int(bbox["y_max"]), int(bbox["x_min"]):int(bbox["x_max"])]
+        else:
+            digitization_mask = mask_arr
         mean_probability = float(np.mean(prob[mask_small])) if np.any(mask_small) else 0.0
     except Exception as exc:
         return {"tool": "Signal_digitize_waveform_image_unet", "error": str(exc), "confidence": 0.0, "model_source": str(model_file)}
     result = _signal_from_mask(
-        mask_arr,
+        digitization_mask,
         sampling_rate,
         out_csv,
         image_path,
@@ -196,6 +279,8 @@ def Signal_digitize_waveform_image_unet(
     )
     result["crop"] = {"left": crop[0], "right": crop[1], "top": crop[2], "bottom": crop[3]}
     result["probability_threshold"] = float(probability_threshold)
-    result["mask_pixel_fraction"] = float(np.mean(mask_arr)) if mask_arr.size else 0.0
+    result["selected_mask_area"] = selected_area
+    result["mask_pixel_fraction"] = float(np.mean(raw_mask_arr)) if raw_mask_arr.size else 0.0
+    result["selected_mask_pixel_fraction"] = float(np.mean(mask_arr)) if mask_arr.size else 0.0
     result["input_size"] = [int(input_height), int(input_width)]
     return result
