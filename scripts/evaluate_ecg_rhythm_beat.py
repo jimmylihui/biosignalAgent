@@ -39,6 +39,9 @@ def multiclass_accuracy(rows: list[dict[str, Any]], truth_key: str, pred_key: st
 
 
 def predict_rhythm(arrhythmia: dict[str, Any]) -> str:
+    model_rhythm = arrhythmia.get("predicted_rhythm")
+    if model_rhythm in {"normal", "af", "other_rhythm"}:
+        return model_rhythm
     flags = set(arrhythmia.get("arrhythmia_flags", []))
     rr_cv = arrhythmia.get("rr_cv") or 0.0
     if "irregular_rr_pattern" in flags and rr_cv >= 0.18:
@@ -107,6 +110,8 @@ def evaluate(manifest_path: str | Path, tolerance_ms: float) -> dict[str, Any]:
             "arrhythmia_flags": arrhythmia.get("arrhythmia_flags", []),
             "rr_cv": arrhythmia.get("rr_cv"),
             "heart_rate_bpm": arrhythmia.get("heart_rate_bpm"),
+            "predicted_rhythm_model": arrhythmia.get("predicted_rhythm"),
+            "rhythm_probabilities": arrhythmia.get("rhythm_probabilities"),
             "error": arrhythmia.get("error"),
         })
         beat_rows.extend(beat_predictions(record, peaks, tolerance_ms))

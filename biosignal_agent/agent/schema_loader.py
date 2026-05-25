@@ -16,8 +16,8 @@ def find_tool_schemas(query: str, top_k: int = 5) -> list[dict]:
     terms = {token.lower() for token in query.replace("_", " ").split()}
     scored = []
     for schema in load_tool_schemas():
-        text = f"{schema['name']} {schema['description']} {schema['modality']}".lower()
+        text = f"{schema.get('name', '')} {schema.get('description', '')} {schema.get('modality', '')}".lower()
         score = sum(1 for term in terms if term in text)
-        scored.append((score, schema["name"], schema))
+        scored.append((score, schema.get("name", ""), schema))
     scored.sort(key=lambda item: (-item[0], item[1]))
     return [schema for score, _, schema in scored[:top_k] if score > 0]

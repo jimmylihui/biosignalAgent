@@ -1,88 +1,170 @@
 from __future__ import annotations
 
 from biosignal_agent.tools.artifact_tools import Signal_detect_artifacts
-from biosignal_agent.tools.abp_tools import ABP_assess_quality, ABP_compute_hemodynamics, ABP_detect_pulses, ABP_screen_pressure_events
-from biosignal_agent.tools.acc_tools import ACC_assess_quality, ACC_detect_activity_bouts, ACC_detect_fall_proxy, ACC_estimate_sleep_wake, ACC_summarize_activity
-from biosignal_agent.tools.bcg_tools import BCG_assess_quality, BCG_detect_j_peaks, BCG_estimate_respiration
-from biosignal_agent.tools.ecg_tools import ECG_assess_quality, ECG_compute_hrv, ECG_detect_r_peaks, ECG_measure_morphology_intervals, ECG_screen_arrhythmia, ECG_screen_sleep_apnea
-from biosignal_agent.tools.eda_tools import EDA_assess_quality, EDA_detect_arousal_events, EDA_screen_stress_proxy, EDA_summarize
-from biosignal_agent.tools.eeg_tools import EEG_assess_quality, EEG_compute_bandpower, EEG_detect_artifact_proxy, EEG_estimate_drowsiness, EEG_estimate_sleep_stage_features, EEG_screen_seizure_like_activity
-from biosignal_agent.tools.emg_tools import EMG_assess_quality, EMG_detect_bursts, EMG_estimate_fatigue, EMG_summarize_activation
-from biosignal_agent.tools.pcg_tools import PCG_assess_quality, PCG_detect_heart_sounds, PCG_extract_murmur_features, PCG_screen_murmur_proxy, PCG_segment_s1_s2_proxy
-from biosignal_agent.tools.ppg_tools import PPG_assess_quality, PPG_assess_perfusion_variability, PPG_detect_peaks, PPG_estimate_respiration_modulation, PPG_screen_pulse_irregularity
-from biosignal_agent.tools.resp_tools import RESP_assess_quality, RESP_detect_apnea, RESP_detect_hypopnea, RESP_estimate_rate, RESP_screen_rate_pattern
-from biosignal_agent.tools.scg_tools import SCG_assess_quality, SCG_detect_j_peaks, SCG_estimate_respiration
-from biosignal_agent.tools.spo2_tools import SpO2_assess_hypoxemia_burden, SpO2_assess_quality, SpO2_detect_desaturation, SpO2_summarize
+from biosignal_agent.tools.digitize_tools import Signal_digitize_waveform_image_ml, Signal_estimate_image_scale, Signal_predict_image_scale_prior
+from biosignal_agent.tools.image_cnn_tools import Signal_classify_modality_from_image_cnn
+from biosignal_agent.tools.modality_tools import Signal_classify_modality
+from biosignal_agent.tools.multimodal_tools import Multimodal_estimate_ecg_ppg_pat_bp_proxy, Multimodal_screen_sleep_apnea_report
+from biosignal_agent.tools.spectrogram_tools import Signal_extract_spectrogram_features, Signal_render_spectrogram_image
+from biosignal_agent.tools.abp_tools import ABP_assess_quality, ABP_classify_pressure_events, ABP_compute_hemodynamics, ABP_detect_acute_hypotensive_episode_proxy, ABP_detect_pulses, ABP_screen_pressure_events
+from biosignal_agent.tools.acc_tools import ACC_assess_quality, ACC_classify_activity_ml, ACC_detect_activity_bouts, ACC_detect_fall_ml, ACC_detect_fall_proxy, ACC_estimate_sleep_wake, ACC_extract_actigraphy_features, ACC_summarize_activity
+from biosignal_agent.tools.bcg_tools import BCG_assess_bed_presence_motion, BCG_assess_quality, BCG_compute_hrv, BCG_detect_j_peaks, BCG_estimate_bp_proxy, BCG_estimate_respiration, BCG_estimate_sleep_features, BCG_route_task_recommendation, BCG_screen_arrhythmia
+from biosignal_agent.tools.ecg_tools import ECG_classify_12lead_ptbxl_superclasses, ECG_delineate_waves_dl, ECG_analyze_qt_interval, ECG_assess_quality, ECG_assess_stress_fatigue_hrv, ECG_classify_beats, ECG_classify_rhythm_segment, ECG_compute_hrv, ECG_detect_afib, ECG_detect_r_peaks, ECG_estimate_heart_rate, ECG_measure_morphology_intervals, ECG_screen_arrhythmia, ECG_screen_conduction_block, ECG_screen_ischemia_st, ECG_screen_sleep_apnea
+from biosignal_agent.tools.eda_tools import EDA_assess_quality, EDA_classify_affective_state_ml, EDA_detect_arousal_events, EDA_extract_tonic_phasic_features, EDA_route_task_recommendation, EDA_screen_stress_ml, EDA_screen_stress_proxy, EDA_summarize
+from biosignal_agent.tools.eeg_tools import EEG_assess_quality, EEG_classify_sleep_stage_ml, EEG_compute_bandpower, EEG_detect_artifact_proxy, EEG_estimate_drowsiness, EEG_estimate_sleep_stage_features, EEG_screen_seizure_like_activity, EEG_screen_seizure_ml
+from biosignal_agent.tools.emg_tools import EMG_analyze_gait_activation, EMG_assess_quality, EMG_classify_action, EMG_classify_gait_speed, EMG_classify_gesture, EMG_classify_prosthetic_gesture, EMG_classify_lower_limb_exercise, EMG_classify_physical_action, EMG_detect_bursts, EMG_estimate_fatigue, EMG_estimate_fatigue_ml, EMG_estimate_gait_phase, EMG_predict_movement_intent, EMG_screen_knee_rehab_status, EMG_screen_neuromuscular_abnormality, EMG_summarize_activation
+from biosignal_agent.tools.pcg_tools import PCG_assess_quality, PCG_assess_rhythm_irregularity, PCG_detect_heart_sounds, PCG_detect_s3_s4_proxy, PCG_estimate_heart_rate, PCG_extract_murmur_features, PCG_monitor_heart_function_proxy, PCG_screen_congenital_abnormality_proxy, PCG_screen_murmur_patient_multisite, PCG_screen_murmur_proxy, PCG_screen_valve_disease_proxy, PCG_segment_s1_s2_proxy
+from biosignal_agent.tools.ppg_tools import PPG_assess_quality, PPG_assess_perfusion_variability, PPG_assess_stress_prv, PPG_assess_vascular_health, PPG_compute_prv, PPG_detect_afib, PPG_detect_fiducial_points, PPG_detect_peaks, PPG_estimate_bp_proxy, PPG_estimate_exercise_intensity, PPG_estimate_heart_rate, PPG_estimate_respiration_modulation, PPG_estimate_sleep_features, PPG_estimate_spo2, PPG_screen_low_perfusion_shock_risk, PPG_screen_pulse_irregularity
+from biosignal_agent.tools.resp_tools import RESP_assess_quality, RESP_detect_apnea, RESP_detect_hypopnea, RESP_estimate_rate, RESP_screen_rate_pattern, RESP_screen_sleep_apnea_ml, RESP_summarize_event_burden
+from biosignal_agent.tools.scg_tools import SCG_assess_quality, SCG_assess_sensor_placement, SCG_compute_cardiac_time_intervals, SCG_detect_fiducial_points, SCG_detect_j_peaks, SCG_estimate_contractility_proxy, SCG_estimate_respiration, SCG_screen_mechanical_abnormality
+from biosignal_agent.tools.spo2_tools import SpO2_assess_hypoxemia_burden, SpO2_assess_quality, SpO2_detect_desaturation, SpO2_extract_oximetry_features, SpO2_screen_sleep_apnea_ml, SpO2_screen_sleep_apnea_oximetry, SpO2_summarize
 
 TOOLS = {
+    "Signal_classify_modality": Signal_classify_modality,
+    "Multimodal_estimate_ecg_ppg_pat_bp_proxy": Multimodal_estimate_ecg_ppg_pat_bp_proxy,
+    "Multimodal_screen_sleep_apnea_report": Multimodal_screen_sleep_apnea_report,
+    "Signal_classify_modality_from_image_cnn": Signal_classify_modality_from_image_cnn,
+    "Signal_extract_spectrogram_features": Signal_extract_spectrogram_features,
+    "Signal_render_spectrogram_image": Signal_render_spectrogram_image,
+    "Signal_digitize_waveform_image_ml": Signal_digitize_waveform_image_ml,
+    "Signal_estimate_image_scale": Signal_estimate_image_scale,
+    "Signal_predict_image_scale_prior": Signal_predict_image_scale_prior,
     "Signal_detect_artifacts": Signal_detect_artifacts,
     "ECG_assess_quality": ECG_assess_quality,
+    "ECG_classify_12lead_ptbxl_superclasses": ECG_classify_12lead_ptbxl_superclasses,
     "ECG_detect_r_peaks": ECG_detect_r_peaks,
+    "ECG_estimate_heart_rate": ECG_estimate_heart_rate,
+    "ECG_classify_beats": ECG_classify_beats,
+    "ECG_classify_rhythm_segment": ECG_classify_rhythm_segment,
+    "ECG_detect_afib": ECG_detect_afib,
+    "ECG_delineate_waves_dl": ECG_delineate_waves_dl,
+    "ECG_analyze_qt_interval": ECG_analyze_qt_interval,
+    "ECG_screen_conduction_block": ECG_screen_conduction_block,
+    "ECG_screen_ischemia_st": ECG_screen_ischemia_st,
+    "ECG_assess_stress_fatigue_hrv": ECG_assess_stress_fatigue_hrv,
     "ECG_compute_hrv": ECG_compute_hrv,
     "ECG_screen_arrhythmia": ECG_screen_arrhythmia,
     "ECG_screen_sleep_apnea": ECG_screen_sleep_apnea,
     "ECG_measure_morphology_intervals": ECG_measure_morphology_intervals,
     "PPG_assess_quality": PPG_assess_quality,
     "PPG_detect_peaks": PPG_detect_peaks,
+    "PPG_estimate_heart_rate": PPG_estimate_heart_rate,
+    "PPG_compute_prv": PPG_compute_prv,
+    "PPG_detect_fiducial_points": PPG_detect_fiducial_points,
+    "PPG_estimate_spo2": PPG_estimate_spo2,
+    "PPG_estimate_bp_proxy": PPG_estimate_bp_proxy,
+    "PPG_detect_afib": PPG_detect_afib,
+    "PPG_estimate_sleep_features": PPG_estimate_sleep_features,
+    "PPG_assess_stress_prv": PPG_assess_stress_prv,
+    "PPG_estimate_exercise_intensity": PPG_estimate_exercise_intensity,
+    "PPG_assess_vascular_health": PPG_assess_vascular_health,
+    "PPG_screen_low_perfusion_shock_risk": PPG_screen_low_perfusion_shock_risk,
     "PPG_assess_perfusion_variability": PPG_assess_perfusion_variability,
     "PPG_screen_pulse_irregularity": PPG_screen_pulse_irregularity,
     "PPG_estimate_respiration_modulation": PPG_estimate_respiration_modulation,
     "BCG_assess_quality": BCG_assess_quality,
     "BCG_detect_j_peaks": BCG_detect_j_peaks,
     "BCG_estimate_respiration": BCG_estimate_respiration,
+    "BCG_compute_hrv": BCG_compute_hrv,
+    "BCG_screen_arrhythmia": BCG_screen_arrhythmia,
+    "BCG_assess_bed_presence_motion": BCG_assess_bed_presence_motion,
+    "BCG_estimate_sleep_features": BCG_estimate_sleep_features,
+    "BCG_estimate_bp_proxy": BCG_estimate_bp_proxy,
+    "BCG_route_task_recommendation": BCG_route_task_recommendation,
     "SCG_assess_quality": SCG_assess_quality,
     "SCG_detect_j_peaks": SCG_detect_j_peaks,
+    "SCG_detect_fiducial_points": SCG_detect_fiducial_points,
+    "SCG_compute_cardiac_time_intervals": SCG_compute_cardiac_time_intervals,
+    "SCG_estimate_contractility_proxy": SCG_estimate_contractility_proxy,
     "SCG_estimate_respiration": SCG_estimate_respiration,
+    "SCG_assess_sensor_placement": SCG_assess_sensor_placement,
+    "SCG_screen_mechanical_abnormality": SCG_screen_mechanical_abnormality,
     "RESP_assess_quality": RESP_assess_quality,
     "RESP_estimate_rate": RESP_estimate_rate,
+    "RESP_screen_sleep_apnea_ml": RESP_screen_sleep_apnea_ml,
     "RESP_detect_apnea": RESP_detect_apnea,
     "RESP_detect_hypopnea": RESP_detect_hypopnea,
     "RESP_screen_rate_pattern": RESP_screen_rate_pattern,
+    "RESP_summarize_event_burden": RESP_summarize_event_burden,
     "SpO2_assess_quality": SpO2_assess_quality,
     "SpO2_summarize": SpO2_summarize,
     "SpO2_detect_desaturation": SpO2_detect_desaturation,
     "SpO2_assess_hypoxemia_burden": SpO2_assess_hypoxemia_burden,
+    "SpO2_extract_oximetry_features": SpO2_extract_oximetry_features,
+    "SpO2_screen_sleep_apnea_oximetry": SpO2_screen_sleep_apnea_oximetry,
+    "SpO2_screen_sleep_apnea_ml": SpO2_screen_sleep_apnea_ml,
     "ABP_assess_quality": ABP_assess_quality,
     "ABP_detect_pulses": ABP_detect_pulses,
     "ABP_screen_pressure_events": ABP_screen_pressure_events,
+    "ABP_classify_pressure_events": ABP_classify_pressure_events,
+    "ABP_detect_acute_hypotensive_episode_proxy": ABP_detect_acute_hypotensive_episode_proxy,
     "ABP_compute_hemodynamics": ABP_compute_hemodynamics,
     "PCG_assess_quality": PCG_assess_quality,
     "PCG_detect_heart_sounds": PCG_detect_heart_sounds,
+    "PCG_estimate_heart_rate": PCG_estimate_heart_rate,
+    "PCG_assess_rhythm_irregularity": PCG_assess_rhythm_irregularity,
+    "PCG_detect_s3_s4_proxy": PCG_detect_s3_s4_proxy,
     "PCG_screen_murmur_proxy": PCG_screen_murmur_proxy,
+    "PCG_screen_murmur_patient_multisite": PCG_screen_murmur_patient_multisite,
+    "PCG_screen_valve_disease_proxy": PCG_screen_valve_disease_proxy,
+    "PCG_screen_congenital_abnormality_proxy": PCG_screen_congenital_abnormality_proxy,
+    "PCG_monitor_heart_function_proxy": PCG_monitor_heart_function_proxy,
     "PCG_extract_murmur_features": PCG_extract_murmur_features,
     "PCG_segment_s1_s2_proxy": PCG_segment_s1_s2_proxy,
     "ACC_assess_quality": ACC_assess_quality,
     "ACC_summarize_activity": ACC_summarize_activity,
+    "ACC_classify_activity_ml": ACC_classify_activity_ml,
+    "ACC_extract_actigraphy_features": ACC_extract_actigraphy_features,
     "ACC_estimate_sleep_wake": ACC_estimate_sleep_wake,
     "ACC_detect_activity_bouts": ACC_detect_activity_bouts,
     "ACC_detect_fall_proxy": ACC_detect_fall_proxy,
+    "ACC_detect_fall_ml": ACC_detect_fall_ml,
     "EDA_assess_quality": EDA_assess_quality,
     "EDA_summarize": EDA_summarize,
+    "EDA_extract_tonic_phasic_features": EDA_extract_tonic_phasic_features,
     "EDA_detect_arousal_events": EDA_detect_arousal_events,
+    "EDA_screen_stress_ml": EDA_screen_stress_ml,
+    "EDA_classify_affective_state_ml": EDA_classify_affective_state_ml,
+    "EDA_route_task_recommendation": EDA_route_task_recommendation,
     "EDA_screen_stress_proxy": EDA_screen_stress_proxy,
     "EEG_assess_quality": EEG_assess_quality,
     "EEG_compute_bandpower": EEG_compute_bandpower,
     "EEG_estimate_sleep_stage_features": EEG_estimate_sleep_stage_features,
+    "EEG_classify_sleep_stage_ml": EEG_classify_sleep_stage_ml,
     "EEG_screen_seizure_like_activity": EEG_screen_seizure_like_activity,
+    "EEG_screen_seizure_ml": EEG_screen_seizure_ml,
     "EEG_estimate_drowsiness": EEG_estimate_drowsiness,
     "EEG_detect_artifact_proxy": EEG_detect_artifact_proxy,
     "EMG_assess_quality": EMG_assess_quality,
     "EMG_summarize_activation": EMG_summarize_activation,
+    "EMG_classify_gesture": EMG_classify_gesture,
+    "EMG_classify_action": EMG_classify_action,
+    "EMG_classify_prosthetic_gesture": EMG_classify_prosthetic_gesture,
+    "EMG_classify_physical_action": EMG_classify_physical_action,
+    "EMG_classify_lower_limb_exercise": EMG_classify_lower_limb_exercise,
+    "EMG_classify_gait_speed": EMG_classify_gait_speed,
+    "EMG_estimate_gait_phase": EMG_estimate_gait_phase,
+    "EMG_screen_knee_rehab_status": EMG_screen_knee_rehab_status,
+    "EMG_analyze_gait_activation": EMG_analyze_gait_activation,
+    "EMG_predict_movement_intent": EMG_predict_movement_intent,
+    "EMG_screen_neuromuscular_abnormality": EMG_screen_neuromuscular_abnormality,
     "EMG_estimate_fatigue": EMG_estimate_fatigue,
+    "EMG_estimate_fatigue_ml": EMG_estimate_fatigue_ml,
     "EMG_detect_bursts": EMG_detect_bursts,
 }
 
 WORKFLOWS = {
-    "ecg": ["ECG_assess_quality", "Signal_detect_artifacts", "ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_arrhythmia", "ECG_screen_sleep_apnea", "ECG_measure_morphology_intervals"],
-    "ppg": ["PPG_assess_quality", "Signal_detect_artifacts", "PPG_detect_peaks", "PPG_assess_perfusion_variability", "PPG_screen_pulse_irregularity", "PPG_estimate_respiration_modulation"],
-    "bcg": ["BCG_assess_quality", "Signal_detect_artifacts", "BCG_detect_j_peaks", "BCG_estimate_respiration"],
-    "scg": ["SCG_assess_quality", "Signal_detect_artifacts", "SCG_detect_j_peaks", "SCG_estimate_respiration"],
-    "resp": ["RESP_assess_quality", "Signal_detect_artifacts", "RESP_estimate_rate", "RESP_detect_apnea", "RESP_detect_hypopnea", "RESP_screen_rate_pattern"],
-    "spo2": ["SpO2_assess_quality", "Signal_detect_artifacts", "SpO2_summarize", "SpO2_detect_desaturation", "SpO2_assess_hypoxemia_burden"],
-    "abp": ["ABP_assess_quality", "Signal_detect_artifacts", "ABP_detect_pulses", "ABP_screen_pressure_events", "ABP_compute_hemodynamics"],
-    "pcg": ["PCG_assess_quality", "Signal_detect_artifacts", "PCG_detect_heart_sounds", "PCG_screen_murmur_proxy", "PCG_extract_murmur_features", "PCG_segment_s1_s2_proxy"],
-    "acc": ["ACC_assess_quality", "Signal_detect_artifacts", "ACC_summarize_activity", "ACC_estimate_sleep_wake", "ACC_detect_activity_bouts", "ACC_detect_fall_proxy"],
-    "eda": ["EDA_assess_quality", "Signal_detect_artifacts", "EDA_summarize", "EDA_detect_arousal_events", "EDA_screen_stress_proxy"],
-    "eeg": ["EEG_assess_quality", "Signal_detect_artifacts", "EEG_compute_bandpower", "EEG_estimate_sleep_stage_features", "EEG_screen_seizure_like_activity", "EEG_estimate_drowsiness", "EEG_detect_artifact_proxy"],
-    "emg": ["EMG_assess_quality", "Signal_detect_artifacts", "EMG_summarize_activation", "EMG_estimate_fatigue", "EMG_detect_bursts"],
+    "ecg": ["ECG_assess_quality", "Signal_detect_artifacts", "ECG_detect_r_peaks", "ECG_estimate_heart_rate", "ECG_compute_hrv", "ECG_classify_beats", "ECG_classify_rhythm_segment", "ECG_detect_afib", "ECG_screen_arrhythmia", "ECG_screen_sleep_apnea", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval", "ECG_screen_conduction_block", "ECG_screen_ischemia_st", "ECG_classify_12lead_ptbxl_superclasses", "ECG_assess_stress_fatigue_hrv"],
+    "ppg": ["PPG_assess_quality", "Signal_detect_artifacts", "PPG_detect_peaks", "PPG_estimate_heart_rate", "PPG_compute_prv", "PPG_detect_fiducial_points", "PPG_assess_perfusion_variability", "PPG_screen_pulse_irregularity", "PPG_detect_afib", "PPG_estimate_respiration_modulation", "PPG_estimate_spo2", "PPG_estimate_bp_proxy", "PPG_estimate_sleep_features", "PPG_assess_stress_prv", "PPG_estimate_exercise_intensity", "PPG_assess_vascular_health", "PPG_screen_low_perfusion_shock_risk"],
+    "bcg": ["BCG_assess_quality", "Signal_detect_artifacts", "BCG_assess_bed_presence_motion", "BCG_detect_j_peaks", "BCG_compute_hrv", "BCG_estimate_respiration", "BCG_screen_arrhythmia", "BCG_estimate_sleep_features", "BCG_estimate_bp_proxy"],
+    "scg": ["SCG_assess_quality", "Signal_detect_artifacts", "SCG_assess_sensor_placement", "SCG_detect_j_peaks", "SCG_detect_fiducial_points", "SCG_compute_cardiac_time_intervals", "SCG_estimate_contractility_proxy", "SCG_estimate_respiration", "SCG_screen_mechanical_abnormality"],
+    "resp": ["RESP_assess_quality", "Signal_detect_artifacts", "RESP_estimate_rate", "RESP_screen_sleep_apnea_ml", "RESP_detect_apnea", "RESP_detect_hypopnea", "RESP_screen_rate_pattern", "RESP_summarize_event_burden"],
+    "multimodal": ["Multimodal_estimate_ecg_ppg_pat_bp_proxy", "Multimodal_screen_sleep_apnea_report"],
+    "spo2": ["SpO2_assess_quality", "Signal_detect_artifacts", "SpO2_summarize", "SpO2_detect_desaturation", "SpO2_assess_hypoxemia_burden", "SpO2_extract_oximetry_features", "SpO2_screen_sleep_apnea_oximetry", "SpO2_screen_sleep_apnea_ml"],
+    "abp": ["ABP_assess_quality", "Signal_detect_artifacts", "ABP_detect_pulses", "ABP_screen_pressure_events", "ABP_classify_pressure_events", "ABP_detect_acute_hypotensive_episode_proxy", "ABP_compute_hemodynamics"],
+    "pcg": ["PCG_assess_quality", "Signal_detect_artifacts", "PCG_detect_heart_sounds", "PCG_estimate_heart_rate", "PCG_segment_s1_s2_proxy", "PCG_assess_rhythm_irregularity", "PCG_detect_s3_s4_proxy", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features", "PCG_screen_valve_disease_proxy", "PCG_screen_congenital_abnormality_proxy", "PCG_monitor_heart_function_proxy"],
+    "acc": ["ACC_assess_quality", "Signal_detect_artifacts", "ACC_summarize_activity", "ACC_classify_activity_ml", "ACC_extract_actigraphy_features", "ACC_estimate_sleep_wake", "ACC_detect_activity_bouts", "ACC_detect_fall_proxy", "ACC_detect_fall_ml"],
+    "eda": ["EDA_assess_quality", "Signal_detect_artifacts", "EDA_summarize", "EDA_extract_tonic_phasic_features", "EDA_detect_arousal_events", "EDA_screen_stress_ml", "EDA_classify_affective_state_ml", "EDA_route_task_recommendation", "EDA_screen_stress_proxy"],
+    "eeg": ["EEG_assess_quality", "Signal_detect_artifacts", "EEG_compute_bandpower", "EEG_estimate_sleep_stage_features", "EEG_classify_sleep_stage_ml", "EEG_screen_seizure_ml", "EEG_screen_seizure_like_activity", "EEG_estimate_drowsiness", "EEG_detect_artifact_proxy"],
+    "emg": ["EMG_assess_quality", "Signal_detect_artifacts", "EMG_summarize_activation", "EMG_classify_gesture", "EMG_classify_prosthetic_gesture", "EMG_classify_action", "EMG_classify_physical_action", "EMG_classify_lower_limb_exercise", "EMG_classify_gait_speed", "EMG_estimate_gait_phase", "EMG_screen_knee_rehab_status", "EMG_analyze_gait_activation", "EMG_predict_movement_intent", "EMG_screen_neuromuscular_abnormality", "EMG_estimate_fatigue_ml", "EMG_estimate_fatigue", "EMG_detect_bursts"],
 }

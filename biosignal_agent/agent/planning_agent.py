@@ -8,17 +8,17 @@ from .tool_registry import TOOLS, WORKFLOWS
 
 MODALITY_KEYWORDS = {
     "ecg": {"ecg", "ekg", "electrocardiogram", "r-peak", "r peak", "qrs", "hrv", "rr", "qt", "qtc", "st", "pr interval", "p wave", "t wave"},
-    "ppg": {"ppg", "photoplethysmography", "pulse", "pleth", "respiration modulation", "respiratory modulation", "ppg respiration", "irregular pulse", "pulse irregularity", "af", "afib"},
+    "ppg": {"ppg", "photoplethysmography", "pulse", "pleth", "prv", "pulse rate variability", "spo2", "oxygen", "respiration modulation", "respiratory modulation", "ppg respiration", "irregular pulse", "pulse irregularity", "af", "afib", "blood pressure", "vascular", "perfusion", "sleep", "stress", "exercise", "shock"},
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak", "bcg respiration", "bcg breathing", "bed-based"},
     "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak", "scg respiration", "scg breathing"},
     "resp": {"resp", "respiration", "respiratory", "breath", "breathing", "tachypnea", "bradypnea", "periodic breathing"},
     "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation", "hypoxemia", "hypoxaemia"},
     "abp": {"abp", "arterial blood pressure", "blood pressure", "systolic", "diastolic"},
-    "pcg": {"pcg", "phonocardiogram", "heart sound", "heart sounds", "s1", "s2", "murmur", "valve", "segmentation", "systole", "diastole"},
+    "pcg": {"pcg", "phonocardiogram", "heart sound", "heart sounds", "s1", "s2", "s3", "s4", "murmur", "valve", "congenital", "chd", "rhythm", "irregular", "segmentation", "systole", "diastole", "spectrogram", "heart sound classification"},
     "acc": {"acc", "accelerometer", "acceleration", "activity", "motion", "actigraphy", "activity bout", "fall", "impact", "sedentary"},
     "eda": {"eda", "gsr", "electrodermal", "skin conductance", "stress"},
     "eeg": {"eeg", "electroencephalogram", "brain", "alpha", "beta", "theta", "delta", "bandpower", "seizure", "spike", "epileptiform", "sleep stage", "drowsiness", "vigilance", "eeg artifact", "blink"},
-    "emg": {"emg", "electromyography", "muscle", "activation", "rms", "fatigue", "median frequency", "burst", "onset", "contraction"},
+    "emg": {"emg", "electromyography", "muscle", "activation", "rms", "fatigue", "median frequency", "burst", "onset", "contraction", "spectrogram", "myopathy", "neuropathy", "condition classification"},
 }
 
 BASIC_ANALYSIS_TOOLS = {
@@ -29,7 +29,7 @@ BASIC_ANALYSIS_TOOLS = {
     "resp": ["RESP_estimate_rate"],
     "spo2": ["SpO2_summarize"],
     "abp": ["ABP_detect_pulses"],
-    "pcg": ["PCG_detect_heart_sounds"],
+    "pcg": ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate"],
     "acc": ["ACC_summarize_activity"],
     "eda": ["EDA_summarize"],
     "eeg": ["EEG_compute_bandpower"],
@@ -42,9 +42,19 @@ TASK_TOOL_RULES = {
     ],
 
     "ppg": [
-        ({"perfusion", "low perfusion", "pulse variability", "pulse amplitude", "vascular"}, ["PPG_detect_peaks", "PPG_assess_perfusion_variability"]),
-        ({"irregular pulse", "pulse irregularity", "af", "afib", "atrial fibrillation"}, ["PPG_detect_peaks", "PPG_screen_pulse_irregularity"]),
-        ({"respiration", "respiratory modulation", "ppg respiration", "breathing"}, ["PPG_detect_peaks", "PPG_estimate_respiration_modulation"]),
+        ({"heart rate", "hr", "bpm", "pulse rate"}, ["PPG_detect_peaks", "PPG_estimate_heart_rate"]),
+        ({"prv", "pulse rate variability", "hrv", "pulse variability", "rmssd", "sdnn"}, ["PPG_detect_peaks", "PPG_compute_prv"]),
+        ({"fiducial", "onset", "dicrotic", "notch", "systolic peak", "pulse morphology"}, ["PPG_detect_peaks", "PPG_detect_fiducial_points"]),
+        ({"spo2", "oxygen saturation", "blood oxygen", "red infrared", "red/ir"}, ["PPG_estimate_spo2"]),
+        ({"blood pressure", "bp", "cuffless", "pat", "ptt"}, ["PPG_detect_peaks", "PPG_detect_fiducial_points", "PPG_estimate_bp_proxy"]),
+        ({"perfusion", "low perfusion", "pulse amplitude"}, ["PPG_detect_peaks", "PPG_assess_perfusion_variability"]),
+        ({"shock", "low-perfusion", "low perfusion shock", "hypoperfusion"}, ["PPG_detect_peaks", "PPG_assess_perfusion_variability", "PPG_screen_low_perfusion_shock_risk"]),
+        ({"irregular pulse", "pulse irregularity", "af", "afib", "atrial fibrillation"}, ["PPG_detect_peaks", "PPG_screen_pulse_irregularity", "PPG_detect_afib"]),
+        ({"respiration", "respiratory modulation", "ppg respiration", "breathing", "respiratory rate"}, ["PPG_detect_peaks", "PPG_estimate_respiration_modulation"]),
+        ({"sleep", "sleep monitoring", "sleep state", "recovery"}, ["PPG_detect_peaks", "PPG_compute_prv", "PPG_estimate_respiration_modulation", "PPG_estimate_sleep_features"]),
+        ({"stress", "emotion", "mental workload", "strain"}, ["PPG_detect_peaks", "PPG_compute_prv", "PPG_assess_stress_prv"]),
+        ({"exercise", "activity intensity", "workout", "sport", "fitness"}, ["PPG_detect_peaks", "PPG_estimate_heart_rate", "PPG_estimate_exercise_intensity"]),
+        ({"vascular", "arterial stiffness", "vascular health", "vascular aging", "pulse wave"}, ["PPG_detect_peaks", "PPG_detect_fiducial_points", "PPG_assess_vascular_health"]),
     ],
 
     "bcg": [
@@ -58,7 +68,14 @@ TASK_TOOL_RULES = {
         ({"map", "mean arterial pressure", "pulse pressure", "hemodynamic", "haemodynamic", "perfusion pressure"}, ["ABP_detect_pulses", "ABP_compute_hemodynamics"]),
     ],
     "pcg": [
-        ({"murmur", "valve", "abnormal heart sound"}, ["PCG_detect_heart_sounds", "PCG_screen_murmur_proxy", "PCG_extract_murmur_features"]),
+        ({"heart rate", "hr", "bpm"}, ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate"]),
+        ({"murmur", "abnormal heart sound"}, ["PCG_detect_heart_sounds", "Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features"]),
+        ({"valve", "valvular", "aortic", "mitral", "tricuspid"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy", "PCG_extract_murmur_features", "PCG_screen_murmur_proxy", "PCG_screen_valve_disease_proxy"]),
+        ({"congenital", "chd", "pediatric structural", "structural abnormality"}, ["PCG_assess_quality", "PCG_detect_heart_sounds", "PCG_screen_murmur_proxy", "PCG_screen_congenital_abnormality_proxy"]),
+        ({"s3", "s4", "extra heart sound", "gallop"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy", "PCG_detect_s3_s4_proxy"]),
+        ({"rhythm", "irregular", "arrhythmia", "cycle variability"}, ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate", "PCG_assess_rhythm_irregularity"]),
+        ({"heart function", "cardiac function", "monitoring", "longitudinal", "trend"}, ["PCG_assess_quality", "PCG_segment_s1_s2_proxy", "PCG_extract_murmur_features", "PCG_monitor_heart_function_proxy"]),
+        ({"spectrogram", "heart sound classification", "pcg classification"}, ["Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features"]),
         ({"s1", "s2", "segmentation", "systole", "diastole"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy"]),
     ],
     "eda": [
@@ -68,11 +85,19 @@ TASK_TOOL_RULES = {
     "emg": [
         ({"fatigue", "median frequency", "muscle fatigue"}, ["EMG_summarize_activation", "EMG_estimate_fatigue"]),
         ({"burst", "bursts", "onset", "contraction", "muscle contraction"}, ["EMG_summarize_activation", "EMG_detect_bursts"]),
+        ({"spectrogram", "classification", "condition", "condition classification", "myopathy", "neuropathy", "healthy"}, ["Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "EMG_summarize_activation"]),
     ],
     "ecg": [
-        ({"arrhythmia", "rhythm", "irregular", "afib", "atrial fibrillation", "bradycardia", "tachycardia", "pause"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_arrhythmia"]),
+        ({"heart rate", "bpm", "r-peak", "r peak", "qrs detection"}, ["ECG_detect_r_peaks", "ECG_estimate_heart_rate"]),
+        ({"beat classification", "beat-level", "beat level", "pvc", "pac", "sveb", "veb", "ectopy"}, ["ECG_detect_r_peaks", "ECG_classify_beats", "ECG_screen_arrhythmia"]),
+        ({"afib", "atrial fibrillation", "af detection", "af screening"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_detect_afib", "ECG_classify_rhythm_segment"]),
+        ({"arrhythmia", "rhythm", "irregular", "bradycardia", "tachycardia", "pause"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_classify_rhythm_segment", "ECG_screen_arrhythmia"]),
         ({"apnea", "apnoea", "sleep disordered", "sleep breathing", "sleep apnea"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_sleep_apnea"]),
-        ({"morphology", "interval", "intervals", "qrs", "qt", "qtc", "st elevation", "st depression", "pr interval", "p wave", "t wave"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals"]),
+        ({"qt", "qtc", "long qt", "qt prolongation"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval"]),
+        ({"conduction", "bundle branch", "av block", "pr interval", "qrs duration"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_screen_conduction_block"]),
+        ({"ischemia", "ischaemia", "st elevation", "st depression", "st abnormality"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_screen_ischemia_st"]),
+        ({"stress", "fatigue", "recovery", "autonomic", "heart rate variability", "hrv", "rmssd", "sdnn", "lf hf"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_assess_stress_fatigue_hrv"]),
+        ({"morphology", "interval", "intervals", "p wave", "t wave"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval", "ECG_screen_conduction_block", "ECG_screen_ischemia_st"]),
     ],
     "resp": [
         ({"apnea", "apnoea", "sleep disordered", "cessation"}, ["RESP_estimate_rate", "RESP_detect_apnea"]),
@@ -133,6 +158,9 @@ class PlanningBioSignalAgent:
                 "what",
                 "estimate",
                 "detect",
+                "screen",
+                "classify",
+                "classification",
                 "peak",
                 "peaks",
                 "heart rate",
@@ -181,6 +209,10 @@ class PlanningBioSignalAgent:
                 "burst",
                 "onset",
                 "contraction",
+                "spectrogram",
+                "condition",
+                "myopathy",
+                "neuropathy",
             ]
         )
         if modality == "ecg":
@@ -236,8 +268,56 @@ class PlanningBioSignalAgent:
                 findings.append(f"{call['tool']} estimates heart rate at {result['heart_rate_bpm']:.1f} bpm using {result.get('method', 'unknown method')}.")
             if "respiratory_rate_bpm" in result and result["respiratory_rate_bpm"] is not None:
                 findings.append(f"{call['tool']} estimates respiratory rate at {result['respiratory_rate_bpm']:.1f} bpm.")
-            if "sdnn_ms" in result:
-                findings.append(f"HRV: mean RR {result['mean_rr_ms']:.1f} ms, SDNN {result['sdnn_ms']:.1f} ms, RMSSD {result['rmssd_ms']:.1f} ms.")
+            if "sdnn_ms" in result and not call["tool"].startswith("PPG_"):
+                mean_rr = result.get("mean_rr_ms")
+                rmssd = result.get("rmssd_ms")
+                if mean_rr is not None and rmssd is not None:
+                    findings.append(f"HRV: mean RR {mean_rr:.1f} ms, SDNN {result['sdnn_ms']:.1f} ms, RMSSD {rmssd:.1f} ms.")
+                else:
+                    findings.append(f"Interval variability: SDNN {result['sdnn_ms']:.1f} ms with available derived variability features.")
+            if call["tool"] == "ECG_classify_beats" and "num_returned_beats" in result:
+                findings.append(f"Beat classification returned {result['num_returned_beats']} of {result.get('num_beats', 0)} beats using {result.get('model_name', 'beat model')}.")
+            if call["tool"] == "ECG_classify_rhythm_segment" and "predicted_rhythm" in result:
+                findings.append(f"Rhythm segment classifier predicts {result['predicted_rhythm']} with confidence {result.get('confidence')}.")
+            if call["tool"] == "ECG_detect_afib" and "afib_risk" in result:
+                findings.append(f"AF screen: {result['afib_risk']} risk (probability {result.get('afib_probability')}).")
+            if call["tool"] == "ECG_delineate_waves_dl" and "qrs_complex_count" in result:
+                findings.append(f"ECG DL delineation found {result.get('p_wave_count', 0)} P-wave, {result.get('qrs_complex_count', 0)} QRS, and {result.get('t_wave_count', 0)} T-wave segments.")
+            if call["tool"] == "ECG_analyze_qt_interval" and "qt_risk" in result:
+                findings.append(f"QT analysis: {result['qt_risk']} risk with QTc {result.get('qtc_interval_ms')} ms.")
+            if call["tool"] == "ECG_screen_conduction_block" and "conduction_risk" in result:
+                findings.append(f"Conduction screen: {result['conduction_risk']} risk; flags {result.get('conduction_flags', [])}.")
+            if call["tool"] == "ECG_screen_ischemia_st" and "ischemia_st_risk" in result:
+                findings.append(f"ST/ischemia screen: {result['ischemia_st_risk']} risk; flags {result.get('ischemia_st_flags', [])}.")
+            if call["tool"] == "ECG_assess_stress_fatigue_hrv" and "stress_fatigue_level" in result:
+                findings.append(f"HRV stress/fatigue proxy: {result['stress_fatigue_level']} with confidence {result.get('confidence')}.")
+            if call["tool"] == "PPG_compute_prv" and "sdnn_ms" in result:
+                findings.append(f"PPG PRV: SDNN {result['sdnn_ms']:.1f} ms, RMSSD {result.get('rmssd_ms')} ms.")
+            if call["tool"] == "PPG_detect_fiducial_points" and "num_morphology_pulses" in result:
+                findings.append(f"PPG fiducials: {result.get('num_morphology_pulses')} morphology pulses with proxy onsets/notches.")
+            if call["tool"] == "PPG_estimate_spo2":
+                if "spo2_percent_proxy" in result:
+                    findings.append(f"PPG SpO2 proxy: {result['spo2_percent_proxy']:.1f}% from red/IR ratio-of-ratios.")
+                elif "error" in result:
+                    findings.append(f"PPG SpO2 unavailable: {result['error']}.")
+            if call["tool"] == "PPG_estimate_bp_proxy" and "bp_proxy_risk" in result:
+                findings.append(f"PPG BP proxy: {result['bp_proxy_risk']} with flags {result.get('bp_proxy_flags', [])}.")
+            if call["tool"] == "PPG_detect_afib" and "afib_risk" in result:
+                findings.append(f"PPG AF screen: {result['afib_risk']} risk, probability {result.get('af_probability')}.")
+            if call["tool"] == "PPG_estimate_sleep_features" and "sleep_proxy" in result:
+                findings.append(f"PPG sleep/rest proxy: {result['sleep_proxy']} with flags {result.get('sleep_feature_flags', [])}.")
+            if call["tool"] == "PPG_assess_stress_prv" and "stress_prv_level" in result:
+                findings.append(f"PPG stress/recovery proxy: {result['stress_prv_level']} with confidence {result.get('confidence')}.")
+            if call["tool"] == "PPG_estimate_exercise_intensity" and "exercise_intensity_zone" in result:
+                findings.append(f"PPG exercise intensity: {result['exercise_intensity_zone']} from {result.get('heart_rate_bpm')} bpm.")
+            if call["tool"] == "PPG_assess_vascular_health" and "vascular_stiffness_proxy" in result:
+                findings.append(f"PPG vascular proxy: {result['vascular_stiffness_proxy']} with flags {result.get('vascular_flags', [])}.")
+            if call["tool"] == "PPG_screen_low_perfusion_shock_risk" and "shock_perfusion_risk" in result:
+                findings.append(f"PPG low-perfusion/shock proxy: {result['shock_perfusion_risk']} with flags {result.get('shock_perfusion_flags', [])}.")
+            if call["tool"] == "Signal_extract_spectrogram_features" and "num_windows" in result:
+                findings.append(f"Extracted spectrogram features over {result['num_windows']} windows for time-frequency analysis.")
+            if call["tool"] == "Signal_render_spectrogram_image" and "image_path" in result:
+                findings.append(f"Rendered spectrogram image to {result['image_path']}.")
             if "error" in result:
                 findings.append(f"{call['tool']} could not complete: {result['error']}.")
         return findings

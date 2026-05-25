@@ -276,7 +276,14 @@ DEFAULT_PLANNING_CASES = [
         case_id='pcg_murmur_proxy',
         question='Screen this phonocardiogram for murmur or abnormal heart sound patterns',
         modality='pcg',
-        expected_tools=('PCG_assess_quality', 'PCG_detect_heart_sounds', 'PCG_screen_murmur_proxy', 'PCG_extract_murmur_features'),
+        expected_tools=(
+            'PCG_assess_quality',
+            'PCG_detect_heart_sounds',
+            'Signal_extract_spectrogram_features',
+            'Signal_render_spectrogram_image',
+            'PCG_screen_murmur_proxy',
+            'PCG_extract_murmur_features',
+        ),
     ),
     PlanningCase(
         case_id='eda_arousal_events',
@@ -391,5 +398,29 @@ DEFAULT_PLANNING_CASES = [
         question='Detect EMG bursts onsets and muscle contraction periods',
         modality='emg',
         expected_tools=('EMG_assess_quality', 'EMG_summarize_activation', 'EMG_detect_bursts'),
+    ),
+    PlanningCase(
+        case_id='pcg_spectrogram_murmur',
+        question='Classify this PCG for murmur or abnormal heart sound using spectrogram features',
+        modality='pcg',
+        expected_tools=(
+            'PCG_assess_quality',
+            'PCG_detect_heart_sounds',
+            'Signal_extract_spectrogram_features',
+            'Signal_render_spectrogram_image',
+            'PCG_screen_murmur_proxy',
+            'PCG_extract_murmur_features',
+        ),
+    ),
+    PlanningCase(
+        case_id='emg_spectrogram_condition',
+        question='Classify this EMG as healthy myopathy or neuropathy using spectrogram features',
+        modality='emg',
+        expected_tools=(
+            'EMG_assess_quality',
+            'EMG_summarize_activation',
+            'Signal_extract_spectrogram_features',
+            'Signal_render_spectrogram_image',
+        ),
     ),
 ]

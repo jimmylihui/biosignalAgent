@@ -1,7 +1,257 @@
 [
   {
+    "name": "Signal_classify_modality",
+    "description": "Classify an unknown one-dimensional biosignal CSV into a likely modality using statistical, spectral, and peak features. Routing baseline only.",
+    "modality": "generic",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "predicted_modality",
+      "scores",
+      "top_modalities",
+      "features",
+      "confidence",
+      "model_source",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "Signal_classify_modality_from_image_cnn",
+    "description": "Classify an uploaded waveform plot image into a likely biosignal modality using a small trained CNN image classifier. Image-level routing baseline for signal screenshots before digitization or tool planning.",
+    "modality": "image",
+    "parameters": {
+      "image_path": {
+        "type": "string"
+      },
+      "crop_left": {
+        "type": "integer"
+      },
+      "crop_right": {
+        "type": "integer"
+      },
+      "crop_top": {
+        "type": "integer"
+      },
+      "crop_bottom": {
+        "type": "integer"
+      },
+      "model_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "predicted_modality",
+      "scores",
+      "top_modalities",
+      "confidence",
+      "model_source",
+      "method",
+      "image_size",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "Signal_digitize_waveform_image_ml",
+    "description": "Digitize a clean single-trace waveform plot image into CSV using a trained pixel-segmentation classifier followed by mask-to-signal extraction.",
+    "modality": "generic",
+    "parameters": {
+      "image_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "out_csv": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "value_min": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "value_max": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "crop_left": {
+        "type": "integer"
+      },
+      "crop_right": {
+        "type": "integer"
+      },
+      "crop_top": {
+        "type": "integer"
+      },
+      "crop_bottom": {
+        "type": "integer"
+      },
+      "model_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "probability_threshold": {
+        "type": "number"
+      },
+      "smooth_window": {
+        "type": "integer"
+      }
+    },
+    "returns": [
+      "out_csv",
+      "num_points",
+      "pixel_coverage",
+      "model_source",
+      "mask_pixel_fraction",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "Signal_estimate_image_scale",
+    "description": "Estimate plot area, grid spacing, and optional physical x/y scale from a waveform image before digitization.",
+    "modality": "image",
+    "parameters": {
+      "image_path": {
+        "type": "string"
+      },
+      "crop_left": {
+        "type": "integer"
+      },
+      "crop_right": {
+        "type": "integer"
+      },
+      "crop_top": {
+        "type": "integer"
+      },
+      "crop_bottom": {
+        "type": "integer"
+      },
+      "duration_s": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "seconds_per_major_grid": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "value_per_major_grid": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "value_units": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "use_ocr": {
+        "type": "boolean"
+      }
+    },
+    "returns": [
+      "plot_area",
+      "pixels_per_major_grid_x",
+      "pixels_per_major_grid_y",
+      "duration_s",
+      "sampling_rate",
+      "value_span",
+      "physical_scale_status",
+      "missing_for_physical_scale",
+      "confidence",
+      "disclaimer",
+      "ocr_status",
+      "ocr_text",
+      "ocr_numbers",
+      "ocr_duration_s"
+    ]
+  },
+  {
+    "name": "Signal_predict_image_scale_prior",
+    "description": "Fallback classifier that ranks discrete x-axis duration candidates when OCR, grid, and metadata cannot determine image scale.",
+    "modality": "image",
+    "parameters": {
+      "image_path": {
+        "type": "string"
+      },
+      "modality": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Optional modality from the image classifier, used as prior context."
+      },
+      "top_k": {
+        "type": "integer"
+      },
+      "model_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "abstain_threshold": {
+        "type": "number"
+      },
+      "model_scope": {
+        "type": "string",
+        "description": "auto, unified, or per_modality. Auto uses a per-modality classifier when available."
+      },
+      "per_modality_model_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "duration_candidates",
+      "best_duration_s",
+      "confidence",
+      "requires_confirmation",
+      "scale_source",
+      "model_source",
+      "model_scope",
+      "trained_duration_classes_s",
+      "disclaimer"
+    ]
+  },
+  {
     "name": "ECG_assess_quality",
-    "description": "Assess ECG signal quality from a CSV waveform.",
+    "description": "Assess ECG signal quality from a CSV waveform using generic signal checks, deep R-peak consistency, RR regularity, and artifact metrics.",
     "modality": "ECG",
     "parameters": {
       "signal_path": {
@@ -22,9 +272,19 @@
     },
     "returns": [
       "quality",
+      "ecg_sqi_score",
+      "quality_flags",
       "finite_ratio",
       "dynamic_range",
       "clipped_ratio",
+      "flatline_fraction",
+      "saturation_fraction",
+      "baseline_wander_ratio",
+      "high_frequency_noise_ratio",
+      "powerline_noise_ratio",
+      "num_detected_r_peaks",
+      "heart_rate_bpm",
+      "rr_cv",
       "confidence"
     ]
   },
@@ -55,8 +315,8 @@
     ]
   },
   {
-    "name": "ECG_compute_hrv",
-    "description": "Compute simple time-domain HRV metrics from detected ECG R peaks.",
+    "name": "ECG_estimate_heart_rate",
+    "description": "Estimate heart rate from ECG R-peak intervals.",
     "modality": "ECG",
     "parameters": {
       "signal_path": {
@@ -73,15 +333,154 @@
       }
     },
     "returns": [
+      "heart_rate_bpm",
+      "num_beats",
+      "r_peak_indices",
+      "peak_result",
+      "confidence",
+      "method"
+    ]
+  },
+  {
+    "name": "ECG_classify_beats",
+    "description": "Classify individual ECG beats using beat-CNN abnormal probability plus RR-pattern proxy labels.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "max_beats": {
+        "type": "integer"
+      }
+    },
+    "returns": [
+      "num_beats",
+      "num_returned_beats",
+      "beat_rows",
+      "beat_model_details",
+      "subtype_summary",
+      "model_source",
+      "model_name",
+      "decision_threshold",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ECG_classify_rhythm_segment",
+    "description": "Classify segment-level ECG rhythm using the rhythm feature classifier and arrhythmia screening fallback.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "predicted_rhythm",
+      "rhythm_probabilities",
+      "arrhythmia_risk",
+      "arrhythmia_score",
+      "arrhythmia_flags",
+      "model_source",
+      "source_arrhythmia_result",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error"
+    ]
+  },
+  {
+    "name": "ECG_detect_afib",
+    "description": "Screen ECG segment for atrial fibrillation using rhythm probabilities or RR-irregularity fallback.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "afib_risk",
+      "afib_probability",
+      "predicted_rhythm",
+      "rhythm_probabilities",
+      "rr_cv",
+      "ectopy_proxy_fraction",
+      "source_arrhythmia_result",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ECG_compute_hrv",
+    "description": "Compute time-domain, nonlinear, and limited frequency-domain HRV metrics from cleaned ECG NN intervals with reliability flags.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "duration_s",
+      "num_r_peaks",
+      "num_raw_rr",
+      "num_clean_nn",
+      "clean_nn_ratio",
       "mean_rr_ms",
       "sdnn_ms",
       "rmssd_ms",
+      "pnn50",
+      "sd1_ms",
+      "sd2_ms",
+      "sd1_sd2_ratio",
+      "lf_power_ms2",
+      "hf_power_ms2",
+      "lf_hf_ratio",
+      "frequency_reliability",
+      "reliability_flags",
       "confidence"
     ]
   },
   {
     "name": "PPG_assess_quality",
-    "description": "Assess PPG signal quality from a CSV waveform.",
+    "description": "Assess PPG signal quality using artifact metrics plus a feature-based SQA classifier trained from CapnoBase direct PPG peak labels and artifact augmentation.",
     "modality": "PPG",
     "parameters": {
       "signal_path": {
@@ -102,12 +501,31 @@
       "finite_ratio",
       "dynamic_range",
       "clipped_ratio",
-      "confidence"
+      "flatline_fraction",
+      "saturation_fraction",
+      "baseline_wander_ratio",
+      "high_frequency_noise_ratio",
+      "artifact_score",
+      "quality_flags",
+      "confidence",
+      "quality_model_good_probability",
+      "quality_model_probabilities",
+      "quality_model_source",
+      "quality_model_cv_metrics",
+      "quality_model_error",
+      "quality_dl_good_probability",
+      "quality_dl_window_good_probability_mean",
+      "quality_dl_window_good_probability_min",
+      "quality_dl_bad_window_fraction",
+      "quality_dl_num_windows",
+      "quality_dl_source",
+      "quality_dl_cv_metrics",
+      "quality_dl_error"
     ]
   },
   {
     "name": "PPG_detect_peaks",
-    "description": "Detect PPG pulse peaks using NeuroKit2 ECG Nabian 2018 peak detection after PPG bandpass preprocessing.",
+    "description": "Detect PPG systolic peaks using a multiscale detector with optional CapnoBase-trained U-Net peak candidate selection.",
     "modality": "PPG",
     "parameters": {
       "signal_path": {
@@ -130,7 +548,26 @@
       "confidence",
       "method",
       "interval_cv",
-      "regularity_confidence"
+      "regularity_confidence",
+      "flatline_fraction",
+      "saturation_fraction",
+      "baseline_wander_ratio",
+      "high_frequency_noise_ratio",
+      "artifact_score",
+      "median_trough_to_peak_amplitude",
+      "scale_candidate_counts",
+      "long_gap_count",
+      "peak_detector_selected",
+      "peak_detector_classical_score",
+      "peak_detector_dl_score",
+      "classical_method",
+      "peak_dl_num_peaks",
+      "peak_dl_heart_rate_bpm",
+      "peak_dl_probability_mean",
+      "peak_dl_probability_p95",
+      "peak_dl_model_source",
+      "peak_dl_cv_metrics",
+      "peak_dl_error"
     ]
   },
   {
@@ -183,7 +620,15 @@
       "heart_rate_bpm",
       "confidence",
       "interval_cv",
-      "regularity_confidence"
+      "regularity_confidence",
+      "spectral_hr_bpm",
+      "spectral_hr_candidates_bpm",
+      "peak_detector_selected",
+      "peak_detector_score",
+      "candidate_hr_min_bpm",
+      "candidate_hr_max_bpm",
+      "harmonic_ambiguity",
+      "all_peak_candidates"
     ]
   },
   {
@@ -238,6 +683,153 @@
       "method",
       "interval_cv",
       "regularity_confidence"
+    ]
+  },
+  {
+    "name": "SCG_detect_fiducial_points",
+    "description": "Detect approximate SCG mechanical fiducial points such as AO, AC, MC, and MO. When ECG input is supplied and the trained ECG-anchor CNN is available, use it for AO candidates; otherwise use J-peak anchored physiological windows. ECG pairing supports R-to-AO timing and HR, not diagnostic PEP.",
+    "modality": "SCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ecg_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ecg_sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "ecg_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "ao_indices",
+      "ac_indices",
+      "mc_indices",
+      "mo_indices",
+      "ecg_r_indices",
+      "r_to_ao_ms",
+      "num_beats",
+      "heart_rate_bpm",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "SCG_compute_cardiac_time_intervals",
+    "description": "Compute SCG cardiac mechanical time interval proxies such as R-to-AO, LVET, IVCT, IVRT, and R-to-AO/LVET from detected fiducials. ECG input enables the ECG-anchor CNN AO backend and is needed for electromechanical timing; outputs remain research-use proxies.",
+    "modality": "SCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ecg_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ecg_sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "ecg_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "r_to_ao_ms",
+      "lvet_ms",
+      "ivct_ms",
+      "ivrt_ms",
+      "r_to_ao_over_lvet",
+      "heart_rate_bpm",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "SCG_estimate_contractility_proxy",
+    "description": "Estimate a research-use SCG electromechanical timing/contractility proxy from cardiac time intervals and systolic mechanical energy. Not EF, cardiac output, or diagnosis.",
+    "modality": "SCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ecg_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ecg_sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "ecg_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "contractility_proxy_label",
+      "contractility_proxy_score",
+      "drivers",
+      "r_to_ao_ms",
+      "lvet_ms",
+      "r_to_ao_over_lvet",
+      "median_systolic_energy",
+      "median_ao_amplitude",
+      "confidence",
+      "disclaimer"
     ]
   },
   {
@@ -341,7 +933,14 @@
       "mean_spo2_percent",
       "min_spo2_percent",
       "time_below_90_fraction",
-      "confidence"
+      "confidence",
+      "median_spo2_percent",
+      "nadir_spo2_percent",
+      "time_below_88_fraction",
+      "time_below_85_fraction",
+      "ct90_minutes",
+      "recording_duration_hours",
+      "artifact_fraction"
     ]
   },
   {
@@ -401,7 +1000,7 @@
   },
   {
     "name": "PCG_assess_quality",
-    "description": "Assess PCG signal quality from a CSV waveform.",
+    "description": "Assess PCG quality using generic signal checks plus heart-sound bandpower, SNR, dropout, saturation, and periodicity features.",
     "modality": "PCG",
     "parameters": {
       "signal_path": {
@@ -422,12 +1021,23 @@
       "finite_ratio",
       "dynamic_range",
       "clipped_ratio",
-      "confidence"
+      "pcg_quality_score",
+      "pcg_quality_label",
+      "pcg_snr_db",
+      "cycle_seconds",
+      "periodicity_confidence",
+      "dropout_fraction",
+      "saturation_fraction",
+      "cycle_duration_cv",
+      "segmentation_confidence",
+      "pcg_quality_flags",
+      "confidence",
+      "method"
     ]
   },
   {
     "name": "PCG_detect_heart_sounds",
-    "description": "Detect approximate PCG heart sound events using an envelope peak method.",
+    "description": "Detect S1/S2-like PCG heart sounds using Springer-supervised TCN segmentation when available, with duration-constrained Hilbert envelope fallback.",
     "modality": "PCG",
     "parameters": {
       "signal_path": {
@@ -445,12 +1055,220 @@
     },
     "returns": [
       "sound_indices",
+      "s1_indices",
+      "s2_indices",
       "num_sounds",
+      "num_s1",
+      "num_s2",
       "heart_rate_bpm",
+      "cycle_seconds",
+      "periodicity_confidence",
+      "interval_cv",
+      "regularity_confidence",
       "confidence",
       "method",
+      "reference_method",
+      "segmentation_model_source",
+      "segmentation_model_metrics"
+    ]
+  },
+  {
+    "name": "PCG_estimate_heart_rate",
+    "description": "Estimate PCG heart rate from S1-S1 or alternating heart-sound intervals using duration-constrained segmentation.",
+    "modality": "PCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "heart_rate_bpm",
+      "cycle_seconds",
+      "num_beats_used",
+      "beat_source",
       "interval_cv",
-      "regularity_confidence"
+      "regularity_confidence",
+      "confidence",
+      "method",
+      "segmentation_model_source",
+      "segmentation_model_metrics"
+    ]
+  },
+  {
+    "name": "PCG_assess_rhythm_irregularity",
+    "description": "Assess auxiliary PCG rhythm irregularity from S1/cycle interval variability; not a substitute for ECG rhythm diagnosis.",
+    "modality": "PCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "heart_rate_bpm",
+      "num_cycles",
+      "mean_cycle_seconds",
+      "cycle_duration_cv",
+      "sdnn_ms",
+      "rmssd_ms",
+      "irregularity_score",
+      "rhythm_irregularity_risk",
+      "rhythm_flags",
+      "confidence",
+      "method",
+      "segmentation_model_source",
+      "segmentation_model_metrics"
+    ]
+  },
+  {
+    "name": "PCG_detect_s3_s4_proxy",
+    "description": "Detect possible S3/S4 extra heart sounds from diastolic timing windows as an unvalidated envelope proxy.",
+    "modality": "PCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "s3_candidate_indices",
+      "s4_candidate_indices",
+      "num_s3_candidates",
+      "num_s4_candidates",
+      "s3_proxy_score",
+      "s4_proxy_score",
+      "extra_sound_flags",
+      "confidence",
+      "method"
+    ]
+  },
+  {
+    "name": "PCG_screen_valve_disease_proxy",
+    "description": "Screen for broad valve-disease-like murmur timing patterns and, when available, BMD-HS-trained spectrogram CNN plus feature-model AS/AR/MR/MS/N probabilities.",
+    "modality": "PCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "valve_disease_proxy_score",
+      "valve_pattern_candidates",
+      "murmur_timing_pattern",
+      "systolic_murmur_score",
+      "diastolic_murmur_score",
+      "valve_screen_risk",
+      "confidence",
+      "method",
+      "valve_model_probabilities",
+      "valve_model_thresholds",
+      "valve_model_positive_labels",
+      "valve_model_source",
+      "valve_model_cv_metrics",
+      "valve_deep_model_probabilities",
+      "valve_deep_model_thresholds",
+      "valve_deep_model_positive_labels",
+      "valve_deep_model_source",
+      "valve_deep_model_val_metrics"
+    ]
+  },
+  {
+    "name": "PCG_screen_congenital_abnormality_proxy",
+    "description": "Screen for pediatric/congenital structural abnormality from PCG using murmur/rhythm/quality proxy plus CirCor outcome feature/CNN research models; not a CHD diagnosis.",
+    "modality": "PCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "congenital_abnormality_proxy_score",
+      "proxy_only_score",
+      "supervised_outcome_probability_abnormal",
+      "congenital_screen_risk",
+      "screen_flags",
+      "murmur_result",
+      "rhythm_result",
+      "quality_result",
+      "outcome_feature_model_result",
+      "outcome_deep_model_result",
+      "confidence",
+      "method"
+    ]
+  },
+  {
+    "name": "PCG_monitor_heart_function_proxy",
+    "description": "Summarize longitudinal PCG heart-function proxy features across one or more recordings, including HR, timing, quality, and murmur trends.",
+    "modality": "PCG",
+    "parameters": {
+      "recordings": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "num_recordings",
+      "record_summaries",
+      "heart_rate_range_bpm",
+      "max_murmur_proxy_score",
+      "trend_flags",
+      "heart_function_monitoring_risk",
+      "confidence",
+      "method"
     ]
   },
   {
@@ -481,7 +1299,7 @@
   },
   {
     "name": "ACC_summarize_activity",
-    "description": "Summarize accelerometer activity level from signal variability.",
+    "description": "Summarize accelerometer activity level from triaxial magnitude or single-axis fallback.",
     "modality": "ACC",
     "parameters": {
       "signal_path": {
@@ -499,9 +1317,12 @@
     },
     "returns": [
       "activity_std",
-      "dynamic_range",
+      "dynamic_range_g",
+      "jerk_p95_g_per_s",
       "activity_level",
-      "confidence"
+      "input_type",
+      "confidence",
+      "method"
     ]
   },
   {
@@ -661,7 +1482,7 @@
   },
   {
     "name": "ECG_screen_arrhythmia",
-    "description": "Screen ECG rhythm for RR irregularity, pauses, bradycardia, tachycardia, and ectopy-proxy patterns using detected R peaks. Screening only, not a diagnostic classifier.",
+    "description": "Screen ECG for arrhythmia risk and provide rhythm-specific classification probabilities for normal/AF/other rhythm when the rhythm classifier is available.",
     "modality": "ECG",
     "parameters": {
       "signal_path": {
@@ -686,7 +1507,11 @@
       "arrhythmia_risk",
       "confidence",
       "method",
-      "disclaimer"
+      "disclaimer",
+      "predicted_rhythm",
+      "rhythm_probabilities",
+      "rhythm_model_source",
+      "rhythm_cv_metrics"
     ]
   },
   {
@@ -745,7 +1570,17 @@
       "event_intervals_s",
       "confidence",
       "method",
-      "disclaimer"
+      "disclaimer",
+      "desaturation_event_count_3pct",
+      "desaturation_event_count_4pct",
+      "odi3_per_hour",
+      "odi4_per_hour",
+      "mean_desaturation_depth_percent",
+      "max_desaturation_depth_percent",
+      "median_desaturation_duration_s",
+      "desaturation_area_percent_minutes_per_hour",
+      "events",
+      "artifact_fraction"
     ]
   },
   {
@@ -779,7 +1614,7 @@
   },
   {
     "name": "ACC_estimate_sleep_wake",
-    "description": "Estimate a coarse sleep/rest versus wake/activity hint from accelerometer variability. Actigraphy proxy only.",
+    "description": "Estimate coarse sleep/rest versus wake/activity from ENMO-style actigraphy features. Proxy only unless PSG-labeled calibration is available.",
     "modality": "ACC",
     "parameters": {
       "signal_path": {
@@ -796,17 +1631,21 @@
       }
     },
     "returns": [
-      "activity_std",
-      "activity_level",
       "sleep_wake_hint",
+      "restful_fraction",
+      "mean_enmo_g",
+      "duration_min",
+      "actigraphy_features",
       "confidence",
       "method",
-      "disclaimer"
+      "disclaimer",
+      "error",
+      "fallback_result"
     ]
   },
   {
     "name": "ECG_screen_sleep_apnea",
-    "description": "Screen an ECG sleep segment for apnea risk using HRV and RR-interval proxy features. ECG-only proxy, not a clinical apnea detector.",
+    "description": "Screen an ECG sleep segment for apnea risk using RR/EDR deep models plus HRV proxy evidence. For long continuous ECG, uses a 21-minute sequence-context RR/EDR CNN-BiLSTM with per-epoch risk aggregation; falls back to 5-minute or single-epoch RR/EDR CNNs for shorter ECG. ECG-only proxy, not a clinical apnea detector.",
     "modality": "ECG",
     "parameters": {
       "signal_path": {
@@ -833,12 +1672,29 @@
       "rr_cv",
       "confidence",
       "method",
+      "apnea_probability",
+      "decision_threshold",
+      "model_margin",
+      "evidence_flags",
+      "reliability_flags",
+      "input_duration_s",
+      "rr_clean_ratio",
+      "rr_interval_count",
+      "rr_range_s",
+      "rr_apnea_band_power_ratio",
+      "edr_apnea_band_power_ratio",
+      "edr_dominant_frequency_hz",
+      "edr_variability",
+      "model_name",
+      "model_source",
+      "deep_cv_metrics",
+      "sequence_context_details",
       "disclaimer"
     ]
   },
   {
     "name": "PPG_assess_perfusion_variability",
-    "description": "Assess PPG pulse amplitude, low-perfusion proxy, and pulse interval variability from Nabian-style peaks.",
+    "description": "Assess PPG perfusion and pulse variability from peak-trough amplitude, beat morphology, pulse interval variation, and window-level perfusion stability.",
     "modality": "PPG",
     "parameters": {
       "signal_path": {
@@ -857,10 +1713,35 @@
     "returns": [
       "pulse_amplitude_proxy",
       "dynamic_range",
+      "median_pulse_amplitude",
+      "pulse_amplitude_iqr",
+      "pulse_amplitude_cv",
+      "perfusion_index_proxy",
+      "low_amplitude_pulse_fraction",
+      "num_amplitude_pulses",
+      "median_rise_time_s",
+      "median_decay_time_s",
+      "median_pulse_width_half_height_s",
+      "median_pulse_area",
+      "median_upstroke_slope",
+      "pulse_width_cv",
+      "pulse_area_cv",
+      "rise_time_cv",
+      "upstroke_slope_cv",
+      "amplitude_alternans_index",
+      "num_morphology_pulses",
+      "window_perfusion_index_cv",
+      "low_perfusion_window_fraction",
+      "num_perfusion_windows",
       "pulse_interval_cv",
+      "robust_pulse_interval_cv",
       "heart_rate_bpm",
+      "ppg_quality",
+      "quality_model_good_probability",
       "perfusion_level",
       "pulse_variability_risk",
+      "pulse_variability_flags",
+      "artifact_score",
       "confidence",
       "method",
       "disclaimer"
@@ -868,7 +1749,7 @@
   },
   {
     "name": "ABP_screen_pressure_events",
-    "description": "Screen ABP for hypotension or hypertension proxy events from pulse-derived systolic and diastolic estimates.",
+    "description": "Screen ABP for pressure events using beat-level event burden plus legacy median flags.",
     "modality": "ABP",
     "parameters": {
       "signal_path": {
@@ -890,9 +1771,107 @@
       "heart_rate_bpm",
       "pressure_flags",
       "pressure_risk",
+      "event_burden",
       "confidence",
       "method",
-      "disclaimer"
+      "disclaimer",
+      "error"
+    ]
+  },
+  {
+    "name": "ABP_classify_pressure_events",
+    "description": "Classify beat-level ABP hypotension, severe hypotension/shock proxy, hypertension, and pulse-pressure event burden.",
+    "modality": "ABP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "hypotension_map_threshold": {
+        "type": "number"
+      },
+      "severe_map_threshold": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "pressure_event_risk",
+      "event_flags",
+      "num_beats",
+      "duration_s",
+      "median_map_value",
+      "map_p05",
+      "map_p95",
+      "median_systolic_value",
+      "approx_diastolic_value",
+      "median_pulse_pressure",
+      "hypotensive_beat_fraction",
+      "severe_hypotensive_beat_fraction",
+      "hypertensive_beat_fraction",
+      "narrow_pulse_pressure_fraction",
+      "wide_pulse_pressure_fraction",
+      "hypotension_intervals_s",
+      "severe_hypotension_intervals_s",
+      "confidence",
+      "method",
+      "benchmark_direction",
+      "disclaimer",
+      "error"
+    ]
+  },
+  {
+    "name": "ABP_detect_acute_hypotensive_episode_proxy",
+    "description": "Detect acute hypotensive episode evidence using a PhysioNet/CinC 2009-style minute-MAP 30-minute rule.",
+    "modality": "ABP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "map_threshold": {
+        "type": "number"
+      },
+      "window_minutes": {
+        "type": "number"
+      },
+      "required_fraction": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "ahe_risk",
+      "ahe_event_count",
+      "ahe_intervals_s",
+      "valid_minute_count",
+      "low_map_minute_count",
+      "low_map_minute_fraction",
+      "recent_window_low_map_fraction",
+      "minute_map_threshold",
+      "window_minutes",
+      "required_low_minutes",
+      "median_minute_map",
+      "min_minute_map",
+      "confidence",
+      "method",
+      "source_note",
+      "disclaimer",
+      "error"
     ]
   },
   {
@@ -918,9 +1897,59 @@
       "continuous_sound_fraction",
       "murmur_proxy_score",
       "murmur_risk",
+      "cycle_seconds",
+      "segmentation_confidence",
+      "murmur_model_prediction",
+      "murmur_model_probability_abnormal",
+      "murmur_model_source",
+      "murmur_model_cv_metrics",
+      "murmur_model_error",
       "confidence",
       "method",
-      "disclaimer"
+      "disclaimer",
+      "systolic_murmur_score",
+      "diastolic_murmur_score",
+      "murmur_timing_pattern",
+      "model_heuristic_disagreement"
+    ]
+  },
+  {
+    "name": "PCG_screen_murmur_patient_multisite",
+    "description": "Patient-level murmur screening from multiple PCG auscultation sites using a CirCor-style log-frequency attention CNN. Research screening only.",
+    "modality": "PCG",
+    "parameters": {
+      "recordings": {
+        "type": "string",
+        "description": "JSON list or JSON file path. Each item should include signal_path/path and location in AV/PV/TV/MV/Phc; optional sampling_rate and column for CSV signals."
+      },
+      "sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "murmur_model_prediction",
+      "murmur_model_probability_present",
+      "murmur_risk",
+      "threshold",
+      "used_locations",
+      "num_locations_used",
+      "model_source",
+      "model_reference",
+      "model_cv_metrics",
+      "model_best_threshold_metrics",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error"
     ]
   },
   {
@@ -1060,7 +2089,11 @@
       "num_samples",
       "confidence",
       "method",
-      "disclaimer"
+      "disclaimer",
+      "time_below_85_fraction",
+      "ct90_minutes",
+      "hypoxic_burden_percent_minutes_per_hour_below90",
+      "artifact_fraction"
     ]
   },
   {
@@ -1095,7 +2128,75 @@
   },
   {
     "name": "ECG_measure_morphology_intervals",
-    "description": "Estimate ECG morphology interval proxies including PR, QRS, QT/QTc, and ST deviation from R-peak anchored delineation.",
+    "description": "Estimate ECG morphology interval proxies including PR, QRS, QT/QTc, and ST deviation with delineation validity filters.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "pr_interval_ms",
+      "pr_interval_iqr_ms",
+      "qrs_duration_ms",
+      "qrs_duration_iqr_ms",
+      "qt_interval_ms",
+      "qt_interval_iqr_ms",
+      "qtc_interval_ms",
+      "qtc_fridericia_ms",
+      "st_deviation_proxy",
+      "st_deviation_normalized",
+      "valid_interval_counts",
+      "interval_quality_flags",
+      "morphology_flags",
+      "morphology_risk",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ECG_analyze_qt_interval",
+    "description": "Analyze QT and QTc interval prolongation/shortening from ECG morphology delineation.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "qt_interval_ms",
+      "qtc_interval_ms",
+      "qtc_fridericia_ms",
+      "qt_risk",
+      "qt_flags",
+      "morphology_result",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ECG_screen_conduction_block",
+    "description": "Screen for conduction delay/AV block proxies using PR and QRS interval measurements.",
     "modality": "ECG",
     "parameters": {
       "signal_path": {
@@ -1114,11 +2215,71 @@
     "returns": [
       "pr_interval_ms",
       "qrs_duration_ms",
-      "qt_interval_ms",
-      "qtc_interval_ms",
+      "conduction_risk",
+      "conduction_flags",
+      "morphology_result",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ECG_screen_ischemia_st",
+    "description": "Screen ST elevation/depression proxy evidence from ECG morphology intervals.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
       "st_deviation_proxy",
-      "morphology_flags",
-      "morphology_risk",
+      "st_deviation_normalized",
+      "ischemia_st_risk",
+      "ischemia_st_flags",
+      "benchmark_direction",
+      "morphology_result",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ECG_assess_stress_fatigue_hrv",
+    "description": "Assess ECG HRV-derived stress/fatigue/recovery proxy evidence.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "stress_fatigue_level",
+      "stress_fatigue_score",
+      "stress_fatigue_flags",
+      "mean_hr_bpm",
+      "sdnn_ms",
+      "rmssd_ms",
+      "lf_hf_ratio",
+      "hrv_result",
       "confidence",
       "method",
       "disclaimer"
@@ -1185,8 +2346,49 @@
     ]
   },
   {
+    "name": "RESP_summarize_event_burden",
+    "description": "Summarize standalone respiration rate and apnea/hypopnea-like event burden from airflow/respiration waveform.",
+    "modality": "RESP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "respiratory_rate_bpm",
+      "num_breaths",
+      "respiratory_event_index_per_hour",
+      "respiratory_event_burden_fraction",
+      "event_burden_severity",
+      "event_flags",
+      "apnea_event_count",
+      "hypopnea_event_count",
+      "merged_event_count",
+      "apnea_intervals_s",
+      "hypopnea_intervals_s",
+      "merged_event_intervals_s",
+      "longest_event_s",
+      "rate_result",
+      "pattern_result",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error",
+      "rate_fallback"
+    ]
+  },
+  {
     "name": "PPG_estimate_respiration_modulation",
-    "description": "Estimate respiration proxy from PPG amplitude modulation and respiratory-band envelope power.",
+    "description": "Estimate respiration proxy from multiple PPG respiratory modulation sources: baseline wander, Hilbert envelope, pulse amplitude, and pulse interval modulation, with harmonic correction.",
     "modality": "PPG",
     "parameters": {
       "signal_path": {
@@ -1205,8 +2407,18 @@
     "returns": [
       "respiratory_rate_bpm",
       "respiratory_modulation_index",
+      "respiration_source",
+      "supporting_source",
+      "harmonic_promoted_from_bpm",
+      "respiration_selector_probability",
+      "respiration_selector_previous_bpm",
+      "respiration_selector_source",
+      "respiration_selector_cv_metrics",
+      "respiration_selector_error",
+      "respiration_candidate_rates",
       "heart_rate_bpm",
-      "num_peaks",
+      "ppg_quality",
+      "quality_model_good_probability",
       "confidence",
       "method",
       "disclaimer"
@@ -1265,8 +2477,84 @@
     ]
   },
   {
+    "name": "SCG_assess_sensor_placement",
+    "description": "Assess whether an SCG waveform looks like an acceptable chest mechanical recording using cardiac-band power, motion/noise ratios, peak regularity, and quality flags.",
+    "modality": "SCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "placement_quality",
+      "heart_rate_bpm",
+      "num_peaks",
+      "reasons",
+      "confidence",
+      "quality_summary",
+      "peak_summary",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "SCG_screen_mechanical_abnormality",
+    "description": "SCG mechanical abnormality screening proxy using interpretable quality/rhythm/timing rules plus optional VHD-trained valve subtype probabilities when the classifier model is available. Screening only, not diagnostic.",
+    "modality": "SCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ecg_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ecg_sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "ecg_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "mechanical_abnormality_risk",
+      "flags",
+      "heart_rate_bpm",
+      "interval_cv",
+      "lvet_ms",
+      "r_to_ao_over_lvet",
+      "confidence",
+      "disclaimer"
+    ]
+  },
+  {
     "name": "PCG_segment_s1_s2_proxy",
-    "description": "Segment a phonocardiogram into alternating S1/S2 proxy heart-sound peaks and estimate systole/diastole timing.",
+    "description": "Segment PCG S1/S2 states with a Springer-supervised TCN when available, falling back to duration-constrained Hilbert envelope segmentation.",
     "modality": "PCG",
     "parameters": {
       "signal_path": {
@@ -1283,18 +2571,32 @@
       }
     },
     "returns": [
+      "s1_indices",
+      "s2_indices",
       "num_s1",
       "num_s2",
       "systole_duration_s",
       "diastole_duration_s",
+      "systole_duration_cv",
+      "diastole_duration_cv",
+      "cycle_duration_cv",
+      "systolic_coverage_fraction",
+      "diastolic_coverage_fraction",
+      "cycle_seconds",
+      "heart_rate_bpm",
+      "periodicity_confidence",
       "confidence",
       "method",
-      "disclaimer"
+      "reference_method",
+      "disclaimer",
+      "error",
+      "segmentation_model_source",
+      "segmentation_model_metrics"
     ]
   },
   {
     "name": "ACC_detect_activity_bouts",
-    "description": "Detect accelerometer activity bouts and estimate active-bout rate.",
+    "description": "Detect accelerometer activity bouts using magnitude RMS over short windows.",
     "modality": "ACC",
     "parameters": {
       "signal_path": {
@@ -1313,15 +2615,18 @@
     "returns": [
       "activity_bout_count",
       "activity_bout_rate_per_min",
-      "activity_level",
+      "activity_threshold_g",
+      "input_type",
+      "event_intervals_s",
       "confidence",
       "method",
-      "disclaimer"
+      "disclaimer",
+      "error"
     ]
   },
   {
     "name": "ACC_detect_fall_proxy",
-    "description": "Screen accelerometer data for high-impact events as a fall-detection proxy.",
+    "description": "Screen accelerometer data for fall-like impact plus post-impact inactivity/posture-change evidence.",
     "modality": "ACC",
     "parameters": {
       "signal_path": {
@@ -1339,10 +2644,48 @@
     },
     "returns": [
       "impact_event_count",
+      "fall_like_event_count",
+      "impact_events",
+      "impact_threshold_dynamic_g",
       "fall_risk",
+      "input_type",
       "confidence",
       "method",
-      "disclaimer"
+      "disclaimer",
+      "error"
+    ]
+  },
+  {
+    "name": "ACC_detect_fall_ml",
+    "description": "Classify fall versus ADL from triaxial ACC using a UniMiB-SHAR trained feature ensemble, with fall-proxy fallback.",
+    "modality": "ACC",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "fall_label",
+      "fall_probability",
+      "label_probabilities",
+      "proxy_result",
+      "input_type",
+      "model_source",
+      "model_metrics",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error",
+      "fallback_result"
     ]
   },
   {
@@ -1428,7 +2771,7 @@
   },
   {
     "name": "PPG_screen_pulse_irregularity",
-    "description": "Screen PPG pulse intervals for irregular-pulse or AF-like variability. Statistical baseline proxy only.",
+    "description": "Screen PPG pulse intervals for AF-like irregularity using artifact-aware interval features, an optional interval-attention BiLSTM classifier, and feature/heuristic fallbacks.",
     "modality": "PPG",
     "parameters": {
       "signal_path": {
@@ -1446,15 +2789,71 @@
     },
     "returns": [
       "heart_rate_bpm",
+      "num_valid_intervals",
       "pulse_interval_cv",
+      "robust_pulse_interval_cv",
       "normalized_rmssd",
       "successive_change_fraction",
+      "pnn80_fraction",
+      "pnn120_fraction",
+      "pnn200_fraction",
+      "turning_point_ratio",
       "irregular_pulse_score",
       "irregular_pulse_flags",
+      "heuristic_irregular_pulse_risk",
       "irregular_pulse_risk",
+      "predicted_rhythm",
+      "af_probability",
+      "interval_dl_af_probability",
+      "interval_dl_predicted_rhythm",
+      "interval_dl_model_source",
+      "interval_dl_cv_metrics",
+      "interval_dl_error",
+      "feature_model_af_probability",
+      "feature_probabilities",
+      "feature_model_source",
+      "feature_model_cv_metrics",
+      "feature_model_error",
+      "flatline_fraction",
+      "saturation_fraction",
+      "baseline_wander_ratio",
+      "high_frequency_noise_ratio",
+      "artifact_score",
       "confidence",
       "method",
       "disclaimer"
+    ]
+  },
+  {
+    "name": "EDA_screen_stress_ml",
+    "description": "Screen EDA stress likelihood with a WESAD-trained EDA-only feature ensemble; falls back to proxy if the signal is too short or the model file is missing.",
+    "modality": "EDA",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "stress_probability",
+      "stress_window_fraction",
+      "stress_level",
+      "num_windows",
+      "model_source",
+      "model_cv_metrics",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error",
+      "proxy_result"
     ]
   },
   {
@@ -1490,7 +2889,7 @@
   },
   {
     "name": "PCG_extract_murmur_features",
-    "description": "Extract PCG spectral, envelope, and timing features for normal/abnormal or murmur baseline classifiers.",
+    "description": "Extract segmentation-aware PCG murmur features, including global spectrum plus systolic/diastolic high-frequency continuity and timing-pattern scores.",
     "modality": "PCG",
     "parameters": {
       "signal_path": {
@@ -1522,9 +2921,1568 @@
       "envelope_p99_median_ratio",
       "continuous_fraction_60",
       "continuous_fraction_75",
+      "systolic_high_band_ratio",
+      "diastolic_high_band_ratio",
+      "systolic_mid_band_ratio",
+      "diastolic_mid_band_ratio",
+      "systolic_spectral_centroid_hz",
+      "diastolic_spectral_centroid_hz",
+      "systolic_continuous_fraction",
+      "diastolic_continuous_fraction",
+      "systolic_murmur_score",
+      "diastolic_murmur_score",
+      "murmur_timing_pattern",
+      "num_systolic_segments",
+      "num_diastolic_segments",
+      "segmentation_confidence",
       "num_sounds",
       "heart_rate_bpm",
       "sound_interval_cv",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "Signal_extract_spectrogram_features",
+    "description": "Extract STFT spectrogram summary features for dense biomedical signals such as PCG and EMG; use for heart sound murmur or abnormal PCG classification, EMG condition classification, and myopathy versus neuropathy screening features.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "signal_path": {
+          "type": "string"
+        },
+        "sampling_rate": {
+          "type": "number"
+        },
+        "column": {
+          "type": "string"
+        },
+        "modality": {
+          "type": "string"
+        },
+        "window_seconds": {
+          "type": "number"
+        },
+        "overlap": {
+          "type": "number"
+        },
+        "max_frequency_hz": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "signal_path",
+        "sampling_rate"
+      ]
+    },
+    "modality": "any"
+  },
+  {
+    "name": "Signal_render_spectrogram_image",
+    "description": "Render a log-power STFT spectrogram PNG for dense biomedical signals such as PCG and EMG; use when a task asks for spectrogram/image representation, heart sound murmur classification, or EMG healthy myopathy neuropathy condition classification.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "signal_path": {
+          "type": "string"
+        },
+        "sampling_rate": {
+          "type": "number"
+        },
+        "out_png": {
+          "type": "string"
+        },
+        "column": {
+          "type": "string"
+        },
+        "modality": {
+          "type": "string"
+        },
+        "window_seconds": {
+          "type": "number"
+        },
+        "overlap": {
+          "type": "number"
+        },
+        "max_frequency_hz": {
+          "type": "number"
+        },
+        "width": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "signal_path",
+        "sampling_rate"
+      ]
+    },
+    "modality": "any"
+  },
+  {
+    "name": "EMG_classify_gesture",
+    "description": "Classify EMG hand gesture/action from multichannel EMG using the trained UCI gesture feature ensemble.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_sec": {
+        "type": "number"
+      },
+      "step_sec": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "predicted_class",
+      "predicted_gesture",
+      "class_probabilities",
+      "confidence",
+      "method"
+    ]
+  },
+  {
+    "name": "EMG_classify_prosthetic_gesture",
+    "description": "Classify NinaPro-style multichannel sEMG into 52 prosthetic hand/wrist gesture IDs using either a fast feature ensemble or multi-stream CNN backend; best used with user-specific calibration.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_sec": {
+        "type": "number"
+      },
+      "step_sec": {
+        "type": "number"
+      },
+      "backend": {
+        "type": "string",
+        "enum": [
+          "feature",
+          "multistream_cnn"
+        ]
+      }
+    },
+    "returns": [
+      "backend",
+      "predicted_gesture_id",
+      "gesture_probabilities",
+      "top5_gesture_ids",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_estimate_fatigue_ml",
+    "description": "Estimate EMG fatigue probability using the trained multi-channel fatigue feature ensemble; protocol-level screening, not clinical diagnosis.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_sec": {
+        "type": "number"
+      },
+      "step_sec": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "fatigue_probability",
+      "fatigue_state",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_classify_action",
+    "description": "Classify EMG physical action into 20 UCI action classes using a trained feature ensemble; coarse research baseline for action recognition.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_samples": {
+        "type": "integer"
+      },
+      "step_samples": {
+        "type": "integer"
+      }
+    },
+    "returns": [
+      "predicted_action",
+      "action_probabilities",
+      "top5_actions",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_classify_physical_action",
+    "description": "Classify EMG physical action category as normal activity versus aggressive/high-intensity action using the trained UCI Physical Action feature ensemble.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_samples": {
+        "type": "integer"
+      },
+      "step_samples": {
+        "type": "integer"
+      }
+    },
+    "returns": [
+      "action_category",
+      "aggressive_probability",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_predict_movement_intent",
+    "description": "Predict upcoming EMG movement intent from short pre-movement-like windows using a UCI gesture onset proxy model.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_sec": {
+        "type": "number"
+      },
+      "step_sec": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "predicted_intent",
+      "intent_probabilities",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_screen_neuromuscular_abnormality",
+    "description": "Screen single-channel EMG for healthy/myopathy/neuropathy-like patterns using a tiny EMGDB feature-ensemble smoke model.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "window_sec": {
+        "type": "number"
+      },
+      "step_sec": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "predicted_condition",
+      "condition_probabilities",
+      "abnormal_probability",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_classify_lower_limb_exercise",
+    "description": "Classify lower-limb EMG/goniometry exercise windows as walking, standing knee flexion, or sitting leg extension using the UCI lower-limb subject-held-out baseline.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_sec": {
+        "type": "number"
+      },
+      "step_sec": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "predicted_exercise",
+      "exercise_probabilities",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_screen_knee_rehab_status",
+    "description": "Screen lower-limb EMG/goniometry for normal-vs-abnormal knee patterns using the UCI lower-limb subject-held-out baseline.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_sec": {
+        "type": "number"
+      },
+      "step_sec": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "predicted_status",
+      "status_probabilities",
+      "abnormal_knee_probability",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_analyze_gait_activation",
+    "description": "Summarize lower-limb muscle activation, coactivation, quadriceps/hamstrings balance, and knee-flexion range from EMG/goniometry.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_sec": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "muscle_activation",
+      "coactivation_fraction",
+      "quadriceps_to_hamstrings_rms_ratio",
+      "knee_flexion_range_deg",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_classify_gait_speed",
+    "description": "Classify walking speed from GEDS-style wearable EMG/IMU/FSR gait signals as slow, comfortable, or fast.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "columns": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "window_sec": {
+        "type": "number"
+      },
+      "step_sec": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "predicted_speed",
+      "speed_probabilities",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EMG_estimate_gait_phase",
+    "description": "Estimate dominant right-foot gait phase from GEDS-style EMG/IMU/FSR signals using stance/swing event-label training.",
+    "modality": "EMG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "window_sec": {
+        "type": "number"
+      },
+      "step_sec": {
+        "type": "number"
+      }
+    },
+    "returns": [
+      "dominant_phase",
+      "phase_probabilities",
+      "phase_fraction_by_window",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "EDA_extract_tonic_phasic_features",
+    "description": "Extract WESAD-compatible EDA tonic, phasic, SCR, slope, and dynamic-range features for arousal/stress protocol analysis.",
+    "modality": "EDA",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "mean_level",
+      "tonic_mean",
+      "tonic_std",
+      "phasic_mean",
+      "phasic_std",
+      "scr_count",
+      "scr_rate_per_min",
+      "scr_mean_prominence",
+      "scr_max_prominence",
+      "dynamic_range",
+      "slope_per_second",
+      "feature_vector_length",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error"
+    ]
+  },
+  {
+    "name": "EDA_classify_affective_state_ml",
+    "description": "Classify WESAD protocol state from EDA as baseline, stress, or amusement. This is not generic emotion recognition.",
+    "modality": "EDA",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "predicted_state",
+      "state_probabilities",
+      "num_windows",
+      "model_source",
+      "model_cv_metrics",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error"
+    ]
+  },
+  {
+    "name": "EDA_route_task_recommendation",
+    "description": "Route EDA user tasks to safe supported EDA tools and block unsupported standalone interpretations such as lie detection.",
+    "modality": "EDA",
+    "parameters": {
+      "task": {
+        "type": "string"
+      },
+      "signal_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "requested_task",
+      "recommended_tool",
+      "recommendation",
+      "stress_result",
+      "affective_state_result",
+      "feature_result",
+      "confidence",
+      "method"
+    ]
+  },
+  {
+    "name": "EEG_classify_sleep_stage_ml",
+    "description": "Classify coarse sleep stage from a single-channel 30 s EEG CSV using a UCDDB-trained feature ensemble. Research baseline only.",
+    "modality": "EEG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "predicted_sleep_stage",
+      "stage_probabilities",
+      "model_source",
+      "model_cv_metrics",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error",
+      "fallback_result"
+    ]
+  },
+  {
+    "name": "EEG_screen_seizure_ml",
+    "description": "Screen seizure likelihood from a single-channel EEG CSV using a small CHB-MIT chb01 feature ensemble. Research baseline only.",
+    "modality": "EEG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "seizure_probability",
+      "seizure_risk",
+      "class_probabilities",
+      "model_source",
+      "model_cv_metrics",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error",
+      "fallback_result"
+    ]
+  },
+  {
+    "name": "ACC_classify_activity_ml",
+    "description": "Classify UCI-HAR-style activity from tri-axial ACC CSV, with magnitude-only fallback. Research baseline only.",
+    "modality": "ACC",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "activity_label",
+      "activity_probabilities",
+      "coarse_activity_label",
+      "input_type",
+      "model_source",
+      "model_metrics",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error",
+      "fallback_result"
+    ]
+  },
+  {
+    "name": "ACC_extract_actigraphy_features",
+    "description": "Extract ENMO-style actigraphy features for activity/sleep-wake routing from triaxial ACC or magnitude fallback.",
+    "modality": "ACC",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "duration_min",
+      "mean_enmo_g",
+      "median_enmo_g",
+      "p95_enmo_g",
+      "restful_fraction",
+      "sedentary_fraction",
+      "light_activity_fraction",
+      "moderate_vigorous_fraction",
+      "anglez_mean_deg",
+      "anglez_std_deg",
+      "input_type",
+      "confidence",
+      "method",
+      "error"
+    ]
+  },
+  {
+    "name": "RESP_screen_sleep_apnea_ml",
+    "description": "Screen UCDDB-style respiratory-event likelihood from respiratory flow, optionally fused with SpO2. Research baseline only.",
+    "modality": "RESP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "spo2_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "spo2_sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "spo2_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "respiratory_event_probability",
+      "respiratory_event_risk",
+      "class_probabilities",
+      "used_spo2",
+      "model_source",
+      "model_metrics",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error",
+      "fallback_result",
+      "apnea_fallback",
+      "hypopnea_fallback"
+    ]
+  },
+  {
+    "name": "BCG_compute_hrv",
+    "description": "Compute BCG beat-to-beat HRV proxy metrics from detected J peaks.",
+    "modality": "BCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "num_clean_intervals",
+      "mean_hr_bpm",
+      "median_hr_bpm",
+      "mean_nn_ms",
+      "sdnn_ms",
+      "rmssd_ms",
+      "pnn50",
+      "interval_cv",
+      "lf_power_ms2",
+      "hf_power_ms2",
+      "lf_hf_ratio",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "BCG_screen_arrhythmia",
+    "description": "Screen BCG beat interval irregularity as an AF/rhythm abnormality proxy; confirm with ECG.",
+    "modality": "BCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "arrhythmia_risk",
+      "irregularity_score",
+      "interval_cv",
+      "rmssd_ms",
+      "pnn50",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "BCG_assess_bed_presence_motion",
+    "description": "Estimate bed presence and motion artifact burden from BCG mechanical signal.",
+    "modality": "BCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "presence_state",
+      "motion_burst_fraction",
+      "motion_energy",
+      "dynamic_range",
+      "heart_rate_bpm",
+      "num_peaks",
+      "confidence"
+    ]
+  },
+  {
+    "name": "BCG_estimate_sleep_features",
+    "description": "Extract BCG HRV, respiration, and motion features for conservative sleep/wake proxy.",
+    "modality": "BCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "sleep_wake_proxy",
+      "sleep_proxy_score",
+      "heart_rate_bpm",
+      "respiratory_rate_bpm",
+      "motion_burst_fraction",
+      "rmssd_ms",
+      "sdnn_ms",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "BCG_estimate_bp_proxy",
+    "description": "Expose BCG morphology/timing features for calibrated BP experiments; does not output absolute BP without calibration.",
+    "modality": "BCG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "calibration_sbp": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "calibration_dbp": {
+        "type": [
+          "number",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "heart_rate_bpm",
+      "morphology_amplitude_proxy",
+      "interval_cv",
+      "calibrated_baseline_sbp",
+      "calibrated_baseline_dbp",
+      "relative_bp_variation_index",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "BCG_route_task_recommendation",
+    "description": "Route common BCG task requests to supported proxy tools and flag unsupported standalone diagnostic tasks.",
+    "modality": "BCG",
+    "parameters": {
+      "task": {
+        "type": "string"
+      }
+    },
+    "returns": [
+      "recommended_tools",
+      "standalone_supported",
+      "reason"
+    ]
+  },
+  {
+    "name": "SpO2_extract_oximetry_features",
+    "description": "Extract ODI, hypoxemia, distribution, and variability features from SpO2.",
+    "modality": "SpO2",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "mean_spo2",
+      "std_spo2",
+      "min_spo2",
+      "time_below_90_fraction",
+      "odi3_per_hour",
+      "odi4_per_hour",
+      "hypoxic_burden_percent_minutes_per_hour_below90",
+      "artifact_fraction",
+      "confidence"
+    ]
+  },
+  {
+    "name": "SpO2_screen_sleep_apnea_oximetry",
+    "description": "Oximetry-only sleep-disordered-breathing screening from ODI and hypoxemia burden.",
+    "modality": "SpO2",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "sleep_apnea_oximetry_risk",
+      "oximetry_risk_score",
+      "odi3_per_hour",
+      "odi4_per_hour",
+      "nadir_spo2_percent",
+      "time_below_90_fraction",
+      "hypoxic_burden_percent_minutes_per_hour_below90",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "SpO2_screen_sleep_apnea_ml",
+    "description": "SpO2-only ML respiratory-event window screen trained on UCDDB features when available.",
+    "modality": "SpO2",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "prediction",
+      "respiratory_event_probability",
+      "class_probabilities",
+      "model_used",
+      "model_source",
+      "cv_metrics",
+      "confidence",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "Multimodal_estimate_ecg_ppg_pat_bp_proxy",
+    "description": "Estimate ECG-to-PPG pulse arrival time and directional BP/perfusion proxy from paired ECG and PPG.",
+    "modality": "ECG+PPG",
+    "parameters": {
+      "ecg_path": {
+        "type": "string"
+      },
+      "ecg_sampling_rate": {
+        "type": "number"
+      },
+      "ppg_path": {
+        "type": "string"
+      },
+      "ppg_sampling_rate": {
+        "type": "number"
+      },
+      "ecg_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ppg_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "matched_beat_count",
+      "median_pat_s",
+      "pat_iqr_s",
+      "pat_cv",
+      "pat_bp_proxy_risk",
+      "flags",
+      "ecg_heart_rate_bpm",
+      "ppg_heart_rate_bpm",
+      "perfusion_result",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error"
+    ]
+  },
+  {
+    "name": "Multimodal_screen_sleep_apnea_report",
+    "description": "Fuse ECG, RESP/Flow, and SpO2 evidence into a multimodal sleep-apnea screening report.",
+    "modality": "ECG+RESP+SpO2",
+    "parameters": {
+      "ecg_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ecg_sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "resp_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "resp_sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "spo2_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "spo2_sampling_rate": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "ecg_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "resp_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "spo2_column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "fused_sleep_apnea_probability",
+      "sleep_apnea_evidence_level",
+      "evidence_flags",
+      "modalities_used",
+      "evidence",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error"
+    ]
+  },
+  {
+    "name": "PPG_estimate_heart_rate",
+    "description": "Estimate heart rate from PPG systolic pulse intervals.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "heart_rate_bpm",
+      "num_pulses",
+      "pulse_peak_indices",
+      "peak_result",
+      "confidence",
+      "method"
+    ]
+  },
+  {
+    "name": "PPG_compute_prv",
+    "description": "Compute pulse-rate variability (PRV) from PPG pulse-to-pulse intervals.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "mean_pulse_interval_ms",
+      "median_pulse_interval_ms",
+      "mean_pulse_rate_bpm",
+      "sdnn_ms",
+      "rmssd_ms",
+      "pnn50",
+      "pulse_interval_cv",
+      "lf_power",
+      "hf_power",
+      "lf_hf_ratio",
+      "num_intervals",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PPG_detect_fiducial_points",
+    "description": "Detect PPG systolic peaks plus proxy pulse onsets and dicrotic notches.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "systolic_peak_indices",
+      "pulse_onset_indices",
+      "dicrotic_notch_indices_proxy",
+      "median_rise_time_s",
+      "median_decay_time_s",
+      "median_pulse_width_half_height_s",
+      "median_pulse_area",
+      "median_upstroke_slope",
+      "num_morphology_pulses",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PPG_estimate_spo2",
+    "description": "Estimate uncalibrated SpO2 proxy from dual-wavelength red and infrared PPG columns when available.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "red_column": {
+        "type": "string"
+      },
+      "infrared_column": {
+        "type": "string"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "spo2_percent_proxy",
+      "ratio_of_ratios",
+      "red_ac_dc",
+      "ir_ac_dc",
+      "quality",
+      "confidence",
+      "method",
+      "disclaimer",
+      "error",
+      "available_columns"
+    ]
+  },
+  {
+    "name": "PPG_estimate_bp_proxy",
+    "description": "Screen PPG morphology evidence related to cuffless BP or arterial stiffness; does not estimate SBP/DBP without calibration.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "bp_proxy_risk",
+      "bp_proxy_score",
+      "bp_proxy_flags",
+      "median_rise_time_s",
+      "median_pulse_width_half_height_s",
+      "median_upstroke_slope",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PPG_detect_afib",
+    "description": "AF-specific wrapper around PPG pulse interval irregularity models.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "afib_risk",
+      "af_probability",
+      "predicted_rhythm",
+      "irregular_pulse_risk",
+      "source_irregularity_result",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PPG_estimate_sleep_features",
+    "description": "Summarize PPG-derived sleep/rest features from HR, PRV, respiration, and perfusion proxies.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "sleep_proxy",
+      "sleep_feature_flags",
+      "heart_rate_bpm",
+      "rmssd_ms",
+      "sdnn_ms",
+      "respiratory_rate_bpm",
+      "perfusion_level",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PPG_assess_stress_prv",
+    "description": "Assess nonspecific stress/recovery proxy from PPG PRV features.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "stress_prv_level",
+      "stress_prv_score",
+      "stress_prv_flags",
+      "prv_result",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PPG_estimate_exercise_intensity",
+    "description": "Estimate exercise intensity zone from PPG heart rate with optional resting/max HR calibration.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "resting_hr_bpm": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "max_hr_bpm": {
+        "type": [
+          "number",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "exercise_intensity_zone",
+      "exercise_intensity_fraction",
+      "heart_rate_bpm",
+      "calibration_basis",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PPG_assess_vascular_health",
+    "description": "Screen vascular morphology proxies such as rise time, pulse width, and decay/rise ratio.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "vascular_stiffness_proxy",
+      "vascular_proxy_score",
+      "vascular_flags",
+      "rise_decay_ratio",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "PPG_screen_low_perfusion_shock_risk",
+    "description": "Screen low-perfusion/shock-risk proxy from PPG perfusion, quality, and tachycardia evidence.",
+    "modality": "PPG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "shock_perfusion_risk",
+      "shock_perfusion_score",
+      "shock_perfusion_flags",
+      "heart_rate_bpm",
+      "perfusion_level",
+      "quality",
+      "confidence",
+      "method",
+      "disclaimer"
+    ]
+  },
+  {
+    "name": "ECG_delineate_waves_dl",
+    "description": "Experimental QTDB-trained P/QRS/T ECG wave segmentation backend for morphology evidence near 250 Hz.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "p_wave_segments",
+      "qrs_complex_segments",
+      "t_wave_segments",
+      "p_wave_count",
+      "qrs_complex_count",
+      "t_wave_count",
+      "wave_pixel_fraction",
+      "confidence",
+      "method",
+      "model_source",
+      "disclaimer",
+      "error"
+    ]
+  },
+  {
+    "name": "ECG_classify_12lead_ptbxl_superclasses",
+    "description": "Classify PTB-XL diagnostic superclasses from a 12-lead ECG using full PTB-XL ResNet models.",
+    "modality": "ECG",
+    "parameters": {
+      "signal_path": {
+        "type": "string",
+        "description": "Path to 12-lead ECG CSV/NPY/NPZ/WFDB record. CSV should contain at least 12 numeric lead columns."
+      }
+    },
+    "returns": [
+      "classes",
+      "probabilities",
+      "decision_thresholds",
+      "predicted_positive_classes",
+      "cv_metrics",
+      "training_report",
       "confidence",
       "method",
       "disclaimer"

@@ -11,13 +11,34 @@ This version keeps signal analysis in explicit Python tools. The agent can use e
 - BCG: signal quality, Nabian-style J-peak detection, heart-rate estimate, BCG-derived respiration proxy
 - SCG: signal quality, Nabian-style J-peak detection, heart-rate estimate, SCG-derived respiration proxy
 - RESP: signal quality, artifact screen, respiratory-rate estimate, apnea proxy, hypopnea proxy, rate/pattern proxy
-- SpO2: signal quality, artifact screen, oxygen-saturation summary, desaturation events, hypoxemia burden
+- SpO2: signal quality, artifact screen, oxygen-saturation summary, rolling-baseline ODI3/ODI4 desaturation events, hypoxemia burden, oximetry-only sleep-apnea screening/ML evidence
 - ABP: signal quality, artifact screen, pulse detection, heart-rate and pressure-value summary, hypotension/hypertension proxy, MAP/pulse-pressure proxy
 - PCG: signal quality, heart-sound event detection, murmur proxy, murmur feature extraction baseline, S1/S2 segmentation proxy
 - ACC: signal quality, activity summary, sleep/wake proxy, activity-bout detection, fall/impact proxy
-- EDA: signal quality, tonic/phasic summary, arousal/SCR event proxy, stress/arousal score proxy
+- EDA: signal quality, WESAD-compatible tonic/phasic/SCR features, arousal/SCR event proxy, WESAD-trained stress ML classifier, WESAD baseline/stress/amusement protocol-state classifier, safe task routing, heuristic stress/arousal fallback
 - EEG: signal quality, artifact screen, bandpower summary, sleep-stage features, seizure-like spike proxy, drowsiness/vigilance proxy, EEG artifact proxy
-- EMG: signal quality, artifact screen, activation summary, fatigue median-frequency proxy, burst/onset proxy
+- EMG: signal quality, artifact screen, activation summary, gesture classification, prosthetic gesture classification, movement-intent proxy, physical action screening, lower-limb exercise/rehab screening, gait speed/phase, neuromuscular abnormality smoke screen, fatigue ML/proxy, burst/onset proxy
+- Generic routing: `Signal_classify_modality` feature-based classifier for unknown single-signal CSVs, with heuristic fallback if no trained model is present
+- Image input: `Signal_digitize_waveform_image_ml` trained pixel-segmentation baseline for clean single-trace waveform plots
+
+## Classify An Unknown Signal
+
+```bash
+python examples/classify_signal_modality.py --csv path/to/signal.csv --sampling-rate 250
+```
+
+This runs the local feature-based routing classifier and returns the top modality candidates before choosing a task-specific workflow.
+
+## Digitize A Waveform Image
+
+```bash
+python examples/digitize_waveform_image.py \
+  --image path/to/waveform.png \
+  --sampling-rate 250 \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/digitized/example.csv
+```
+
+The baseline digitizer extracts a dark single trace from a clean plot image. If axis calibration is known, pass `--value-min`, `--value-max`, and crop bounds; otherwise the output is normalized.
 
 ## Run A CSV Report
 
@@ -260,6 +281,45 @@ python scripts/evaluate_acc_fall.py
 # CHB-MIT EDF files can be slow to download; the script enforces both seizure and non-seizure windows.
 python scripts/prepare_chbmit_seizure_dataset.py --download --max-seizure-files 1
 python scripts/evaluate_chbmit_seizure.py
+
+python scripts/prepare_modality_classifier_dataset.py
+python scripts/evaluate_modality_classifier.py
+
+python scripts/render_waveform_digitization_benchmark.py --seconds 10 --max-per-modality 4
+python scripts/evaluate_waveform_digitization.py --method rule
+python scripts/train_waveform_digitization_pixel_model.py --train-variant clean
+python scripts/evaluate_waveform_digitization.py --method ml \
+  --out-json /data1/jiahui/biosignal-agent/outputs/waveform_digitization_ml_eval.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/waveform_digitization_ml_eval.csv
+python scripts/train_waveform_digitization_unet.py --epochs 8 --batch-size 4 --height 128 --width 384
+python scripts/evaluate_waveform_digitization.py --method unet --probability-threshold 0.65 \
+  --out-json /data1/jiahui/biosignal-agent/outputs/waveform_digitization_unet_eval.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/waveform_digitization_unet_eval.csv
+
+python scripts/prepare_ecg_image_digitization_dataset.py
+python scripts/prepare_ecg_image_kit_samples.py --limit 12
+python scripts/prepare_ecg_image_kit_generated_dataset.py
+python scripts/evaluate_waveform_segmentation_masks.py \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/ecg_image_kit_generated_manifest.json \
+  --model-path /data1/jiahui/biosignal-agent/outputs/ecg_image_kit_generated_unet.pt \
+  --out-json /data1/jiahui/biosignal-agent/outputs/ecg_image_kit_generated_segmentation_eval.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/ecg_image_kit_generated_segmentation_eval.csv
+python scripts/train_waveform_digitization_unet.py \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/ecg_image_digitization_manifest.json \
+  --model-path /data1/jiahui/biosignal-agent/outputs/ecg_image_digitization_unet.pt \
+  --out-json /data1/jiahui/biosignal-agent/outputs/ecg_image_digitization_unet_train.json \
+  --epochs 12 --batch-size 2 --height 128 --width 384
+python scripts/evaluate_waveform_digitization.py \
+  --manifest /data1/jiahui/biosignal-agent/datasets/processed/ecg_image_digitization_manifest.json \
+  --method unet \
+  --model-path /data1/jiahui/biosignal-agent/outputs/ecg_image_digitization_unet.pt \
+  --probability-threshold 0.65 \
+  --out-json /data1/jiahui/biosignal-agent/outputs/ecg_image_digitization_unet_eval.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/ecg_image_digitization_unet_eval.csv
+python scripts/evaluate_image_digitization_smoke.py --method unet \
+  --model-path /data1/jiahui/biosignal-agent/outputs/waveform_digitization_unet.pt \
+  --out-json /data1/jiahui/biosignal-agent/outputs/ecg_image_kit_unet_smoke_eval.json \
+  --out-csv /data1/jiahui/biosignal-agent/outputs/ecg_image_kit_unet_smoke_eval.csv
 ```
 
 Latest labeled benchmark snapshot:
@@ -271,7 +331,10 @@ Latest labeled benchmark snapshot:
 - PhysioNet/CinC 2016 PCG normal/abnormal: proxy F1 0.000 on 10 balanced records; feature+logistic-regression baseline F1 0.750.
 - MIMIC PERform AF PPG AF/non-AF: irregular-pulse proxy F1 0.857 on 8 windows.
 - UCI-HAR ACC activity: random-forest feature baseline macro-F1 0.958 on 48 windows; active/rest F1 1.000.
-- WESAD stress, UniMiB/SisFall fall, and CHB-MIT seizure scripts are implemented; WESAD/fall need local raw files, and CHB-MIT needs complete EDF download before metrics are reported.
+- CHB-MIT seizure-window screening: EEG seizure-like proxy F1 1.000 on 2 small windows after EDF subset download.
+- Signal modality classifier: feature-based random forest macro-F1 0.952 on 117 windows across ECG, PPG, BCG, SCG, RESP, SpO2, ABP, PCG, ACC, EDA, EEG, and EMG.
+- Waveform image digitization: rule baseline reaches 31/43 successful digitizations with mean correlation 0.855, NRMSE 0.056, peak-F1 0.837; trained RGB pixel-segmentation baseline reaches 43/43 with mean correlation 0.851, NRMSE 0.056, peak-F1 0.828; tiny U-Net reaches 43/43 with mean correlation 0.843, NRMSE 0.065, peak-F1 0.793 across clean/grid/color/artifact images. ECG-only rendered connector smoke test has 4/4 ok with correlation 0.849, NRMSE 0.087, peak-F1 0.751. ECG-Image-Kit image-only smoke test on 12 sample segments has no waveform ground truth; rule/RGB-pixel/U-Net all produce CSVs, with mean pixel coverage 0.153/0.673/0.947 respectively. ECG-Image-Kit generated MIT-BIH benchmark now has 5 bbox-cropped images, waveform references, and plotted-pixel masks; specialized tiny U-Net reaches segmentation Dice 0.784/IoU 0.646, while waveform calibration remains poor (peak-F1 0.000), so the next issue is coordinate/axis calibration rather than line detection alone. Added image-resolution risk screening and strategy recommendation tools so image agents can avoid under-resolved waveform reconstruction; low-res PCG improves from corr 0.237 to 0.855 under high-res aligned oracle rendering, and a high-res ML pixel digitizer improves overall corr from 0.851 to 0.943. ECG/SCG/EEG/PCG improve to 0.993/0.992/0.987/0.855 respectively. A difficult-signal ultra-high-res track further improves ECG/SCG/EEG/PCG/EMG to 0.999/0.999/0.998/0.946/0.585; EMG remains the main task/spectrogram path candidate. Added `Signal_extract_spectrogram_features` and `Signal_render_spectrogram_image`. PCG spectrogram summary baseline reaches accuracy 0.80/F1 0.75; PCG spectrogram-image PCA/logistic baseline reaches accuracy 0.90/F1 0.889 on 10 records. EMG spectrogram condition smoke reaches window-level macro-F1 1.0 with summary features and 0.967 with spectrogram-image pixels on 30 windows from 3 records; not subject-independent.
+- WESAD stress and UniMiB/SisFall fall scripts are implemented; both still need local raw files before metrics are reported.
 
 These numbers are intentionally baseline-level: they turn major tasks into measurable targets before replacing heuristics with stronger models.
 
@@ -561,18 +624,23 @@ Initial no-fallback LLM baseline: 32 planning cases, 30 true OpenRouter successe
 
 The planning benchmark now includes broader task prompts beyond peak/rate extraction:
 
+See `docs/ecg_ppg_sota_mapping.md` for the current ECG/PPG SOTA/GitHub provenance map, including which tools are local DL models, open-source candidates, or conservative proxy wrappers.
+
+
 - Generic artifact screening: clipping, flatline/dropout, abrupt jumps, and high-frequency noise.
-- ECG arrhythmia screening: irregular RR, pauses, bradycardia, tachycardia, ectopy-proxy flags.
-- ECG morphology/interval screening: PR/QRS/QT/QTc and ST-deviation proxies.
+- ECG heart-rate, R-peak/QRS, HRV, stress/fatigue proxy, and beat-level classification wrappers.
+- ECG rhythm/AF/arrhythmia screening: rhythm-segment classifier, AF-specific wrapper, irregular RR, pauses, bradycardia, tachycardia, and ectopy-proxy flags.
+- ECG morphology/interval screening: PR/QRS/QT/QTc, conduction-delay, and ST-deviation proxies.
 - ECG sleep-apnea proxy: HRV/RR-pattern screening for ECG-only apnea baselines.
-- PPG perfusion/variability and irregular-pulse proxies: pulse amplitude, interval CV, normalized RMSSD, successive interval-change flags.
+- PPG task wrappers: HR, PRV, systolic/onset/notch fiducials, respiration, AF/irregular pulse, dual-wavelength SpO2 proxy, perfusion/low-shock proxy, BP/vascular morphology proxy, sleep/rest features, stress/recovery PRV proxy, and exercise-intensity HR proxy.
 - RESP sleep-apnea, hypopnea, and rate-pattern screening: low-amplitude pauses, reduced-flow events, tachypnea/bradypnea/periodic breathing proxies.
 - SpO2 desaturation and hypoxemia burden: ODI-style event count, minimum SpO2, time below 90/88 percent.
 - ABP pressure-event and hemodynamic proxy: approximate hypotension/hypertension flags, MAP, and pulse pressure.
 - PCG murmur proxy and feature baseline: high-frequency continuous energy plus spectral/envelope/timing features.
-- EDA arousal/stress proxies: phasic skin-conductance-response peaks plus tonic/phasic stress-arousal score.
+- EDA arousal/stress tools: WESAD-compatible tonic/phasic/SCR features, WESAD-trained binary stress classifier (AUROC 0.870/BAcc 0.780), WESAD baseline/stress/amusement CNN protocol-state classifier (macro-AUROC 0.759/macro-F1 0.568), plus heuristic fallback and safety routing for unsupported uses such as standalone lie detection.
 - EEG sleep-stage features and seizure-like proxy: band ratios plus robust spike/fast-power screen.
 - EMG activation and fatigue proxy: RMS/MAV plus median-frequency fatigue hint.
+- EMG gesture/action/fatigue/rehab/neuromuscular models: UCI gesture 6-class feature ensemble reaches subject-independent accuracy 0.777 / macro-F1 0.777; NinaPro DB1 52-class prosthetic gesture augmented feature baseline reaches calibrated-user top-1 0.585/top-5 0.821 but strict subject-held-out top-1 0.107; optional multi-stream CNN backend reaches calibrated trial-voting top-1 0.732/top-5 0.937; UCI onset-derived movement-intent proxy reaches accuracy/macro-F1 0.725; UCI Physical Action 20-class action recognition reaches subject-held-out accuracy 0.269 / macro-F1 0.266, while normal-vs-aggressive screen reaches AUROC 0.884 / accuracy 0.827 under leave-one-subject-out; UCI lower-limb EMG/goniometry exercise classification reaches subject-held-out accuracy 0.836 / macro-F1 0.835, and knee normal-vs-abnormal rehab screen reaches AUROC 0.930 / macro-F1 0.921; GEDS wearable gait speed reaches subject-held-out accuracy 0.789 / macro-F1 0.788 on the full S00-S22 414-trial benchmark, and right stance/swing phase reaches accuracy 0.974 / macro-F1 0.972 / AUROC 0.997; Zenodo fatigue early-vs-late protocol model reaches AUROC 0.774 / balanced accuracy 0.699. Added an EMGDB healthy/myopathy/neuropathy smoke screen with window-level accuracy/macro-F1 1.0 on 27 windows, but it is not subject-independent and is explicitly research-only. A small 1D CNN underperforms the feature ensemble on cross-subject gesture recognition (macro-F1 0.411), so the tool keeps the feature model. Added `EMG_classify_gesture`, `EMG_classify_prosthetic_gesture` with `backend="feature"|"multistream_cnn"`, `EMG_predict_movement_intent`, `EMG_classify_physical_action`, `EMG_classify_lower_limb_exercise`, `EMG_classify_gait_speed`, `EMG_estimate_gait_phase`, `EMG_screen_knee_rehab_status`, `EMG_analyze_gait_activation`, `EMG_screen_neuromuscular_abnormality`, and `EMG_estimate_fatigue_ml` tools.
 - ACC sleep/wake proxy: actigraphy-style rest/activity hint.
 
 The expanded rule-planning set has 63 planning cases. Latest expanded rule evals:
@@ -659,6 +727,10 @@ python scripts/evaluate_apnea_ecg.py \
 
 Current Apnea-ECG subset: 60 one-minute ECG windows, 8 apnea and 52 normal. The ECG-only HRV proxy is intentionally a weak baseline: accuracy 0.533, precision 0.083, recall 0.250, specificity 0.577, and F1 0.125. This gives the framework a concrete negative result and points the next apnea work toward RESP/SpO2/PSG-labeled datasets instead of ECG-only heuristics.
 
+### SpO2 Tool Optimization
+
+SpO2 now exposes rolling-baseline ODI3/ODI4 desaturation detection, event depth/duration/area, T90/T88/T85, CT90, hypoxic burden area below 90%, oximetry-only sleep-apnea severity proxy, and a UCDDB-trained SpO2-only feature model. On UCDDB 25-record / 1974 valid 30s SpO2 windows with record-level GroupKFold, the SpO2-only ML model reaches AUROC 0.542, macro-F1 0.523, and balanced accuracy 0.523; the ODI/hypoxic-burden heuristic reaches AUROC 0.555. This is intentionally documented as a negative result for exact 30s respiratory-event detection: SpO2 remains valuable for overnight burden summaries but should be fused with respiratory airflow/effort for event timing.
+
 ### RESP/SpO2 PSG Benchmark: UCDDB
 
 UCDDB provides PSG respiratory-event labels plus `Flow` and `SpO2` channels in the `.rec` EDF-like file. The connector includes a lightweight EDF reader, so no extra EDF package is required:
@@ -686,3 +758,6 @@ Key outputs:
 /data1/jiahui/biosignal-agent/outputs/planner_comparison_openrouter_vs_rule.json
 /data1/jiahui/biosignal-agent/outputs/planner_comparison_openrouter_retry_vs_rule.json
 ```
+
+
+Multimodal wrappers added: `Multimodal_estimate_ecg_ppg_pat_bp_proxy` for ECG+PPG PAT/BP proxy evidence and `Multimodal_screen_sleep_apnea_report` for ECG/RESP/SpO2 sleep-apnea evidence fusion.

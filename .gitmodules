@@ -1,0 +1,3 @@
+[submodule "external/evaluation-2022"]
+	path = external/evaluation-2022
+	url = https://github.com/physionetchallenges/evaluation-2022.git

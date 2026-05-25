@@ -251,6 +251,68 @@ def generic_labeled_summary(name: str, path: str | Path, metrics_key: str = "met
     }
 
 
+def digitization_summary(path: str | Path) -> dict[str, Any]:
+    payload = load_json(path)
+    if payload.get("missing"):
+        return {"name": "waveform_digitization", **payload}
+    metrics = payload.get("metrics", {})
+    return {
+        "name": "waveform_digitization",
+        "path": str(path),
+        "num_records": metrics.get("num_records"),
+        "num_ok": metrics.get("num_ok"),
+        "mean_waveform_correlation": metrics.get("mean_waveform_correlation"),
+        "mean_nrmse": metrics.get("mean_nrmse"),
+        "mean_peak_f1": metrics.get("mean_peak_f1"),
+        "mean_hr_abs_error_bpm": metrics.get("mean_hr_abs_error_bpm"),
+        "modality_retention_accuracy": metrics.get("modality_retention_accuracy"),
+        "method": payload.get("method"),
+        "model_path": payload.get("model_path"),
+        "by_variant": payload.get("by_variant", {}),
+    }
+
+
+def segmentation_summary(name: str, path: str | Path) -> dict[str, Any]:
+    payload = load_json(path)
+    if payload.get("missing"):
+        return {"name": name, **payload}
+    metrics = payload.get("metrics", {})
+    return {
+        "name": name,
+        "path": str(path),
+        "method": payload.get("method"),
+        "model_path": payload.get("model_path"),
+        "num_records": metrics.get("num_records"),
+        "num_ok": metrics.get("num_ok"),
+        "mean_precision": metrics.get("mean_precision"),
+        "mean_recall": metrics.get("mean_recall"),
+        "mean_dice": metrics.get("mean_dice"),
+        "mean_iou": metrics.get("mean_iou"),
+        "mean_pred_mask_fraction": metrics.get("mean_pred_mask_fraction"),
+        "mean_truth_mask_fraction": metrics.get("mean_truth_mask_fraction"),
+    }
+
+
+def image_smoke_summary(name: str, path: str | Path) -> dict[str, Any]:
+    payload = load_json(path)
+    if payload.get("missing"):
+        return {"name": name, **payload}
+    metrics = payload.get("metrics", {})
+    return {
+        "name": name,
+        "path": str(path),
+        "method": payload.get("method"),
+        "num_records": payload.get("num_records"),
+        "num_ok": payload.get("num_ok"),
+        "ok_rate": metrics.get("ok_rate"),
+        "mean_pixel_coverage": metrics.get("mean_pixel_coverage"),
+        "mean_mask_pixel_fraction": metrics.get("mean_mask_pixel_fraction"),
+        "mean_confidence": metrics.get("mean_confidence"),
+        "ecg_modality_retention": metrics.get("ecg_modality_retention"),
+        "prediction_counts": payload.get("prediction_counts", {}),
+    }
+
+
 def instruction_summary(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     if not path.exists():
@@ -342,6 +404,54 @@ def markdown_report(report: dict[str, Any]) -> str:
 
     lines.extend([
         "",
+        "## Waveform Digitization",
+        "",
+        "| Benchmark | Method | Records | OK | Corr | NRMSE | Peak F1 | HR MAE | Modality Retention |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ])
+    for digitization in [report.get("digitization_benchmark", {}), report.get("digitization_ml_benchmark", {}), report.get("digitization_unet_benchmark", {}), report.get("ecg_image_digitization_unet_benchmark", {}), report.get("ecg_image_kit_generated_unet_benchmark", {})]:
+        if not digitization:
+            continue
+        lines.append(
+            f"| {digitization.get('name')} | {digitization.get('method')} | {fmt_metric(digitization.get('num_records'))} | "
+            f"{fmt_metric(digitization.get('num_ok'))} | {fmt_metric(digitization.get('mean_waveform_correlation'))} | "
+            f"{fmt_metric(digitization.get('mean_nrmse'))} | {fmt_metric(digitization.get('mean_peak_f1'))} | "
+            f"{fmt_metric(digitization.get('mean_hr_abs_error_bpm'))} | {fmt_metric(digitization.get('modality_retention_accuracy'))} |"
+        )
+
+    lines.extend([
+        "",
+        "## Waveform Segmentation",
+        "",
+        "| Benchmark | Method | Records | OK | Precision | Recall | Dice | IoU | Pred Mask | Truth Mask |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ])
+    for item in report.get("segmentation_benchmarks", []):
+        lines.append(
+            f"| {item.get('name')} | {item.get('method')} | {fmt_metric(item.get('num_records'))} | "
+            f"{fmt_metric(item.get('num_ok'))} | {fmt_metric(item.get('mean_precision'))} | "
+            f"{fmt_metric(item.get('mean_recall'))} | {fmt_metric(item.get('mean_dice'))} | "
+            f"{fmt_metric(item.get('mean_iou'))} | {fmt_metric(item.get('mean_pred_mask_fraction'))} | "
+            f"{fmt_metric(item.get('mean_truth_mask_fraction'))} |"
+        )
+
+    lines.extend([
+        "",
+        "## Image-Only Digitization Smoke",
+        "",
+        "| Benchmark | Method | Records | OK | OK Rate | Coverage | Mask Fraction | Confidence | ECG Retention |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ])
+    for item in report.get("image_smoke_benchmarks", []):
+        lines.append(
+            f"| {item.get('name')} | {item.get('method')} | {fmt_metric(item.get('num_records'))} | "
+            f"{fmt_metric(item.get('num_ok'))} | {fmt_metric(item.get('ok_rate'))} | "
+            f"{fmt_metric(item.get('mean_pixel_coverage'))} | {fmt_metric(item.get('mean_mask_pixel_fraction'))} | "
+            f"{fmt_metric(item.get('mean_confidence'))} | {fmt_metric(item.get('ecg_modality_retention'))} |"
+        )
+
+    lines.extend([
+        "",
         "## Instruction Data",
         "",
         "| Dataset | Samples | Validation Errors | Task Counts |",
@@ -381,6 +491,24 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             generic_labeled_summary("acc_activity_uci_har", args.acc_activity_eval),
             generic_labeled_summary("acc_fall_unimib", args.acc_fall_eval),
             generic_labeled_summary("chbmit_seizure_eeg", args.chbmit_seizure_eval),
+            generic_labeled_summary("signal_modality_classifier", args.modality_classifier_eval),
+            generic_labeled_summary("pcg_spectrogram_murmur", args.pcg_spectrogram_murmur_eval),
+            generic_labeled_summary("emg_spectrogram_condition", args.emg_spectrogram_condition_eval),
+            generic_labeled_summary("pcg_spectrogram_image_murmur", args.pcg_spectrogram_image_murmur_eval),
+            generic_labeled_summary("emg_spectrogram_image_condition", args.emg_spectrogram_image_condition_eval),
+        ],
+        "digitization_benchmark": digitization_summary(args.waveform_digitization_eval),
+        "digitization_ml_benchmark": digitization_summary(args.waveform_digitization_ml_eval),
+        "digitization_unet_benchmark": digitization_summary(args.waveform_digitization_unet_eval),
+        "ecg_image_digitization_unet_benchmark": digitization_summary(args.ecg_image_digitization_unet_eval),
+        "ecg_image_kit_generated_unet_benchmark": digitization_summary(args.ecg_image_kit_generated_unet_eval),
+        "segmentation_benchmarks": [
+            segmentation_summary("ecg_image_kit_generated_unet_segmentation", args.ecg_image_kit_generated_segmentation_eval),
+        ],
+        "image_smoke_benchmarks": [
+            image_smoke_summary("ecg_image_kit_rule_smoke", args.ecg_image_kit_rule_smoke_eval),
+            image_smoke_summary("ecg_image_kit_ml_smoke", args.ecg_image_kit_ml_smoke_eval),
+            image_smoke_summary("ecg_image_kit_unet_smoke", args.ecg_image_kit_unet_smoke_eval),
         ],
         "instruction_data": [
             {"name": "full_sft", **instruction_summary(args.full_sft)},
@@ -411,6 +539,20 @@ def main() -> None:
     parser.add_argument("--acc-activity-eval", default="/data1/jiahui/biosignal-agent/outputs/acc_activity_eval.json")
     parser.add_argument("--acc-fall-eval", default="/data1/jiahui/biosignal-agent/outputs/acc_fall_eval.json")
     parser.add_argument("--chbmit-seizure-eval", default="/data1/jiahui/biosignal-agent/outputs/chbmit_seizure_eval.json")
+    parser.add_argument("--modality-classifier-eval", default="/data1/jiahui/biosignal-agent/outputs/modality_classifier_eval.json")
+    parser.add_argument("--pcg-spectrogram-murmur-eval", default="/data1/jiahui/biosignal-agent/outputs/pcg_spectrogram_murmur_eval.json")
+    parser.add_argument("--emg-spectrogram-condition-eval", default="/data1/jiahui/biosignal-agent/outputs/emg_spectrogram_condition_eval.json")
+    parser.add_argument("--pcg-spectrogram-image-murmur-eval", default="/data1/jiahui/biosignal-agent/outputs/pcg_spectrogram_image_murmur_eval.json")
+    parser.add_argument("--emg-spectrogram-image-condition-eval", default="/data1/jiahui/biosignal-agent/outputs/emg_spectrogram_image_condition_eval.json")
+    parser.add_argument("--waveform-digitization-eval", default="/data1/jiahui/biosignal-agent/outputs/waveform_digitization_eval.json")
+    parser.add_argument("--waveform-digitization-ml-eval", default="/data1/jiahui/biosignal-agent/outputs/waveform_digitization_ml_eval.json")
+    parser.add_argument("--waveform-digitization-unet-eval", default="/data1/jiahui/biosignal-agent/outputs/waveform_digitization_unet_eval.json")
+    parser.add_argument("--ecg-image-digitization-unet-eval", default="/data1/jiahui/biosignal-agent/outputs/ecg_image_digitization_unet_eval.json")
+    parser.add_argument("--ecg-image-kit-rule-smoke-eval", default="/data1/jiahui/biosignal-agent/outputs/ecg_image_kit_rule_smoke_eval.json")
+    parser.add_argument("--ecg-image-kit-ml-smoke-eval", default="/data1/jiahui/biosignal-agent/outputs/ecg_image_kit_ml_smoke_eval.json")
+    parser.add_argument("--ecg-image-kit-unet-smoke-eval", default="/data1/jiahui/biosignal-agent/outputs/ecg_image_kit_unet_smoke_eval.json")
+    parser.add_argument("--ecg-image-kit-generated-unet-eval", default="/data1/jiahui/biosignal-agent/outputs/ecg_image_kit_generated_specialized_unet_eval.json")
+    parser.add_argument("--ecg-image-kit-generated-segmentation-eval", default="/data1/jiahui/biosignal-agent/outputs/ecg_image_kit_generated_segmentation_eval.json")
     parser.add_argument("--full-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_sft.jsonl")
     parser.add_argument("--planning-sft", default="/data1/jiahui/biosignal-agent/outputs/biosignal_txagent_planning_sft.jsonl")
     parser.add_argument("--out-json", default="/data1/jiahui/biosignal-agent/outputs/benchmark_report_major_tasks.json")

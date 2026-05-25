@@ -20,7 +20,7 @@ def evaluate(manifest_path: str | Path) -> dict[str, Any]:
     for record in manifest.get("records", []):
         irregular = PPG_screen_pulse_irregularity(record["path"], float(record["sampling_rate"]), column=None)
         perfusion = PPG_assess_perfusion_variability(record["path"], float(record["sampling_rate"]), column=None)
-        prediction = "af" if irregular.get("irregular_pulse_risk") == "elevated_irregular_pulse_proxy" else "non_af"
+        prediction = irregular.get("predicted_rhythm") or ("af" if irregular.get("irregular_pulse_risk") == "elevated_irregular_pulse_proxy" else "non_af")
         rows.append({
             "record": record["record"],
             "truth": record["label"],
@@ -29,6 +29,14 @@ def evaluate(manifest_path: str | Path) -> dict[str, Any]:
             "pulse_interval_cv": irregular.get("pulse_interval_cv"),
             "normalized_rmssd": irregular.get("normalized_rmssd"),
             "successive_change_fraction": irregular.get("successive_change_fraction"),
+            "pnn80_fraction": irregular.get("pnn80_fraction"),
+            "pnn200_fraction": irregular.get("pnn200_fraction"),
+            "turning_point_ratio": irregular.get("turning_point_ratio"),
+            "af_probability": irregular.get("af_probability"),
+            "interval_dl_af_probability": irregular.get("interval_dl_af_probability"),
+            "feature_model_af_probability": irregular.get("feature_model_af_probability"),
+            "method": irregular.get("method"),
+            "artifact_score": irregular.get("artifact_score"),
             "irregular_pulse_score": irregular.get("irregular_pulse_score"),
             "irregular_pulse_risk": irregular.get("irregular_pulse_risk"),
             "pulse_amplitude_proxy": perfusion.get("pulse_amplitude_proxy"),
