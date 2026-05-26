@@ -16,7 +16,7 @@ Recommended artifact: `biosignal_tool_universe_v1.json`; recommended table: `tab
 
 ### BioSignalBench v1
 
-BioSignalBench v1 contains 238 cases split into train/dev/held-out = 168/22/48. It covers modality routing, image-to-signal digitization, scale/OCR extraction, tool planning, executable tool evaluation, report factuality, and multimodal session reasoning. BioSignalBench v1-expanded contains 461 cases with train/dev/held-out = 324/45/92; it is a stress complement, not a replacement for the clean split.
+BioSignalBench v1 contains 238 cases split into train/dev/held-out = 168/22/48. It covers modality routing, image-to-signal digitization, scale/OCR extraction, tool planning, executable tool evaluation, report factuality, and multimodal session reasoning. BioSignalBench v1-expanded now contains 1,279 cases; it is a stress/scale complement, not a replacement for the clean split. The expansion adds public-signal task cases from MIT-BIH arrhythmia windows, real-world ECG/PPG/RESP/SCG/BCG segments, dedicated ACC/EDA/SpO2/ABP/PCG/EEG/EMG/BCG manifests, waveform-image digitization cases, and UCDDB EEG+RESP+SpO2 session cases.
 
 Recommended tables: `table2_biosignalbench_composition.md`, `table27_biosignalbench_expanded_composition.md`.
 
@@ -98,3 +98,10 @@ The main empirical pattern is that BioSignalAgent has strong retrieval coverage 
 - `table27_biosignalbench_expanded_composition.md`: present
 - `table28_expanded_heldout_baseline_comparison.md`: present
 - `table30_txagent_gap_matrix.md`: present
+
+
+### Expanded Benchmark Size Update - 2026-05-26
+
+We increased BioSignalBench v1-expanded from the prior 461-case stress manifest to a 1,279-case stress/scale manifest while preserving the frozen clean v1 split. The new manifest contains 603 tool-execution cases, 268 multimodal-session cases, 217 report-factuality cases, 66 tool-planning cases, 63 image digitization cases, and 62 scale/OCR cases. Inputs include 885 CSV waveform cases, 268 session cases, 125 image cases, and one text negative case. Validation passes with 0 errors.
+
+Lightweight expanded-baseline results: rule planner + TF-IDF retrieval obtains retrieval 1.000, exact planning 0.034, and Tool F1 0.536; TF-IDF ToolRAG-as-planner obtains retrieval 1.000, exact planning 0.000, and Tool F1 0.526; oracle tools remain 1.000. This confirms that the expanded benchmark is substantially harder than the clean split and should be reported as a stress benchmark rather than the primary headline score until the live SFT controller is retrained/evaluated on the larger task distribution.

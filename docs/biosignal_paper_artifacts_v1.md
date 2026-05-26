@@ -553,3 +553,17 @@ Current manuscript-ready numbers:
 Interpretation: the clean split remains the primary frozen benchmark row. The expanded split is stress evidence and now includes a necessary raw-vs-guardrail ablation. The paper should explicitly say the perfect expanded planning row is a live LoRA planner plus metadata-derived controller repair, not pure raw LLM generation.
 
 External LLM note: an expanded OpenRouter/owl-alpha run was attempted but synchronous external API calls hung during SSL read; the process was interrupted and not kept as a final artifact. The clean 48-case OpenRouter baseline remains the current external LLM row unless a more stable endpoint is added.
+
+
+## Expanded Benchmark Size Update - 2026-05-26
+
+The expanded BioSignalBench artifact was rebuilt as a 1,279-case stress/scale manifest. It adds realistic public-signal task cases from processed ECG, PPG, RESP, SpO2, EEG, ACC, EDA, ABP, PCG, EMG, BCG, and SCG manifests, plus UCDDB EEG+RESP+SpO2 session cases.
+
+Updated artifacts:
+- Expanded manifest: `/data1/jiahui/biosignal-agent/outputs/biosignalbench_v1_expanded.jsonl`
+- Expanded summary: `/data1/jiahui/biosignal-agent/outputs/biosignalbench_v1_expanded_summary.json`
+- Expanded validation: `/data1/jiahui/biosignal-agent/outputs/biosignalbench_v1_expanded_validation.json`
+- Composition table: `/data1/jiahui/biosignal-agent/outputs/paper_tables/table27_biosignalbench_expanded_composition.md`
+- Baseline comparison: `/data1/jiahui/biosignal-agent/outputs/paper_tables/table32_expanded1279_baseline_comparison.md`
+
+Baseline results on 1,279 cases: rule planner planning 0.034 / Tool F1 0.536; TF-IDF ToolRAG planning 0.000 / Tool F1 0.526; oracle planning and Tool F1 1.000.
