@@ -554,6 +554,47 @@ def _pcg_best_segmentation_events(values: np.ndarray, sampling_rate: float) -> d
     events["segmentation_method"] = "duration_constrained_hilbert_envelope_segmentation"
     return events
 
+def _pcg_event_point(sample_index: int | None, values: np.ndarray, envelope: np.ndarray, sampling_rate: float) -> dict | None:
+    if sample_index is None:
+        return None
+    idx = int(sample_index)
+    if idx < 0 or idx >= len(values):
+        return None
+    point = {
+        "sample_index": idx,
+        "time_s": float(idx / float(sampling_rate)),
+        "amplitude": float(values[idx]),
+    }
+    if 0 <= idx < len(envelope):
+        point["envelope_amplitude"] = float(envelope[idx])
+    return point
+
+
+def _pcg_s1_s2_fiducials(values: np.ndarray, envelope: np.ndarray, sampling_rate: float, s1_indices: np.ndarray, s2_indices: np.ndarray) -> dict:
+    s1 = np.asarray(s1_indices, dtype=int)
+    s2 = np.asarray(s2_indices, dtype=int)
+    fiducials = []
+    for beat_index, s1_idx in enumerate(s1[:5000]):
+        next_s2 = s2[s2 > s1_idx]
+        next_s1 = s1[s1 > s1_idx]
+        s2_idx = int(next_s2[0]) if len(next_s2) and (not len(next_s1) or next_s2[0] < next_s1[0]) else None
+        fiducials.append({
+            "beat_index": int(beat_index),
+            "S1": _pcg_event_point(int(s1_idx), values, envelope, sampling_rate),
+            "S2": _pcg_event_point(s2_idx, values, envelope, sampling_rate),
+        })
+    denom = max(1, len(fiducials))
+    return {
+        "fiducials": fiducials,
+        "s1_points": [_pcg_event_point(int(x), values, envelope, sampling_rate) for x in s1[:5000]],
+        "s2_points": [_pcg_event_point(int(x), values, envelope, sampling_rate) for x in s2[:5000]],
+        "missing_fiducial_fraction": {
+            "S1": float(sum(row["S1"] is None for row in fiducials) / denom),
+            "S2": float(sum(row["S2"] is None for row in fiducials) / denom),
+        },
+    }
+
+
 def _load_pcg_murmur_model() -> dict | object | None:
     global _PCG_MURMUR_MODEL_CACHE
     if joblib is None or not PCG_MURMUR_MODEL_PATH.exists():
@@ -719,15 +760,21 @@ def PCG_detect_heart_sounds(signal_path: str, sampling_rate: float, column: str 
     data = _load_pcg_signal_data(signal_path, sampling_rate, column)
     events = _pcg_best_segmentation_events(data.values, data.sampling_rate)
     s1_indices = events["s1_indices"]
+    s2_indices = events["s2_indices"]
     sound_indices = events["sound_indices"]
+    fiducial_payload = _pcg_s1_s2_fiducials(data.values, events.get("envelope", np.asarray([])), data.sampling_rate, s1_indices, s2_indices)
     heart_rate = bpm_from_peaks(s1_indices, data.sampling_rate) if len(s1_indices) >= 2 else bpm_from_peaks(sound_indices[::2], data.sampling_rate)
     regularity = interval_regularity(s1_indices if len(s1_indices) >= 2 else sound_indices[::2], data.sampling_rate)
     confidence = float(events.get("segmentation_confidence", 0.2)) if heart_rate is not None and 35 <= heart_rate <= 220 else 0.2
     return {
         "tool": "PCG_detect_heart_sounds",
+        "fiducials": fiducial_payload["fiducials"],
+        "s1_points": fiducial_payload["s1_points"],
+        "s2_points": fiducial_payload["s2_points"],
+        "missing_fiducial_fraction": fiducial_payload["missing_fiducial_fraction"],
         "sound_indices": sound_indices.tolist(),
-        "s1_indices": s1_indices[:20].tolist(),
-        "s2_indices": events["s2_indices"][:20].tolist(),
+        "s1_indices": s1_indices.tolist(),
+        "s2_indices": s2_indices.tolist(),
         "num_sounds": int(len(sound_indices)),
         "num_s1": int(len(events["s1_indices"])),
         "num_s2": int(len(events["s2_indices"])),
@@ -807,6 +854,7 @@ def PCG_segment_s1_s2_proxy(signal_path: str, sampling_rate: float, column: str 
         return {"tool": "PCG_segment_s1_s2_proxy", "error": "not enough heart sounds", "confidence": 0.1, "method": "duration_constrained_hilbert_envelope_segmentation"}
     s1 = np.asarray(s1_indices, dtype=int)
     s2 = np.asarray(s2_indices, dtype=int)
+    fiducial_payload = _pcg_s1_s2_fiducials(data.values, events.get("envelope", np.asarray([])), data.sampling_rate, s1, s2)
     pairs = []
     for idx in s1:
         next_s2 = s2[s2 > idx]
@@ -824,8 +872,12 @@ def PCG_segment_s1_s2_proxy(signal_path: str, sampling_rate: float, column: str 
     heart_rate = bpm_from_peaks(s1, data.sampling_rate)
     return {
         "tool": "PCG_segment_s1_s2_proxy",
-        "s1_indices": s1[:20].tolist(),
-        "s2_indices": s2[:20].tolist(),
+        "fiducials": fiducial_payload["fiducials"],
+        "s1_points": fiducial_payload["s1_points"],
+        "s2_points": fiducial_payload["s2_points"],
+        "missing_fiducial_fraction": fiducial_payload["missing_fiducial_fraction"],
+        "s1_indices": s1.tolist(),
+        "s2_indices": s2.tolist(),
         "num_s1": int(len(s1)),
         "num_s2": int(len(s2)),
         "systole_duration_s": float(np.nanmedian(systoles)) if len(systoles) else None,
@@ -843,7 +895,7 @@ def PCG_segment_s1_s2_proxy(signal_path: str, sampling_rate: float, column: str 
         "segmentation_model_source": events.get("segmentation_model_source"),
         "segmentation_model_metrics": events.get("segmentation_model_metrics"),
         "reference_method": "Springer/Schmidt-style HSMM-inspired duration-constrained PCG state segmentation",
-        "disclaimer": "S1/S2 segmentation is unsupervised and duration-constrained; clinical-grade segmentation requires labeled validation.",
+        "disclaimer": "S1/S2 segmentation uses the Springer-supervised TCN when available and duration-constrained envelope fallback otherwise; clinical-grade segmentation requires labeled validation.",
     }
 
 

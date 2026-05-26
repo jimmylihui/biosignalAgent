@@ -1167,7 +1167,7 @@
   },
   {
     "name": "PCG_detect_heart_sounds",
-    "description": "Detect S1/S2-like PCG heart sounds using Springer-supervised TCN segmentation when available, with duration-constrained Hilbert envelope fallback.",
+    "description": "Detect PCG S1 and S2 heart-sound events using Springer-supervised TCN segmentation when available, with duration-constrained Hilbert envelope fallback. Returns S1/S2 positions with sample/time/amplitude.",
     "modality": "PCG",
     "parameters": {
       "signal_path": {
@@ -1184,6 +1184,10 @@
       }
     },
     "returns": [
+      "fiducials",
+      "s1_points",
+      "s2_points",
+      "missing_fiducial_fraction",
       "sound_indices",
       "s1_indices",
       "s2_indices",
@@ -1193,8 +1197,6 @@
       "heart_rate_bpm",
       "cycle_seconds",
       "periodicity_confidence",
-      "interval_cv",
-      "regularity_confidence",
       "confidence",
       "method",
       "reference_method",
@@ -2685,7 +2687,7 @@
   },
   {
     "name": "PCG_segment_s1_s2_proxy",
-    "description": "Segment PCG S1/S2 states with a Springer-supervised TCN when available, falling back to duration-constrained Hilbert envelope segmentation.",
+    "description": "Segment PCG S1/S2 events with a Springer-supervised TCN when available, falling back to duration-constrained Hilbert envelope segmentation. Returns S1/S2 positions with sample/time/amplitude plus systole/diastole timing.",
     "modality": "PCG",
     "parameters": {
       "signal_path": {
@@ -2702,6 +2704,10 @@
       }
     },
     "returns": [
+      "fiducials",
+      "s1_points",
+      "s2_points",
+      "missing_fiducial_fraction",
       "s1_indices",
       "s2_indices",
       "num_s1",

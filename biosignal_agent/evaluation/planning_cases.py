@@ -170,6 +170,12 @@ DEFAULT_PLANNING_CASES = [
         expected_tools=('PCG_assess_quality', 'PCG_detect_heart_sounds'),
     ),
     PlanningCase(
+        case_id='pcg_s1_s2',
+        question='Detect S1 and S2 heart sound events in this PCG signal',
+        modality='pcg',
+        expected_tools=('PCG_assess_quality', 'PCG_detect_heart_sounds'),
+    ),
+    PlanningCase(
         case_id='acc_quality',
         question='Assess ACC signal quality',
         modality='acc',

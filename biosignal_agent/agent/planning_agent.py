@@ -77,7 +77,8 @@ TASK_TOOL_RULES = {
         ({"rhythm", "irregular", "arrhythmia", "cycle variability"}, ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate", "PCG_assess_rhythm_irregularity"]),
         ({"heart function", "cardiac function", "monitoring", "longitudinal", "trend"}, ["PCG_segment_s1_s2_proxy", "PCG_extract_murmur_features", "PCG_monitor_heart_function_proxy"]),
         ({"spectrogram", "heart sound classification", "pcg classification"}, ["Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features"]),
-        ({"s1", "s2", "segmentation", "systole", "diastole"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy"]),
+        ({"s1", "s2", "heart sound event", "heart sound events"}, ["PCG_detect_heart_sounds"]),
+        ({"segmentation", "systole", "diastole"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy"]),
     ],
     "eda": [
         ({"arousal", "sympathetic", "stress event", "skin conductance response", "scr"}, ["EDA_summarize", "EDA_detect_arousal_events"]),
@@ -259,7 +260,8 @@ class PlanningBioSignalAgent:
                     "mechanical fiducial",
                 ]
             )
-            if not respiration_only and not ppg_specific_morphology and not scg_specific_fiducial:
+            pcg_specific_sounds = modality == "pcg" and any(term in text for term in ["s1", "s2", "heart sound event", "heart sound events"])
+            if not respiration_only and not ppg_specific_morphology and not scg_specific_fiducial and not pcg_specific_sounds:
                 selected.extend(BASIC_ANALYSIS_TOOLS.get(modality, []))
 
         for terms, tools in TASK_TOOL_RULES.get(modality, []):
