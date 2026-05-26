@@ -6,7 +6,6 @@
       "modality": "ECG",
       "task": "R-peak and QRS detection",
       "current_tools": [
-        "ECG_detect_r_peaks",
         "ECG_estimate_heart_rate"
       ],
       "existing_work": [
@@ -104,7 +103,6 @@
       "modality": "ECG",
       "task": "Beat classification",
       "current_tools": [
-        "ECG_detect_r_peaks",
         "ECG_classify_beats",
         "ECG_screen_arrhythmia"
       ],
@@ -209,7 +207,6 @@
       "modality": "PPG",
       "task": "Pulse peak detection",
       "current_tools": [
-        "PPG_detect_peaks",
         "PPG_estimate_heart_rate",
         "PPG_compute_prv",
         "PPG_detect_fiducial_points"
@@ -428,7 +425,6 @@
         "RESP_summarize_event_burden",
         "SpO2_screen_sleep_apnea_ml",
         "SpO2_detect_peaks_troughs",
-        "SpO2_detect_desaturation",
         "Multimodal_screen_sleep_apnea_report"
       ],
       "existing_work": [
@@ -464,7 +460,6 @@
       "current_tools": [
         "SpO2_summarize",
         "SpO2_detect_peaks_troughs",
-        "SpO2_detect_desaturation",
         "SpO2_assess_hypoxemia_burden",
         "SpO2_extract_oximetry_features",
         "SpO2_screen_sleep_apnea_oximetry",
@@ -505,7 +500,6 @@
       "modality": "EEG+EOG+EMG",
       "task": "Sleep staging",
       "current_tools": [
-        "EEG_compute_bandpower",
         "EEG_estimate_sleep_stage_features",
         "EEG_classify_sleep_stage_ml",
         "EEG_estimate_drowsiness"
@@ -605,7 +599,6 @@
       "modality": "PCG",
       "task": "S1/S2 segmentation",
       "current_tools": [
-        "PCG_segment_s1_s2_proxy",
         "PCG_estimate_heart_rate",
         "PCG_assess_rhythm_irregularity",
         "PCG_detect_s3_s4_proxy"
@@ -728,7 +721,6 @@
       "modality": "SCG",
       "task": "J-peak, MC/IM/AO/AC/MO fiducials, respiration, and cardiac timing",
       "current_tools": [
-        "SCG_detect_j_peaks",
         "SCG_estimate_respiration",
         "SCG_detect_fiducial_points",
         "SCG_compute_cardiac_time_intervals"
@@ -896,8 +888,7 @@
       "modality": "EMG",
       "task": "Activation, bursts, and onset detection",
       "current_tools": [
-        "EMG_summarize_activation",
-        "EMG_detect_bursts"
+        "EMG_summarize_activation"
       ],
       "existing_work": [
         "RMS envelope",
@@ -1289,8 +1280,6 @@
       "task": "Standalone respiratory event detection",
       "current_tools": [
         "RESP_detect_breath_peaks",
-        "RESP_detect_apnea",
-        "RESP_detect_hypopnea",
         "RESP_screen_sleep_apnea_ml",
         "RESP_summarize_event_burden"
       ],
@@ -1320,8 +1309,7 @@
       "current_tools": [
         "EMG_estimate_fatigue_ml",
         "EMG_estimate_fatigue",
-        "EMG_summarize_activation",
-        "EMG_detect_bursts"
+        "EMG_summarize_activation"
       ],
       "existing_work": [
         "EMG fatigue tools combine activation and frequency-domain features with ML/proxy outputs; fatigue remains benchmark-dependent and should report dataset and muscle/task context."

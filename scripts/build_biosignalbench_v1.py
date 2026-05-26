@@ -19,9 +19,26 @@ LEGACY_EXPECTED_TOOL_REPLACEMENTS = {
     'ABP_detect_pulses': 'ABP_detect_fiducial_points',
 }
 
+REMOVED_TOOL_NAMES = {
+    'SpO2_detect_desaturation',
+    'EMG_detect_bursts',
+    'EEG_compute_bandpower',
+    'RESP_detect_apnea',
+    'RESP_detect_hypopnea',
+    'ECG_detect_r_peaks',
+    'PPG_detect_peaks',
+    'SCG_detect_j_peaks',
+    'PCG_segment_s1_s2_proxy',
+}
+
 
 def normalize_expected_tools(tools: list[str]) -> list[str]:
-    normalized = [LEGACY_EXPECTED_TOOL_REPLACEMENTS.get(str(tool), str(tool)) for tool in tools]
+    normalized = []
+    for tool in tools:
+        mapped = LEGACY_EXPECTED_TOOL_REPLACEMENTS.get(str(tool), str(tool))
+        if mapped in REMOVED_TOOL_NAMES:
+            continue
+        normalized.append(mapped)
     return list(dict.fromkeys(normalized))
 
 
@@ -103,7 +120,7 @@ def trace_cases(trace_dir: str, limit: int = 120) -> list[dict[str, Any]]:
         except Exception:
             continue
         plan = payload.get('tool_plan') or []
-        tools = [call.get('name') for call in plan if call.get('name')]
+        tools = normalize_expected_tools([call.get('name') for call in plan if call.get('name')])
         if not tools:
             continue
         modality = str(payload.get('modality') or '').lower() or infer_modality_from_tools(tools)
@@ -138,7 +155,7 @@ def session_cases(sft_paths: list[str], limit: int = 80) -> list[dict[str, Any]]
                 answer = json.loads(assistant)
             except Exception:
                 continue
-            tools = [call.get('name') for plan in answer.get('signal_plans', []) for call in plan.get('tool_calls', []) if call.get('name')]
+            tools = normalize_expected_tools([call.get('name') for plan in answer.get('signal_plans', []) for call in plan.get('tool_calls', []) if call.get('name')])
             if not tools:
                 continue
             cid = row.get('metadata', {}).get('trace_id') or f'session_{len(rows):04d}'

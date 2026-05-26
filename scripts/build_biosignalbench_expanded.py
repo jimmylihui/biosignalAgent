@@ -107,31 +107,31 @@ def _tool_cases_for_record(record: dict[str, Any], idx: int) -> list[dict[str, A
     specs: list[tuple[str, str, list[str], dict[str, Any]]] = []
     if modality == 'ecg':
         specs.extend([
-            ('hrv', 'Estimate heart rate and HRV from this ECG segment.', ['ECG_assess_quality', 'ECG_detect_r_peaks', 'ECG_compute_hrv'], {'type': 'ecg_hr_hrv_from_window'}),
-            ('rhythm', 'Screen this ECG segment for rhythm irregularity or arrhythmia concern.', ['ECG_assess_quality', 'ECG_detect_r_peaks', 'ECG_compute_hrv', 'ECG_screen_arrhythmia'], {'type': 'ecg_arrhythmia_window', 'label': record.get('label'), 'binary_label': record.get('binary_label')}),
+            ('hrv', 'Estimate heart rate and HRV from this ECG segment.', ['ECG_assess_quality', 'ECG_compute_hrv'], {'type': 'ecg_hr_hrv_from_window'}),
+            ('rhythm', 'Screen this ECG segment for rhythm irregularity or arrhythmia concern.', ['ECG_assess_quality', 'ECG_compute_hrv', 'ECG_screen_arrhythmia'], {'type': 'ecg_arrhythmia_window', 'label': record.get('label'), 'binary_label': record.get('binary_label')}),
         ])
     elif modality == 'ppg':
         specs.extend([
-            ('pulse', 'Estimate pulse rate from this PPG segment.', ['PPG_assess_quality', 'PPG_detect_peaks'], {'type': 'ppg_pulse_rate'}),
+            ('pulse', 'Estimate pulse rate from this PPG segment.', ['PPG_assess_quality'], {'type': 'ppg_pulse_rate'}),
             ('fiducials', 'Detect PPG pulse onset, systolic peak, dicrotic notch, and diastolic peak fiducials.', ['PPG_assess_quality', 'PPG_detect_fiducial_points'], {'type': 'ppg_on_sp_dn_dp_fiducials'}),
-            ('prv', 'Compute pulse-rate variability and pulse irregularity from this PPG segment.', ['PPG_assess_quality', 'PPG_detect_peaks', 'PPG_compute_prv', 'PPG_screen_pulse_irregularity'], {'type': 'ppg_prv_irregularity'}),
+            ('prv', 'Compute pulse-rate variability and pulse irregularity from this PPG segment.', ['PPG_assess_quality', 'PPG_compute_prv', 'PPG_screen_pulse_irregularity'], {'type': 'ppg_prv_irregularity'}),
         ])
     elif modality == 'resp':
         specs.extend([
             ('rate', 'Estimate respiratory rate from this breathing segment.', ['RESP_assess_quality', 'RESP_estimate_rate'], {'type': 'resp_rate'}),
             ('breath_peaks', 'Detect inhale and exhale peaks from this respiration segment.', ['RESP_assess_quality', 'RESP_detect_breath_peaks'], {'type': 'resp_inhale_exhale_peaks'}),
-            ('event', 'Screen this respiration segment for apnea or hypopnea-like events.', ['RESP_assess_quality', 'RESP_estimate_rate', 'RESP_detect_apnea', 'RESP_detect_hypopnea'], {'type': 'resp_event_window', 'label': record.get('respiratory_event_label'), 'event_types': record.get('event_types')}),
+            ('event', 'Screen this respiration segment for apnea or hypopnea-like events.', ['RESP_assess_quality', 'RESP_estimate_rate'], {'type': 'resp_event_window', 'label': record.get('respiratory_event_label'), 'event_types': record.get('event_types')}),
         ])
     elif modality == 'spo2':
         specs.extend([
-            ('oxygen', 'Summarize oxygen saturation and desaturation burden from this SpO2 segment.', ['SpO2_assess_quality', 'SpO2_summarize', 'SpO2_detect_desaturation'], {'type': 'spo2_desaturation'}),
+            ('oxygen', 'Summarize oxygen saturation and desaturation burden from this SpO2 segment.', ['SpO2_assess_quality', 'SpO2_summarize'], {'type': 'spo2_desaturation'}),
             ('peaks_troughs', 'Detect SpO2 peaks and troughs from this oximetry segment.', ['SpO2_assess_quality', 'SpO2_detect_peaks_troughs'], {'type': 'spo2_peaks_troughs'}),
-            ('apnea_support', 'Use this SpO2 segment as supportive evidence for sleep-disordered breathing risk.', ['SpO2_assess_quality', 'SpO2_summarize', 'SpO2_detect_desaturation', 'SpO2_screen_sleep_apnea_oximetry'], {'type': 'spo2_sleep_apnea_support'}),
+            ('apnea_support', 'Use this SpO2 segment as supportive evidence for sleep-disordered breathing risk.', ['SpO2_assess_quality', 'SpO2_summarize', 'SpO2_screen_sleep_apnea_oximetry'], {'type': 'spo2_sleep_apnea_support'}),
         ])
     elif modality == 'eeg':
         specs.extend([
-            ('bandpower', 'Compute EEG bandpower features for this epoch.', ['EEG_assess_quality', 'EEG_compute_bandpower'], {'type': 'eeg_bandpower'}),
-            ('sleep', 'Estimate sleep-stage features from this EEG epoch.', ['EEG_assess_quality', 'EEG_compute_bandpower', 'EEG_estimate_sleep_stage_features'], {'type': 'eeg_sleep_features', 'label': record.get('sleep_stage')}),
+            ('bandpower', 'Compute EEG bandpower features for this epoch.', ['EEG_assess_quality'], {'type': 'eeg_bandpower'}),
+            ('sleep', 'Estimate sleep-stage features from this EEG epoch.', ['EEG_assess_quality', 'EEG_estimate_sleep_stage_features'], {'type': 'eeg_sleep_features', 'label': record.get('sleep_stage')}),
         ])
     elif modality == 'acc':
         specs.extend([
@@ -165,7 +165,7 @@ def _tool_cases_for_record(record: dict[str, Any], idx: int) -> list[dict[str, A
         ])
     elif modality == 'scg':
         specs.extend([
-            ('jpeaks', 'Detect SCG fiducial/J peaks and estimate heart rate from this segment.', ['SCG_assess_quality', 'SCG_detect_j_peaks', 'SCG_detect_fiducial_points'], {'type': 'scg_hr'}),
+            ('jpeaks', 'Detect SCG fiducial/J peaks and estimate heart rate from this segment.', ['SCG_assess_quality', 'SCG_detect_fiducial_points'], {'type': 'scg_hr'}),
             ('respiration', 'Estimate respiration or mechanical modulation from this SCG segment.', ['SCG_assess_quality', 'SCG_estimate_respiration'], {'type': 'scg_respiration'}),
         ])
     out = []
@@ -219,7 +219,7 @@ def psg_session_task_cases(manifest_path: str | Path, max_records: int = 240, st
             'Review this sleep segment using respiration, SpO2, and EEG. Is there evidence of apnea, hypopnea, oxygen desaturation, or sleep-stage uncertainty?',
             'session',
             'eeg+resp+spo2',
-            ['RESP_assess_quality', 'RESP_estimate_rate', 'RESP_detect_apnea', 'RESP_detect_hypopnea', 'SpO2_assess_quality', 'SpO2_summarize', 'SpO2_detect_desaturation', 'EEG_assess_quality', 'EEG_compute_bandpower', 'EEG_estimate_sleep_stage_features', 'Multimodal_screen_sleep_apnea_report'],
+            ['RESP_assess_quality', 'RESP_estimate_rate', 'SpO2_assess_quality', 'SpO2_summarize', 'EEG_assess_quality', 'EEG_estimate_sleep_stage_features', 'Multimodal_screen_sleep_apnea_report'],
             str(manifest_path),
             signals=signals,
             expected_key_outputs=['respiratory_rate_bpm', 'desaturation_burden', 'sleep_stage_features', 'modality_agreement', 'limitations'],

@@ -371,32 +371,6 @@
     ]
   },
   {
-    "name": "ECG_detect_r_peaks",
-    "description": "Detect ECG R peaks using the Pan-Tompkins 1985 method via NeuroKit2, with Nabian 2018 fallback, and estimate heart rate.",
-    "modality": "ECG",
-    "parameters": {
-      "signal_path": {
-        "type": "string"
-      },
-      "sampling_rate": {
-        "type": "number"
-      },
-      "column": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    "returns": [
-      "r_peak_indices",
-      "num_peaks",
-      "heart_rate_bpm",
-      "confidence",
-      "method"
-    ]
-  },
-  {
     "name": "ECG_estimate_heart_rate",
     "description": "Estimate heart rate from ECG R-peak intervals.",
     "modality": "ECG",
@@ -606,53 +580,6 @@
     ]
   },
   {
-    "name": "PPG_detect_peaks",
-    "description": "Detect PPG systolic peaks using a multiscale detector with optional CapnoBase-trained U-Net peak candidate selection.",
-    "modality": "PPG",
-    "parameters": {
-      "signal_path": {
-        "type": "string"
-      },
-      "sampling_rate": {
-        "type": "number"
-      },
-      "column": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    "returns": [
-      "peak_indices",
-      "num_peaks",
-      "heart_rate_bpm",
-      "confidence",
-      "method",
-      "interval_cv",
-      "regularity_confidence",
-      "flatline_fraction",
-      "saturation_fraction",
-      "baseline_wander_ratio",
-      "high_frequency_noise_ratio",
-      "artifact_score",
-      "median_trough_to_peak_amplitude",
-      "scale_candidate_counts",
-      "long_gap_count",
-      "peak_detector_selected",
-      "peak_detector_classical_score",
-      "peak_detector_dl_score",
-      "classical_method",
-      "peak_dl_num_peaks",
-      "peak_dl_heart_rate_bpm",
-      "peak_dl_probability_mean",
-      "peak_dl_probability_p95",
-      "peak_dl_model_source",
-      "peak_dl_cv_metrics",
-      "peak_dl_error"
-    ]
-  },
-  {
     "name": "BCG_assess_quality",
     "description": "Assess BCG signal quality from a CSV waveform.",
     "modality": "BCG",
@@ -737,34 +664,6 @@
       "dynamic_range",
       "clipped_ratio",
       "confidence"
-    ]
-  },
-  {
-    "name": "SCG_detect_j_peaks",
-    "description": "Detect approximate SCG J peaks using NeuroKit2 ECG Nabian 2018 peak detection after SCG bandpass preprocessing.",
-    "modality": "SCG",
-    "parameters": {
-      "signal_path": {
-        "type": "string"
-      },
-      "sampling_rate": {
-        "type": "number"
-      },
-      "column": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    "returns": [
-      "j_peak_indices",
-      "num_peaks",
-      "heart_rate_bpm",
-      "confidence",
-      "method",
-      "interval_cv",
-      "regularity_confidence"
     ]
   },
   {
@@ -1614,34 +1513,6 @@
     ]
   },
   {
-    "name": "EEG_compute_bandpower",
-    "description": "Compute EEG delta, theta, alpha, beta, and gamma bandpower using Welch PSD.",
-    "modality": "EEG",
-    "parameters": {
-      "signal_path": {
-        "type": "string"
-      },
-      "sampling_rate": {
-        "type": "number"
-      },
-      "column": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    "returns": [
-      "delta_power",
-      "theta_power",
-      "alpha_power",
-      "beta_power",
-      "gamma_power",
-      "total_power",
-      "confidence"
-    ]
-  },
-  {
     "name": "EMG_assess_quality",
     "description": "Assess EMG signal quality from a CSV waveform.",
     "modality": "EMG",
@@ -1723,75 +1594,6 @@
       "rhythm_probabilities",
       "rhythm_model_source",
       "rhythm_cv_metrics"
-    ]
-  },
-  {
-    "name": "RESP_detect_apnea",
-    "description": "Screen respiration waveform for low-amplitude apnea-like events lasting at least 10 seconds.",
-    "modality": "RESP",
-    "parameters": {
-      "signal_path": {
-        "type": "string"
-      },
-      "sampling_rate": {
-        "type": "number"
-      },
-      "column": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    "returns": [
-      "apnea_event_count",
-      "apnea_index_per_hour",
-      "longest_event_s",
-      "low_respiration_fraction",
-      "event_intervals_s",
-      "confidence",
-      "method",
-      "disclaimer"
-    ]
-  },
-  {
-    "name": "SpO2_detect_desaturation",
-    "description": "Screen SpO2 time series for oxygen desaturation events and estimate oxygen desaturation index.",
-    "modality": "SpO2",
-    "parameters": {
-      "signal_path": {
-        "type": "string"
-      },
-      "sampling_rate": {
-        "type": "number"
-      },
-      "column": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    "returns": [
-      "baseline_spo2_percent",
-      "min_spo2_percent",
-      "time_below_90_fraction",
-      "desaturation_event_count",
-      "oxygen_desaturation_index_per_hour",
-      "event_intervals_s",
-      "confidence",
-      "method",
-      "disclaimer",
-      "desaturation_event_count_3pct",
-      "desaturation_event_count_4pct",
-      "odi3_per_hour",
-      "odi4_per_hour",
-      "mean_desaturation_depth_percent",
-      "max_desaturation_depth_percent",
-      "median_desaturation_duration_s",
-      "desaturation_area_percent_minutes_per_hour",
-      "events",
-      "artifact_fraction"
     ]
   },
   {
@@ -2240,34 +2042,6 @@
       "spike_rate_per_min",
       "fast_power_ratio",
       "seizure_like_risk",
-      "confidence",
-      "method",
-      "disclaimer"
-    ]
-  },
-  {
-    "name": "RESP_detect_hypopnea",
-    "description": "Detect hypopnea-like reduced respiration envelope events lasting at least 10 seconds.",
-    "modality": "RESP",
-    "parameters": {
-      "signal_path": {
-        "type": "string"
-      },
-      "sampling_rate": {
-        "type": "number"
-      },
-      "column": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    "returns": [
-      "hypopnea_event_count",
-      "hypopnea_index_per_hour",
-      "reduced_respiration_fraction",
-      "event_intervals_s",
       "confidence",
       "method",
       "disclaimer"
@@ -2765,52 +2539,6 @@
     ]
   },
   {
-    "name": "PCG_segment_s1_s2_proxy",
-    "description": "Segment PCG S1/S2 events with a Springer-supervised TCN when available, falling back to duration-constrained Hilbert envelope segmentation. Returns S1/S2 positions with sample/time/amplitude plus systole/diastole timing.",
-    "modality": "PCG",
-    "parameters": {
-      "signal_path": {
-        "type": "string"
-      },
-      "sampling_rate": {
-        "type": "number"
-      },
-      "column": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    "returns": [
-      "fiducials",
-      "s1_points",
-      "s2_points",
-      "missing_fiducial_fraction",
-      "s1_indices",
-      "s2_indices",
-      "num_s1",
-      "num_s2",
-      "systole_duration_s",
-      "diastole_duration_s",
-      "systole_duration_cv",
-      "diastole_duration_cv",
-      "cycle_duration_cv",
-      "systolic_coverage_fraction",
-      "diastolic_coverage_fraction",
-      "cycle_seconds",
-      "heart_rate_bpm",
-      "periodicity_confidence",
-      "confidence",
-      "method",
-      "reference_method",
-      "disclaimer",
-      "error",
-      "segmentation_model_source",
-      "segmentation_model_metrics"
-    ]
-  },
-  {
     "name": "ACC_detect_activity_bouts",
     "description": "Detect accelerometer activity bouts using magnitude RMS over short windows.",
     "modality": "ACC",
@@ -2953,33 +2681,6 @@
       "eeg_artifact_level",
       "extreme_amplitude_fraction",
       "high_frequency_power_ratio",
-      "confidence",
-      "method",
-      "disclaimer"
-    ]
-  },
-  {
-    "name": "EMG_detect_bursts",
-    "description": "Detect EMG activation bursts and onset-like periods from an RMS envelope.",
-    "modality": "EMG",
-    "parameters": {
-      "signal_path": {
-        "type": "string"
-      },
-      "sampling_rate": {
-        "type": "number"
-      },
-      "column": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    "returns": [
-      "burst_count",
-      "burst_rate_per_min",
-      "mean_burst_duration_s",
       "confidence",
       "method",
       "disclaimer"

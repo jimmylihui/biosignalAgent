@@ -22,17 +22,17 @@ MODALITY_KEYWORDS = {
 }
 
 BASIC_ANALYSIS_TOOLS = {
-    "ecg": ["ECG_detect_r_peaks"],
-    "ppg": ["PPG_detect_peaks"],
+    "ecg": [],
+    "ppg": [],
     "bcg": ["BCG_detect_j_peaks"],
-    "scg": ["SCG_detect_j_peaks"],
+    "scg": [],
     "resp": ["RESP_detect_breath_peaks"],
     "spo2": ["SpO2_summarize"],
     "abp": ["ABP_detect_fiducial_points"],
     "pcg": ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate"],
     "acc": ["ACC_summarize_activity"],
     "eda": ["EDA_summarize"],
-    "eeg": ["EEG_compute_bandpower"],
+    "eeg": [],
     "emg": ["EMG_summarize_activation"],
 }
 
@@ -42,18 +42,18 @@ TASK_TOOL_RULES = {
     ],
 
     "ppg": [
-        ({"heart rate", "hr", "bpm", "pulse rate"}, ["PPG_detect_peaks"]),
-        ({"prv", "pulse rate variability", "hrv", "pulse variability", "rmssd", "sdnn"}, ["PPG_detect_peaks", "PPG_compute_prv"]),
+        ({"heart rate", "hr", "bpm", "pulse rate"}, []),
+        ({"prv", "pulse rate variability", "hrv", "pulse variability", "rmssd", "sdnn"}, ["PPG_compute_prv"]),
         ({"fiducial", "onset", "dicrotic", "notch", "systolic peak", "diastolic peak", "pulse morphology"}, ["PPG_detect_fiducial_points"]),
         ({"spo2", "oxygen saturation", "blood oxygen", "red infrared", "red/ir"}, ["PPG_estimate_spo2"]),
         ({"blood pressure", "bp", "cuffless", "pat", "ptt"}, ["PPG_detect_fiducial_points", "PPG_estimate_bp_proxy"]),
         ({"perfusion", "low perfusion", "pulse amplitude"}, ["PPG_assess_perfusion_variability"]),
         ({"shock", "low-perfusion", "low perfusion shock", "hypoperfusion"}, ["PPG_screen_low_perfusion_shock_risk"]),
-        ({"irregular pulse", "pulse irregularity", "af", "afib", "atrial fibrillation"}, ["PPG_detect_peaks", "PPG_screen_pulse_irregularity", "PPG_detect_afib"]),
-        ({"respiration", "respiratory modulation", "ppg respiration", "breathing", "respiratory rate"}, ["PPG_detect_peaks", "PPG_estimate_respiration_modulation"]),
-        ({"sleep", "sleep monitoring", "sleep state", "recovery"}, ["PPG_detect_peaks", "PPG_compute_prv", "PPG_estimate_respiration_modulation", "PPG_estimate_sleep_features"]),
-        ({"stress", "emotion", "mental workload", "strain"}, ["PPG_detect_peaks", "PPG_compute_prv", "PPG_assess_stress_prv"]),
-        ({"exercise", "activity intensity", "workout", "sport", "fitness"}, ["PPG_detect_peaks", "PPG_estimate_heart_rate", "PPG_estimate_exercise_intensity"]),
+        ({"irregular pulse", "pulse irregularity", "af", "afib", "atrial fibrillation"}, ["PPG_screen_pulse_irregularity", "PPG_detect_afib"]),
+        ({"respiration", "respiratory modulation", "ppg respiration", "breathing", "respiratory rate"}, ["PPG_estimate_respiration_modulation"]),
+        ({"sleep", "sleep monitoring", "sleep state", "recovery"}, ["PPG_compute_prv", "PPG_estimate_respiration_modulation", "PPG_estimate_sleep_features"]),
+        ({"stress", "emotion", "mental workload", "strain"}, ["PPG_compute_prv", "PPG_assess_stress_prv"]),
+        ({"exercise", "activity intensity", "workout", "sport", "fitness"}, ["PPG_estimate_heart_rate", "PPG_estimate_exercise_intensity"]),
         ({"vascular", "arterial stiffness", "vascular health", "vascular aging", "pulse wave"}, ["PPG_detect_fiducial_points", "PPG_assess_vascular_health"]),
     ],
 
@@ -71,14 +71,14 @@ TASK_TOOL_RULES = {
     "pcg": [
         ({"heart rate", "hr", "bpm"}, ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate"]),
         ({"murmur", "abnormal heart sound"}, ["PCG_detect_heart_sounds", "Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features"]),
-        ({"valve", "valvular", "aortic", "mitral", "tricuspid"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy", "PCG_extract_murmur_features", "PCG_screen_murmur_proxy", "PCG_screen_valve_disease_proxy"]),
+        ({"valve", "valvular", "aortic", "mitral", "tricuspid"}, ["PCG_detect_heart_sounds", "PCG_extract_murmur_features", "PCG_screen_murmur_proxy", "PCG_screen_valve_disease_proxy"]),
         ({"congenital", "chd", "pediatric structural", "structural abnormality"}, ["PCG_detect_heart_sounds", "PCG_screen_murmur_proxy", "PCG_screen_congenital_abnormality_proxy"]),
-        ({"s3", "s4", "extra heart sound", "gallop"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy", "PCG_detect_s3_s4_proxy"]),
+        ({"s3", "s4", "extra heart sound", "gallop"}, ["PCG_detect_heart_sounds", "PCG_detect_s3_s4_proxy"]),
         ({"rhythm", "irregular", "arrhythmia", "cycle variability"}, ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate", "PCG_assess_rhythm_irregularity"]),
-        ({"heart function", "cardiac function", "monitoring", "longitudinal", "trend"}, ["PCG_segment_s1_s2_proxy", "PCG_extract_murmur_features", "PCG_monitor_heart_function_proxy"]),
+        ({"heart function", "cardiac function", "monitoring", "longitudinal", "trend"}, ["PCG_extract_murmur_features", "PCG_monitor_heart_function_proxy"]),
         ({"spectrogram", "heart sound classification", "pcg classification"}, ["Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features"]),
         ({"s1", "s2", "heart sound event", "heart sound events"}, ["PCG_detect_heart_sounds"]),
-        ({"segmentation", "systole", "diastole"}, ["PCG_detect_heart_sounds", "PCG_segment_s1_s2_proxy"]),
+        ({"segmentation", "systole", "diastole"}, ["PCG_detect_heart_sounds"]),
     ],
     "eda": [
         ({"arousal", "sympathetic", "stress event", "skin conductance response", "scr"}, ["EDA_summarize", "EDA_detect_arousal_events"]),
@@ -86,37 +86,37 @@ TASK_TOOL_RULES = {
     ],
     "emg": [
         ({"fatigue", "median frequency", "muscle fatigue"}, ["EMG_summarize_activation", "EMG_estimate_fatigue"]),
-        ({"burst", "bursts", "onset", "contraction", "muscle contraction"}, ["EMG_summarize_activation", "EMG_detect_bursts"]),
+        ({"burst", "bursts", "onset", "contraction", "muscle contraction"}, ["EMG_summarize_activation"]),
         ({"spectrogram", "classification", "condition", "condition classification", "myopathy", "neuropathy", "healthy"}, ["Signal_extract_spectrogram_features", "Signal_render_spectrogram_image", "EMG_summarize_activation"]),
     ],
     "ecg": [
-        ({"heart rate", "bpm", "r-peak", "r peak", "qrs detection"}, ["ECG_detect_r_peaks"]),
-        ({"beat classification", "beat-level", "beat level", "pvc", "pac", "sveb", "veb", "ectopy"}, ["ECG_detect_r_peaks", "ECG_classify_beats", "ECG_screen_arrhythmia"]),
-        ({"afib", "atrial fibrillation", "af detection", "af screening"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_detect_afib", "ECG_classify_rhythm_segment"]),
-        ({"arrhythmia", "rhythm", "irregular", "bradycardia", "tachycardia", "pause"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_classify_rhythm_segment", "ECG_screen_arrhythmia"]),
-        ({"apnea", "apnoea", "sleep disordered", "sleep breathing", "sleep apnea"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_screen_sleep_apnea"]),
-        ({"qt", "qtc", "long qt", "qt prolongation"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval"]),
-        ({"conduction", "bundle branch", "av block", "pr interval", "qrs duration"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_screen_conduction_block"]),
-        ({"ischemia", "ischaemia", "st elevation", "st depression", "st abnormality"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_screen_ischemia_st"]),
-        ({"stress", "fatigue", "recovery", "autonomic"}, ["ECG_detect_r_peaks", "ECG_compute_hrv", "ECG_assess_stress_fatigue_hrv"]),
-        ({"morphology", "interval", "intervals", "p wave", "t wave"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval", "ECG_screen_conduction_block", "ECG_screen_ischemia_st"]),
+        ({"heart rate", "bpm", "r-peak", "r peak", "qrs detection"}, []),
+        ({"beat classification", "beat-level", "beat level", "pvc", "pac", "sveb", "veb", "ectopy"}, ["ECG_classify_beats", "ECG_screen_arrhythmia"]),
+        ({"afib", "atrial fibrillation", "af detection", "af screening"}, ["ECG_compute_hrv", "ECG_detect_afib", "ECG_classify_rhythm_segment"]),
+        ({"arrhythmia", "rhythm", "irregular", "bradycardia", "tachycardia", "pause"}, ["ECG_compute_hrv", "ECG_classify_rhythm_segment", "ECG_screen_arrhythmia"]),
+        ({"apnea", "apnoea", "sleep disordered", "sleep breathing", "sleep apnea"}, ["ECG_compute_hrv", "ECG_screen_sleep_apnea"]),
+        ({"qt", "qtc", "long qt", "qt prolongation"}, ["ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval"]),
+        ({"conduction", "bundle branch", "av block", "pr interval", "qrs duration"}, ["ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_screen_conduction_block"]),
+        ({"ischemia", "ischaemia", "st elevation", "st depression", "st abnormality"}, ["ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_screen_ischemia_st"]),
+        ({"stress", "fatigue", "recovery", "autonomic"}, ["ECG_compute_hrv", "ECG_assess_stress_fatigue_hrv"]),
+        ({"morphology", "interval", "intervals", "p wave", "t wave"}, ["ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval", "ECG_screen_conduction_block", "ECG_screen_ischemia_st"]),
     ],
     "resp": [
         ({"respiratory rate", "breathing rate", "breath rate", "rate", "bpm", "breaths per minute"}, ["RESP_detect_breath_peaks", "RESP_estimate_rate"]),
         ({"inhale", "exhale", "inspiration", "expiration", "breath peak", "breath peaks", "respiratory peak", "respiratory peaks", "respiratory extrema", "breath fiducial", "breath fiducials"}, ["RESP_detect_breath_peaks"]),
-        ({"apnea", "apnoea", "sleep disordered", "cessation"}, ["RESP_estimate_rate", "RESP_detect_apnea"]),
-        ({"hypopnea", "hypopnoea", "shallow breathing", "airflow reduction", "reduced respiration"}, ["RESP_estimate_rate", "RESP_detect_hypopnea"]),
+        ({"apnea", "apnoea", "sleep disordered", "cessation"}, ["RESP_estimate_rate"]),
+        ({"hypopnea", "hypopnoea", "shallow breathing", "airflow reduction", "reduced respiration"}, ["RESP_estimate_rate"]),
         ({"tachypnea", "bradypnea", "periodic breathing", "irregular breathing", "respiratory pattern", "breathing pattern"}, ["RESP_estimate_rate", "RESP_screen_rate_pattern"]),
     ],
     "spo2": [
         ({"peak", "peaks", "trough", "troughs", "nadir", "nadirs", "local extrema", "maxima", "minima"}, ["SpO2_detect_peaks_troughs"]),
-        ({"desaturation", "desat", "odi", "oxygen drop", "below 90", "apnea"}, ["SpO2_summarize", "SpO2_detect_desaturation"]),
+        ({"desaturation", "desat", "odi", "oxygen drop", "below 90", "apnea"}, ["SpO2_summarize"]),
         ({"hypoxemia", "hypoxaemia", "oxygen burden", "below 88", "low oxygen burden"}, ["SpO2_summarize", "SpO2_assess_hypoxemia_burden"]),
     ],
     "eeg": [
-        ({"sleep stage", "sleep staging", "n1", "n2", "n3", "rem", "wake", "slow wave"}, ["EEG_compute_bandpower", "EEG_estimate_sleep_stage_features"]),
-        ({"seizure", "epileptiform", "spike", "spikes", "abnormal eeg"}, ["EEG_compute_bandpower", "EEG_screen_seizure_like_activity"]),
-        ({"drowsiness", "vigilance", "alertness", "sleepiness"}, ["EEG_compute_bandpower", "EEG_estimate_drowsiness"]),
+        ({"sleep stage", "sleep staging", "n1", "n2", "n3", "rem", "wake", "slow wave"}, ["EEG_estimate_sleep_stage_features"]),
+        ({"seizure", "epileptiform", "spike", "spikes", "abnormal eeg"}, ["EEG_screen_seizure_like_activity"]),
+        ({"drowsiness", "vigilance", "alertness", "sleepiness"}, ["EEG_estimate_drowsiness"]),
         ({"artifact", "blink", "eye movement", "muscle artifact", "eeg artifact"}, ["Signal_detect_artifacts", "EEG_detect_artifact_proxy"]),
     ],
     "acc": [
@@ -223,7 +223,7 @@ class PlanningBioSignalAgent:
         )
         if modality == "ecg":
             if wants_analysis or wants_hrv:
-                selected.append("ECG_detect_r_peaks")
+                selected.append()
             if wants_hrv or any(term in text for term in ["variability", "hrv", "summary", "summarize", "analyze"]):
                 selected.append("ECG_compute_hrv")
         elif wants_analysis and not wants_artifact:

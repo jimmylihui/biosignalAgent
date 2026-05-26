@@ -125,14 +125,14 @@ def dependency_tools_for(tool_name: str, modality: str, level: str) -> list[str]
         return ['ABP_detect_fiducial_points']
     if modality == 'ecg':
         if any(term in n for term in ['compute_hrv', 'estimate_heart_rate', 'screen_arrhythmia', 'detect_afib', 'screen_sleep_apnea', 'classify_rhythm', 'classify_beats']):
-            deps.append('ECG_detect_r_peaks')
+            pass
         if any(term in n for term in ['screen_arrhythmia', 'detect_afib', 'screen_sleep_apnea']):
             deps.append('ECG_compute_hrv')
         if any(term in n for term in ['morphology', 'qt', 'conduction', 'ischemia', 'st']):
             deps.append('ECG_delineate_waves_dl')
     elif modality == 'ppg':
         if any(term in n for term in ['compute_prv', 'estimate_heart_rate', 'screen_pulse_irregularity', 'detect_afib', 'respiration_modulation']):
-            deps.append('PPG_detect_peaks')
+            pass
         if any(term in n for term in ['compute_prv', 'screen_pulse_irregularity', 'detect_afib', 'assess_stress']):
             deps.append('PPG_compute_prv')
         if 'fiducial' in n or 'vascular' in n or 'bp_proxy' in n:
@@ -146,7 +146,7 @@ def dependency_tools_for(tool_name: str, modality: str, level: str) -> list[str]
         if any(term in n for term in ['cardiac_time', 'contractility', 'mechanical_abnormality']):
             deps.append('SCG_detect_fiducial_points')
         if 'j_peak' in n or 'j_peaks' in n:
-            deps.append('SCG_detect_j_peaks')
+            pass
     elif modality == 'resp':
         if 'estimate_rate' in n:
             deps.append('RESP_detect_breath_peaks')
@@ -154,7 +154,7 @@ def dependency_tools_for(tool_name: str, modality: str, level: str) -> list[str]
             deps.append('RESP_estimate_rate')
     elif modality == 'spo2':
         if any(term in n for term in ['summarize', 'sleep_apnea', 'hypoxemia', 'oximetry']):
-            deps.append('SpO2_detect_desaturation')
+            pass
     elif modality == 'pcg':
         if any(term in n for term in ['estimate_heart_rate', 'rhythm_irregularity', 'murmur', 'valve', 'congenital', 's3_s4', 'heart_function']):
             deps.append('PCG_detect_heart_sounds')
@@ -165,10 +165,10 @@ def dependency_tools_for(tool_name: str, modality: str, level: str) -> list[str]
             deps.append('EDA_extract_tonic_phasic_features')
     elif modality == 'eeg':
         if any(term in n for term in ['sleep', 'drowsiness', 'seizure', 'artifact']):
-            deps.append('EEG_compute_bandpower')
+            pass
     elif modality == 'emg':
         if any(term in n for term in ['activation', 'fatigue', 'gesture', 'action', 'gait', 'rehab', 'neuromuscular', 'intent']):
-            deps.append('EMG_detect_bursts')
+            pass
     elif modality == 'abp':
         if any(term in n for term in ['hemodynamics', 'pressure', 'hypotensive', 'shock']):
             deps.append('ABP_detect_fiducial_points')
@@ -179,9 +179,9 @@ def dependency_tools_for(tool_name: str, modality: str, level: str) -> list[str]
             deps.append('ACC_extract_actigraphy_features')
     if tool_name.startswith('Multimodal_'):
         if 'sleep_apnea' in n:
-            deps.extend(['RESP_detect_apnea', 'RESP_detect_hypopnea', 'SpO2_detect_desaturation'])
+            deps.extend([])
         if 'ecg_ppg' in n or 'pat' in n:
-            deps.extend(['ECG_detect_r_peaks', 'PPG_detect_peaks'])
+            deps.extend([])
     return list(dict.fromkeys(dep for dep in deps if dep != tool_name))
 
 
@@ -578,17 +578,17 @@ def session_prior_tools(modality: str, question: str) -> list[str]:
         return []
     selected: list[str] = []
     core_by_modality = {
-        'ecg': ['ECG_assess_quality', 'ECG_detect_r_peaks', 'ECG_compute_hrv'],
-        'ppg': ['PPG_assess_quality', 'PPG_detect_peaks'],
+        'ecg': ['ECG_assess_quality', 'ECG_compute_hrv'],
+        'ppg': ['PPG_assess_quality'],
         'bcg': ['BCG_assess_quality', 'BCG_detect_j_peaks'],
-        'scg': ['SCG_assess_quality', 'SCG_detect_j_peaks'],
+        'scg': ['SCG_assess_quality'],
         'resp': ['RESP_assess_quality', 'RESP_estimate_rate'],
         'spo2': ['SpO2_assess_quality', 'SpO2_summarize'],
         'abp': ['ABP_assess_quality', 'ABP_detect_fiducial_points'],
         'pcg': ['PCG_assess_quality', 'PCG_detect_heart_sounds'],
         'acc': ['ACC_assess_quality', 'ACC_summarize_activity'],
         'eda': ['EDA_assess_quality', 'EDA_summarize'],
-        'eeg': ['EEG_assess_quality', 'EEG_compute_bandpower'],
+        'eeg': ['EEG_assess_quality'],
         'emg': ['EMG_assess_quality', 'EMG_summarize_activation'],
     }
     selected.extend([tool for tool in core_by_modality.get(modality, []) if tool in base])
