@@ -195,6 +195,8 @@ def io_semantics_for(tool_name: str, modality: str, level: str) -> tuple[list[st
         produces.extend(['systolic_onset', 'systolic_peak', 'dicrotic_notch', 'diastolic_peak', 'diastolic_phase_endpoint'])
     if modality == 'ppg' and 'fiducial' in n:
         produces.extend(['pulse_onset', 'systolic_peak', 'dicrotic_notch', 'diastolic_peak'])
+    if modality == 'scg' and 'fiducial' in n:
+        produces.extend(['mc_point', 'im_point', 'ao_point', 'ac_point', 'mo_point'])
     if modality == 'ecg' and ('delineate' in n or 'fiducial' in n):
         produces.extend(['p_wave_peak', 'qrs_complex_peak', 't_wave_peak'])
     if 'hrv' in n:

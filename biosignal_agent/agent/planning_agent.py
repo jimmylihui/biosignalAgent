@@ -10,7 +10,7 @@ MODALITY_KEYWORDS = {
     "ecg": {"ecg", "ekg", "electrocardiogram", "r-peak", "r peak", "qrs", "hrv", "rr", "qt", "qtc", "st", "pr interval", "p wave", "t wave"},
     "ppg": {"ppg", "photoplethysmography", "pulse", "pleth", "prv", "pulse rate variability", "spo2", "oxygen", "respiration modulation", "respiratory modulation", "ppg respiration", "irregular pulse", "pulse irregularity", "af", "afib", "blood pressure", "vascular", "perfusion", "sleep", "stress", "exercise", "shock"},
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak", "bcg respiration", "bcg breathing", "bed-based"},
-    "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak", "scg respiration", "scg breathing"},
+    "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak", "fiducial", "mc", "im", "ao", "ac", "mo", "aortic opening", "aortic closure", "mitral closure", "mitral opening", "scg respiration", "scg breathing"},
     "resp": {"resp", "respiration", "respiratory", "breath", "breathing", "tachypnea", "bradypnea", "periodic breathing"},
     "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation", "hypoxemia", "hypoxaemia"},
     "abp": {"abp", "arterial blood pressure", "blood pressure", "systolic", "diastolic"},
@@ -61,6 +61,7 @@ TASK_TOOL_RULES = {
         ({"respiration", "respiratory", "breathing", "breath"}, ["BCG_estimate_respiration"]),
     ],
     "scg": [
+        ({"fiducial", "mc", "im", "ao", "ac", "mo", "aortic opening", "aortic closure", "mitral closure", "mitral opening", "mechanical fiducial"}, ["SCG_detect_fiducial_points"]),
         ({"respiration", "respiratory", "breathing", "breath"}, ["SCG_estimate_respiration"]),
     ],
     "abp": [
@@ -242,7 +243,23 @@ class PlanningBioSignalAgent:
                     "shock",
                 ]
             )
-            if not respiration_only and not ppg_specific_morphology:
+            scg_specific_fiducial = modality == "scg" and any(
+                term in text
+                for term in [
+                    "fiducial",
+                    "mc",
+                    "im",
+                    "ao",
+                    "ac",
+                    "mo",
+                    "aortic opening",
+                    "aortic closure",
+                    "mitral closure",
+                    "mitral opening",
+                    "mechanical fiducial",
+                ]
+            )
+            if not respiration_only and not ppg_specific_morphology and not scg_specific_fiducial:
                 selected.extend(BASIC_ANALYSIS_TOOLS.get(modality, []))
 
         for terms, tools in TASK_TOOL_RULES.get(modality, []):

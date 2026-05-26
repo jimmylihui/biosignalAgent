@@ -721,12 +721,15 @@
     },
     {
       "modality": "SCG",
-      "task": "J-peak, heart rate, respiration, and cardiac timing",
+      "task": "J-peak, MC/IM/AO/AC/MO fiducials, respiration, and cardiac timing",
       "current_tools": [
         "SCG_detect_j_peaks",
-        "SCG_estimate_respiration"
+        "SCG_estimate_respiration",
+        "SCG_detect_fiducial_points",
+        "SCG_compute_cardiac_time_intervals"
       ],
       "existing_work": [
+        "SCG MC/IM/AO/AC/MO mechanical fiducial detection",
         "SCG AO/AC/MC event detection",
         "Hilbert and template matching",
         "cardiorespiratory SCG monitoring",

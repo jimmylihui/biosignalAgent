@@ -769,7 +769,7 @@
   },
   {
     "name": "SCG_detect_fiducial_points",
-    "description": "Detect approximate SCG mechanical fiducial points such as AO, AC, MC, and MO. When ECG input is supplied and the trained ECG-anchor CNN is available, use it for AO candidates; otherwise use J-peak anchored physiological windows. ECG pairing supports R-to-AO timing and HR, not diagnostic PEP.",
+    "description": "Detect approximate SCG mechanical fiducial points MC, IM, AO, AC, and MO. When ECG input is supplied and the trained ECG-anchor CNN is available, use it for AO candidates; otherwise use J-peak anchored physiological windows. Each fiducial point includes sample/time/amplitude.",
     "modality": "SCG",
     "parameters": {
       "signal_path": {
@@ -804,10 +804,18 @@
       }
     },
     "returns": [
+      "fiducials",
+      "mc_points",
+      "im_points",
+      "ao_points",
+      "ac_points",
+      "mo_points",
+      "mc_indices",
+      "im_indices",
       "ao_indices",
       "ac_indices",
-      "mc_indices",
       "mo_indices",
+      "missing_fiducial_fraction",
       "ecg_r_indices",
       "r_to_ao_ms",
       "num_beats",

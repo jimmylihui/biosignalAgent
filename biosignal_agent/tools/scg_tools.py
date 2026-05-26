@@ -232,6 +232,19 @@ def _local_abs_extrema(values: np.ndarray, center: int, sampling_rate: float, st
     return int(lo + np.argmax(np.abs(values[lo:hi])))
 
 
+def _scg_fiducial_point(sample_index: int | None, values: np.ndarray, sampling_rate: float) -> dict | None:
+    if sample_index is None:
+        return None
+    idx = int(sample_index)
+    if idx < 0 or idx >= len(values):
+        return None
+    return {
+        "sample_index": idx,
+        "time_s": float(idx / float(sampling_rate)),
+        "amplitude": float(values[idx]),
+    }
+
+
 def _ecg_peaks_plausible(peaks: np.ndarray, sampling_rate: float, n_samples: int) -> bool:
     if len(peaks) < 2:
         return False
@@ -297,12 +310,12 @@ def SCG_detect_fiducial_points(
     ecg_sampling_rate: float | None = None,
     ecg_column: str | None = None,
 ) -> dict:
-    """Detect approximate SCG fiducial points.
+    """Detect approximate SCG mechanical fiducial points.
 
-    AO is approximated from the existing SCG J-peak detector. AC, MC, and MO are
-    local mechanical extrema in physiological windows around AO. If ECG is
-    provided, ECG R peaks are paired to AO for R-to-AO timing; this is not a full
-    Q-onset PEP measurement.
+    AO is approximated from the ECG-anchor CNN when possible, otherwise from the
+    existing SCG J-peak detector. MC, IM, AC, and MO are local mechanical extrema
+    in physiological windows around AO. If ECG is provided, ECG R peaks are paired
+    to AO for R-to-AO timing; this is not a full Q-onset PEP measurement.
     """
     data = load_csv_signal(signal_path, sampling_rate, column)
     values = data.values
@@ -328,11 +341,13 @@ def SCG_detect_fiducial_points(
         return {"tool": "SCG_detect_fiducial_points", "ao_indices": ao.tolist(), "confidence": 0.2, "method": "heuristic_scg_fiducials", **peak_details}
 
     cycle_s = float(np.median(np.diff(ao)) / data.sampling_rate)
-    ac, mc, mo = [], [], []
+    ac, mc, im, mo = [], [], [], []
+    fiducials = []
     for i, aortic_open in enumerate(ao):
         ac_end = min(0.45, max(0.22, 0.70 * cycle_s))
         ac_i = _local_abs_extrema(filtered, int(aortic_open), data.sampling_rate, 0.18, ac_end)
-        mc_i = _local_abs_extrema(filtered, int(aortic_open), data.sampling_rate, -0.14, -0.02)
+        mc_i = _local_abs_extrema(filtered, int(aortic_open), data.sampling_rate, -0.16, -0.07)
+        im_i = _local_abs_extrema(filtered, int(aortic_open), data.sampling_rate, -0.08, -0.005)
         if ac_i is not None:
             next_ao = int(ao[i + 1]) if i + 1 < len(ao) else len(filtered) - 1
             mo_end = min(0.30, max(0.10, (next_ao - ac_i) / data.sampling_rate - 0.03))
@@ -341,7 +356,16 @@ def SCG_detect_fiducial_points(
             mo_i = None
         ac.append(ac_i)
         mc.append(mc_i)
+        im.append(im_i)
         mo.append(mo_i)
+        fiducials.append({
+            "beat_index": int(i),
+            "MC": _scg_fiducial_point(mc_i, filtered, data.sampling_rate),
+            "IM": _scg_fiducial_point(im_i, filtered, data.sampling_rate),
+            "AO": _scg_fiducial_point(int(aortic_open), filtered, data.sampling_rate),
+            "AC": _scg_fiducial_point(ac_i, filtered, data.sampling_rate),
+            "MO": _scg_fiducial_point(mo_i, filtered, data.sampling_rate),
+        })
 
     ecg_r = []
     r_to_ao_ms = []
@@ -365,19 +389,33 @@ def SCG_detect_fiducial_points(
     return {
         "tool": "SCG_detect_fiducial_points",
         "source": data.source,
+        "fiducials": fiducials,
+        "mc_points": [row["MC"] for row in fiducials if row["MC"] is not None],
+        "im_points": [row["IM"] for row in fiducials if row["IM"] is not None],
+        "ao_points": [row["AO"] for row in fiducials if row["AO"] is not None],
+        "ac_points": [row["AC"] for row in fiducials if row["AC"] is not None],
+        "mo_points": [row["MO"] for row in fiducials if row["MO"] is not None],
         "ao_indices": ao.tolist(),
         "ac_indices": [int(x) if x is not None else None for x in ac],
         "mc_indices": [int(x) if x is not None else None for x in mc],
+        "im_indices": [int(x) if x is not None else None for x in im],
         "mo_indices": [int(x) if x is not None else None for x in mo],
         "ecg_r_indices": ecg_r,
         "r_to_ao_ms": r_to_ao_ms,
         "num_beats": int(len(ao)),
         "heart_rate_bpm": bpm_from_peaks(ao, data.sampling_rate),
         "confidence": confidence,
-        "method": "ecg_anchor_cnn_fiducial_windows" if peak_details.get("detector_backend") == "ecg_anchor_cnn" else "heuristic_scg_fiducial_windows",
+        "missing_fiducial_fraction": {
+            "MC": float(sum(x is None for x in mc) / max(1, len(ao))),
+            "IM": float(sum(x is None for x in im) / max(1, len(ao))),
+            "AO": 0.0,
+            "AC": float(sum(x is None for x in ac) / max(1, len(ao))),
+            "MO": float(sum(x is None for x in mo) / max(1, len(ao))),
+        },
         **regularity,
-        **peak_details,
-        "disclaimer": "ECG-assisted CNN AO detector is used when ECG is supplied and the trained model is available; otherwise this falls back to heuristic SCG fiducial windows. ECG input gives R-to-AO timing, not Q-onset PEP.",
+        **{f"detector_{key}" if key == "method" else key: value for key, value in peak_details.items()},
+        "method": "ecg_anchor_cnn_mc_im_ao_ac_mo_fiducial_windows" if peak_details.get("detector_backend") == "ecg_anchor_cnn" else "heuristic_scg_mc_im_ao_ac_mo_fiducial_windows",
+        "disclaimer": "MC/IM/AO/AC/MO are research-use SCG fiducials from ECG-assisted AO detection when available or heuristic windows otherwise. ECG input gives R-to-AO timing, not Q-onset PEP; valve-event labels are needed for diagnostic timing validation.",
     }
 
 
@@ -396,6 +434,7 @@ def SCG_compute_cardiac_time_intervals(
     ao = fid.get("ao_indices", [])
     ac = fid.get("ac_indices", [])
     mc = fid.get("mc_indices", [])
+    im = fid.get("im_indices", [])
     mo = fid.get("mo_indices", [])
 
     lvet, ivct, ivrt = [], [], []
@@ -428,7 +467,7 @@ def SCG_compute_cardiac_time_intervals(
         "num_beats": fid.get("num_beats"),
         "confidence": confidence,
         "method": "fiducial_window_cardiac_time_intervals",
-        "fiducial_summary": {"ao_count": len(ao), "ac_count": sum(x is not None for x in ac), "mc_count": sum(x is not None for x in mc), "mo_count": sum(x is not None for x in mo)},
+        "fiducial_summary": {"ao_count": len(ao), "ac_count": sum(x is not None for x in ac), "mc_count": sum(x is not None for x in mc), "im_count": sum(x is not None for x in im), "mo_count": sum(x is not None for x in mo)},
         "disclaimer": "Research-use timing proxy. True PEP requires ECG Q-onset and validated AO labels; this tool reports R-to-AO when ECG is supplied.",
     }
 

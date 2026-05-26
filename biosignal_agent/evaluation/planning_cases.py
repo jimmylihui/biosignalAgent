@@ -104,6 +104,12 @@ DEFAULT_PLANNING_CASES = [
         expected_tools=('SCG_assess_quality', 'SCG_detect_j_peaks'),
     ),
     PlanningCase(
+        case_id='scg_fiducials',
+        question='Detect SCG MC, IM, AO, AC, and MO mechanical fiducial points',
+        modality='scg',
+        expected_tools=('SCG_assess_quality', 'SCG_detect_fiducial_points'),
+    ),
+    PlanningCase(
         case_id='scg_hr',
         question='Estimate heart rate from this seismocardiogram mechanical cardiac signal',
         modality='scg',
