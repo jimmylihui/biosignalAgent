@@ -943,6 +943,122 @@ def _session_measurement_findings(trace: dict[str, Any]) -> list[str]:
     return findings[:12]
 
 
+def _session_compact_measurements(trace: dict[str, Any]) -> dict[str, Any]:
+    per_signal: list[dict[str, Any]] = []
+    for run in trace.get("runs", []):
+        label = run.get("signal_label") or (run.get("signal") or {}).get("label") or run.get("modality") or "signal"
+        modality = str(run.get("modality") or (run.get("signal") or {}).get("modality") or "signal").upper()
+        summary: dict[str, Any] = {"label": label, "modality": modality, "tools": []}
+        for call in run.get("tool_results", [])[:8]:
+            result = call.get("result") or {}
+            tool_summary = {"tool": call.get("tool")}
+            for key in ["heart_rate_bpm", "respiratory_rate_bpm", "mean_spo2", "rmssd_ms", "quality_label", "confidence", "error"]:
+                if key in result and result.get(key) is not None:
+                    tool_summary[key] = result.get(key)
+            if len(tool_summary) > 1:
+                summary["tools"].append(tool_summary)
+        per_signal.append(summary)
+    session_tools = []
+    for item in trace.get("session_tool_results", [])[:6]:
+        result = item.get("result") or {}
+        row = {"tool": item.get("tool")}
+        for key in ["median_pulse_arrival_time_ms", "paired_pulses", "sleep_apnea_session_risk", "session_flags", "confidence", "error"]:
+            if key in result and result.get(key) is not None:
+                row[key] = result.get(key)
+        session_tools.append(row)
+    return {"per_signal": per_signal, "session_tools": session_tools}
+
+
+def _fallback_session_human_report(question: str, measurements: dict[str, Any]) -> str:
+    hr_rows = []
+    quality_notes = []
+    for sig in measurements.get("per_signal", []):
+        modality = sig.get("modality")
+        label = sig.get("label")
+        best_hr = None
+        best_conf = None
+        hrv = None
+        for tool in sig.get("tools", []):
+            if tool.get("heart_rate_bpm") is not None:
+                conf = float(tool.get("confidence") or 0)
+                if best_hr is None or conf >= float(best_conf or 0):
+                    best_hr = float(tool.get("heart_rate_bpm"))
+                    best_conf = conf
+            if tool.get("rmssd_ms") is not None:
+                hrv = float(tool.get("rmssd_ms"))
+            if tool.get("quality_label") or tool.get("confidence") is not None:
+                quality_notes.append(f"{modality} confidence around {tool.get('confidence')}")
+        if best_hr is not None:
+            extra = f", HRV RMSSD about {hrv:.1f} ms" if hrv is not None else ""
+            hr_rows.append((modality, label, best_hr, best_conf, extra))
+    lines = []
+    if hr_rows:
+        lines.append("The main finding is that the cardiac-rate estimates are broadly in the same range, but not identical across sensors.")
+        for modality, label, hr, conf, extra in hr_rows:
+            lines.append(f"- {modality} ({label}) estimates heart rate at about {hr:.1f} bpm{extra}, with confidence about {conf:.2f}.")
+        hrs = [row[2] for row in hr_rows]
+        if len(hrs) >= 2:
+            spread = max(hrs) - min(hrs)
+            if spread <= 5:
+                lines.append(f"Across modalities, the HR estimates agree closely, with a spread of about {spread:.1f} bpm.")
+            else:
+                lines.append(f"The HR estimates differ by about {spread:.1f} bpm, so I would treat the combined result as a cross-check rather than a single definitive value.")
+    else:
+        lines.append("The tools ran, but they did not produce a clear shared numeric endpoint for this session.")
+    if measurements.get("session_tools"):
+        lines.append("The session-level fusion tools add cross-signal context, but they should be interpreted as research proxies.")
+    lines.append(f"In plain terms: this answers the question with benchmark data and is useful for demo/research validation, not clinical decision-making. {DISCLAIMER}")
+    return "\n".join(lines)
+
+
+def _llm_session_human_report(question: str, measurements: dict[str, Any]) -> dict[str, Any]:
+    model = os.getenv("OLLAMA_REPORT_MODEL", os.getenv("OLLAMA_AXIS_MODEL", "qwen3.5:4b"))
+    prompt = (
+        "You are BioSignalAgent writing a concise human-readable biosignal report. "
+        "Use only the provided tool measurements. Do not invent diagnoses. Do not list raw key=value dumps. "
+        "Write 2 short paragraphs plus, if useful, 2-4 bullets. Mention agreement/disagreement across modalities, confidence, and limitations. "
+        "Avoid saying 'not a clinical diagnosis' more than once.\n\n"
+        f"User question: {question}\n"
+        f"Measurements JSON: {json.dumps(_jsonable(measurements), ensure_ascii=True)[:5000]}"
+    )
+    endpoints = [
+        os.getenv("OLLAMA_HOST", "").rstrip("/") + "/api/chat" if os.getenv("OLLAMA_HOST") else "",
+        "http://127.0.0.1:11434/api/chat",
+    ]
+    endpoints = [endpoint for endpoint in endpoints if endpoint]
+    last_error = None
+    for endpoint in endpoints:
+        try:
+            import requests
+            headers = {"Content-Type": "application/json"}
+            api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+            response = requests.post(
+                endpoint,
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                    "think": False,
+                    "options": {"temperature": 0.25, "num_predict": 450},
+                },
+                timeout=float(os.getenv("OLLAMA_REPORT_TIMEOUT", "30")),
+            )
+            if response.status_code >= 400:
+                last_error = f"http_{response.status_code}:{response.text[:160]}"
+                continue
+            data = response.json()
+            content = (data.get("message", {}) or {}).get("content") or data.get("response") or ""
+            content = str(content).strip()
+            if content:
+                return {"available": True, "model": model, "provider": "ollama", "report": content}
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}:{str(exc)[:160]}"
+    return {"available": False, "model": model, "provider": "ollama", "error": last_error, "report": _fallback_session_human_report(question, measurements)}
+
+
 def run_multimodal_benchmark_demo(label: str | None, question: str | None = None) -> dict[str, Any]:
     case = _selected_benchmark_case(label)
     if not case:
@@ -1000,15 +1116,15 @@ def _human_answer_from_session(label: str | None, question: str, trace: dict[str
         lines.append("The final multimodal route is: " + ", ".join(f"`{tool}`" for tool in dict.fromkeys(plan)) + ".")
         lines.append("")
     lines.append("**Answer:**")
-    findings = _session_measurement_findings(trace)
-    if findings:
-        for finding in findings:
-            lines.append(f"- {finding}")
+    measurements = _session_compact_measurements(trace)
+    human_report = _llm_session_human_report(session.get("question") or question, measurements)
+    lines.append(human_report.get("report") or _fallback_session_human_report(session.get("question") or question, measurements))
+    if human_report.get("available"):
+        lines.append(f"\n_Report style generated by `{human_report.get('model')}` from grounded tool outputs._")
     else:
-        lines.append("The tools ran, but no compact numeric finding was available from the selected benchmark task. Inspect the tool cards above for raw outputs.")
+        lines.append(f"\n_Report style fallback used because the local LLM was unavailable: `{human_report.get('error')}`._")
     lines.extend([
         "",
-        f"This uses benchmark data for a demo/research workflow, not a clinical diagnosis. {DISCLAIMER}",
         "",
         "<details><summary>Raw compact trace</summary>",
         "",
