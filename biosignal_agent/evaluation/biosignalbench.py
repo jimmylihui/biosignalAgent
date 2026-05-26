@@ -72,7 +72,7 @@ def tool_hierarchy_metadata(tool_name: str, modality: str, task: str = '', descr
     modality_l = str(modality or '').lower()
     text = f'{name} {task} {description}'.lower()
     primitive_terms = [
-        'detect_r_peaks', 'detect_peaks', 'detect_j_peaks', 'detect_pulses',
+        'detect_r_peaks', 'detect_peaks', 'detect_j_peaks', 'detect_pulses', 'detect_breath_peaks',
         'detect_heart_sounds', 'segment_s1_s2', 'delineate_waves',
         'detect_fiducial_points', 'compute_bandpower', 'detect_bursts',
         'detect_desaturation', 'detect_apnea', 'detect_hypopnea',
@@ -148,6 +148,8 @@ def dependency_tools_for(tool_name: str, modality: str, level: str) -> list[str]
         if 'j_peak' in n or 'j_peaks' in n:
             deps.append('SCG_detect_j_peaks')
     elif modality == 'resp':
+        if 'estimate_rate' in n:
+            deps.append('RESP_detect_breath_peaks')
         if any(term in n for term in ['detect_apnea', 'detect_hypopnea', 'sleep_apnea', 'event_burden', 'rate_pattern']):
             deps.append('RESP_estimate_rate')
     elif modality == 'spo2':
@@ -207,6 +209,8 @@ def io_semantics_for(tool_name: str, modality: str, level: str) -> tuple[list[st
         produces.extend(['pulse_intervals', 'prv_features'])
     if 'heart_rate' in n or 'estimate_heart_rate' in n:
         produces.append('heart_rate_bpm')
+    if modality == 'resp' and 'detect_breath_peaks' in n:
+        produces.extend(['inhale_peak', 'exhale_peak'])
     if 'resp' in n or 'apnea' in n or 'hypopnea' in n:
         produces.append('respiratory_features')
     if 'spo2' in n or 'desaturation' in n or 'oximetry' in n:

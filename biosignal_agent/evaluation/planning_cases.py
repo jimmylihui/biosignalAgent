@@ -134,6 +134,12 @@ DEFAULT_PLANNING_CASES = [
         expected_tools=('RESP_assess_quality', 'RESP_estimate_rate'),
     ),
     PlanningCase(
+        case_id='resp_breath_peaks',
+        question='Detect inhale and exhale peaks in this respiration waveform',
+        modality='resp',
+        expected_tools=('RESP_assess_quality', 'RESP_detect_breath_peaks'),
+    ),
+    PlanningCase(
         case_id='spo2_quality',
         question='Assess SpO2 signal quality',
         modality='spo2',

@@ -119,6 +119,7 @@ def _tool_cases_for_record(record: dict[str, Any], idx: int) -> list[dict[str, A
     elif modality == 'resp':
         specs.extend([
             ('rate', 'Estimate respiratory rate from this breathing segment.', ['RESP_assess_quality', 'RESP_estimate_rate'], {'type': 'resp_rate'}),
+            ('breath_peaks', 'Detect inhale and exhale peaks from this respiration segment.', ['RESP_assess_quality', 'RESP_detect_breath_peaks'], {'type': 'resp_inhale_exhale_peaks'}),
             ('event', 'Screen this respiration segment for apnea or hypopnea-like events.', ['RESP_assess_quality', 'RESP_estimate_rate', 'RESP_detect_apnea', 'RESP_detect_hypopnea'], {'type': 'resp_event_window', 'label': record.get('respiratory_event_label'), 'event_types': record.get('event_types')}),
         ])
     elif modality == 'spo2':

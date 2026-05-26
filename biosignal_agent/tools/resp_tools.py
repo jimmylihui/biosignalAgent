@@ -126,31 +126,118 @@ def RESP_assess_quality(signal_path: str, sampling_rate: float, column: str | No
     return {"tool": "RESP_assess_quality", "source": data.source, **signal_quality_summary(data.values)}
 
 
-def RESP_estimate_rate(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
-    data = load_csv_signal(signal_path, sampling_rate, column)
-    values = data.values
-    if len(values) < data.sampling_rate * 10:
-        return {"tool": "RESP_estimate_rate", "error": "signal too short", "confidence": 0.0}
-    filtered = bandpass_filter(values, data.sampling_rate, low_hz=0.05, high_hz=0.7, order=3)
-    min_distance = max(1, int(1.5 * data.sampling_rate))
-    prominence = max(float(np.nanstd(filtered)) * 0.2, 1e-8)
-    peaks, _ = scipy_signal.find_peaks(filtered, distance=min_distance, prominence=prominence)
-    if len(peaks) < 2:
-        peaks, _ = scipy_signal.find_peaks(-filtered, distance=min_distance, prominence=prominence)
-    intervals = np.diff(peaks) / data.sampling_rate if len(peaks) >= 2 else np.array([])
-    intervals = intervals[(intervals >= 1.5) & (intervals <= 12.0)]
-    respiratory_rate = float(60.0 / np.median(intervals)) if len(intervals) else None
-    confidence = 0.75 if respiratory_rate is not None and 5 <= respiratory_rate <= 40 else 0.3
+
+
+def _resp_event_point(sample_index: int | None, values: np.ndarray, sampling_rate: float) -> dict | None:
+    if sample_index is None:
+        return None
+    idx = int(sample_index)
+    if idx < 0 or idx >= len(values):
+        return None
     return {
-        "tool": "RESP_estimate_rate",
-        "breath_indices": peaks.tolist(),
-        "num_breaths": int(len(peaks)),
-        "respiratory_rate_bpm": respiratory_rate,
-        "confidence": confidence,
-        "method": "bandpass_find_peaks",
+        "sample_index": idx,
+        "time_s": float(idx / float(sampling_rate)),
+        "amplitude": float(values[idx]),
     }
 
 
+def _resp_filtered(values: np.ndarray, sampling_rate: float) -> np.ndarray:
+    x = _clean_resp_values(values)
+    if len(x) < max(8, int(float(sampling_rate))):
+        return x - np.nanmedian(x) if len(x) else x
+    try:
+        high_hz = min(0.7, max(0.02, 0.45 * float(sampling_rate)))
+        low_hz = min(0.05, 0.5 * high_hz)
+        if not (0 < low_hz < high_hz):
+            return x - np.nanmedian(x)
+        return bandpass_filter(x, sampling_rate, low_hz=low_hz, high_hz=high_hz, order=3)
+    except Exception:
+        return x - np.nanmedian(x)
+
+
+def _resp_inhale_exhale_events(values: np.ndarray, sampling_rate: float) -> dict:
+    filtered = _resp_filtered(values, sampling_rate)
+    if len(filtered) == 0:
+        return {"filtered": filtered, "inhale_peaks": np.asarray([], dtype=int), "exhale_peaks": np.asarray([], dtype=int), "confidence": 0.0}
+    fs = float(sampling_rate)
+    min_distance = max(1, int(round(1.5 * fs)))
+    prominence = max(float(np.nanstd(filtered)) * 0.2, 1e-8)
+    inhale, _ = scipy_signal.find_peaks(filtered, distance=min_distance, prominence=prominence)
+    exhale, _ = scipy_signal.find_peaks(-filtered, distance=min_distance, prominence=prominence)
+    # If polarity is inverted or one phase is weak, keep both extrema types but align counts conservatively.
+    intervals = np.diff(inhale) / fs if len(inhale) >= 2 else np.asarray([])
+    intervals = intervals[(intervals >= 1.5) & (intervals <= 12.0)]
+    rate = float(60.0 / np.median(intervals)) if len(intervals) else None
+    interval_cv = float(np.nanstd(intervals) / (np.nanmean(intervals) + 1e-12)) if len(intervals) > 1 else None
+    confidence = 0.78 if rate is not None and 5 <= rate <= 40 else 0.35
+    if interval_cv is not None:
+        confidence = float(np.clip(confidence - 0.25 * min(1.0, interval_cv), 0.1, 0.85))
+    return {
+        "filtered": filtered,
+        "inhale_peaks": np.asarray(inhale, dtype=int),
+        "exhale_peaks": np.asarray(exhale, dtype=int),
+        "respiratory_rate_bpm": rate,
+        "breath_interval_cv": interval_cv,
+        "confidence": confidence,
+    }
+
+
+def RESP_detect_breath_peaks(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    data = load_csv_signal(signal_path, sampling_rate, column)
+    values = data.values
+    if len(values) < data.sampling_rate * 10:
+        return {"tool": "RESP_detect_breath_peaks", "error": "signal too short", "confidence": 0.0}
+    events = _resp_inhale_exhale_events(values, data.sampling_rate)
+    inhale = events["inhale_peaks"]
+    exhale = events["exhale_peaks"]
+    fiducials = []
+    for i, inhale_idx in enumerate(inhale[:5000]):
+        next_exhale = exhale[exhale > inhale_idx]
+        next_inhale = inhale[inhale > inhale_idx]
+        exhale_idx = int(next_exhale[0]) if len(next_exhale) and (not len(next_inhale) or next_exhale[0] < next_inhale[0]) else None
+        fiducials.append({
+            "breath_index": int(i),
+            "inhale_peak": _resp_event_point(int(inhale_idx), values, data.sampling_rate),
+            "exhale_peak": _resp_event_point(exhale_idx, values, data.sampling_rate),
+        })
+    denom = max(1, len(fiducials))
+    return {
+        "tool": "RESP_detect_breath_peaks",
+        "fiducials": fiducials,
+        "inhale_peak_points": [_resp_event_point(int(x), values, data.sampling_rate) for x in inhale[:5000]],
+        "exhale_peak_points": [_resp_event_point(int(x), values, data.sampling_rate) for x in exhale[:5000]],
+        "inhale_peak_indices": inhale.tolist(),
+        "exhale_peak_indices": exhale.tolist(),
+        "num_inhale_peaks": int(len(inhale)),
+        "num_exhale_peaks": int(len(exhale)),
+        "num_breath_cycles": int(len(fiducials)),
+        "respiratory_rate_bpm": events.get("respiratory_rate_bpm"),
+        "breath_interval_cv": events.get("breath_interval_cv"),
+        "missing_fiducial_fraction": {
+            "inhale_peak": float(sum(row["inhale_peak"] is None for row in fiducials) / denom),
+            "exhale_peak": float(sum(row["exhale_peak"] is None for row in fiducials) / denom),
+        },
+        "confidence": float(events.get("confidence", 0.0)),
+        "method": "resp_bandpass_inhale_exhale_peak_detection",
+        "polarity_note": "Inhale/exhale polarity depends on sensor convention; this tool reports positive-phase and negative-phase respiratory extrema as inhale/exhale candidates.",
+    }
+
+def RESP_estimate_rate(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
+    detected = RESP_detect_breath_peaks(signal_path, sampling_rate, column)
+    if detected.get("error"):
+        return {"tool": "RESP_estimate_rate", "error": detected["error"], "confidence": 0.0, "event_detection": detected}
+    return {
+        "tool": "RESP_estimate_rate",
+        "breath_indices": detected.get("inhale_peak_indices", []),
+        "inhale_peak_indices": detected.get("inhale_peak_indices", []),
+        "exhale_peak_indices": detected.get("exhale_peak_indices", []),
+        "num_breaths": detected.get("num_inhale_peaks", 0),
+        "respiratory_rate_bpm": detected.get("respiratory_rate_bpm"),
+        "breath_interval_cv": detected.get("breath_interval_cv"),
+        "confidence": detected.get("confidence", 0.0),
+        "method": "rate_from_resp_inhale_peak_intervals",
+        "event_detection_method": detected.get("method"),
+    }
 
 def RESP_detect_apnea(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
     data = load_csv_signal(signal_path, sampling_rate, column)

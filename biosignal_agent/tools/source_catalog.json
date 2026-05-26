@@ -392,11 +392,13 @@
       "modality": "RESP",
       "task": "Respiratory rate and pattern",
       "current_tools": [
+        "RESP_detect_breath_peaks",
         "RESP_estimate_rate",
         "RESP_screen_rate_pattern",
         "RESP_summarize_event_burden"
       ],
       "existing_work": [
+        "Inhale/exhale extrema detection with per-event position and amplitude outputs",
         "Respiratory rate from airflow/impedance peak detection",
         "Envelope-based apnea/hypopnea event screening",
         "UCDDB Flow+SpO2 event classification",
@@ -1283,6 +1285,7 @@
       "modality": "RESP",
       "task": "Standalone respiratory event detection",
       "current_tools": [
+        "RESP_detect_breath_peaks",
         "RESP_detect_apnea",
         "RESP_detect_hypopnea",
         "RESP_screen_sleep_apnea_ml",

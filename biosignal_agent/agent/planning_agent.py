@@ -11,7 +11,7 @@ MODALITY_KEYWORDS = {
     "ppg": {"ppg", "photoplethysmography", "pulse", "pleth", "prv", "pulse rate variability", "spo2", "oxygen", "respiration modulation", "respiratory modulation", "ppg respiration", "irregular pulse", "pulse irregularity", "af", "afib", "blood pressure", "vascular", "perfusion", "sleep", "stress", "exercise", "shock"},
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak", "bcg respiration", "bcg breathing", "bed-based"},
     "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak", "fiducial", "mc", "im", "ao", "ac", "mo", "aortic opening", "aortic closure", "mitral closure", "mitral opening", "scg respiration", "scg breathing"},
-    "resp": {"resp", "respiration", "respiratory", "breath", "breathing", "tachypnea", "bradypnea", "periodic breathing"},
+    "resp": {"resp", "respiration", "respiratory", "breath", "breathing", "breath peak", "breath peaks", "inhale", "exhale", "inspiration", "expiration", "tachypnea", "bradypnea", "periodic breathing"},
     "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation", "hypoxemia", "hypoxaemia"},
     "abp": {"abp", "arterial blood pressure", "blood pressure", "systolic", "diastolic"},
     "pcg": {"pcg", "phonocardiogram", "heart sound", "heart sounds", "s1", "s2", "s3", "s4", "murmur", "valve", "congenital", "chd", "rhythm", "irregular", "segmentation", "systole", "diastole", "spectrogram", "heart sound classification"},
@@ -26,7 +26,7 @@ BASIC_ANALYSIS_TOOLS = {
     "ppg": ["PPG_detect_peaks"],
     "bcg": ["BCG_detect_j_peaks"],
     "scg": ["SCG_detect_j_peaks"],
-    "resp": ["RESP_estimate_rate"],
+    "resp": ["RESP_detect_breath_peaks"],
     "spo2": ["SpO2_summarize"],
     "abp": ["ABP_detect_fiducial_points"],
     "pcg": ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate"],
@@ -102,6 +102,8 @@ TASK_TOOL_RULES = {
         ({"morphology", "interval", "intervals", "p wave", "t wave"}, ["ECG_detect_r_peaks", "ECG_measure_morphology_intervals", "ECG_delineate_waves_dl", "ECG_analyze_qt_interval", "ECG_screen_conduction_block", "ECG_screen_ischemia_st"]),
     ],
     "resp": [
+        ({"respiratory rate", "breathing rate", "breath rate", "rate", "bpm", "breaths per minute"}, ["RESP_detect_breath_peaks", "RESP_estimate_rate"]),
+        ({"inhale", "exhale", "inspiration", "expiration", "breath peak", "breath peaks", "respiratory peak", "respiratory peaks", "respiratory extrema", "breath fiducial", "breath fiducials"}, ["RESP_detect_breath_peaks"]),
         ({"apnea", "apnoea", "sleep disordered", "cessation"}, ["RESP_estimate_rate", "RESP_detect_apnea"]),
         ({"hypopnea", "hypopnoea", "shallow breathing", "airflow reduction", "reduced respiration"}, ["RESP_estimate_rate", "RESP_detect_hypopnea"]),
         ({"tachypnea", "bradypnea", "periodic breathing", "irregular breathing", "respiratory pattern", "breathing pattern"}, ["RESP_estimate_rate", "RESP_screen_rate_pattern"]),
@@ -261,7 +263,8 @@ class PlanningBioSignalAgent:
                 ]
             )
             pcg_specific_sounds = modality == "pcg" and any(term in text for term in ["s1", "s2", "heart sound event", "heart sound events"])
-            if not respiration_only and not ppg_specific_morphology and not scg_specific_fiducial and not pcg_specific_sounds:
+            resp_specific_breath_peaks = modality == "resp" and any(term in text for term in ["inhale", "exhale", "inspiration", "expiration", "breath peak", "breath peaks", "respiratory peak", "respiratory peaks", "breath fiducial", "breath fiducials"])
+            if not respiration_only and not ppg_specific_morphology and not scg_specific_fiducial and not pcg_specific_sounds and not resp_specific_breath_peaks:
                 selected.extend(BASIC_ANALYSIS_TOOLS.get(modality, []))
 
         for terms, tools in TASK_TOOL_RULES.get(modality, []):

@@ -949,8 +949,43 @@
     ]
   },
   {
+    "name": "RESP_detect_breath_peaks",
+    "description": "Detect inhale and exhale extrema in a respiration waveform and return per-event positions and amplitudes.",
+    "modality": "RESP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "inhale_peak_indices",
+      "exhale_peak_indices",
+      "inhale_peak_points",
+      "exhale_peak_points",
+      "fiducials",
+      "num_inhale_peaks",
+      "num_exhale_peaks",
+      "num_breath_cycles",
+      "respiratory_rate_bpm",
+      "breath_interval_cv",
+      "missing_fiducial_fraction",
+      "confidence",
+      "method",
+      "polarity_note"
+    ]
+  },
+  {
     "name": "RESP_estimate_rate",
-    "description": "Estimate respiratory rate from a respiration waveform.",
+    "description": "Estimate respiratory rate from detected inhale-peak intervals in a respiration waveform.",
     "modality": "RESP",
     "parameters": {
       "signal_path": {
@@ -968,10 +1003,14 @@
     },
     "returns": [
       "breath_indices",
+      "inhale_peak_indices",
+      "exhale_peak_indices",
       "num_breaths",
       "respiratory_rate_bpm",
+      "breath_interval_cv",
       "confidence",
-      "method"
+      "method",
+      "event_detection_method"
     ]
   },
   {
