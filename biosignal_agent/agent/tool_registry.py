@@ -18,7 +18,7 @@ from biosignal_agent.tools.pcg_tools import PCG_assess_quality, PCG_assess_rhyth
 from biosignal_agent.tools.ppg_tools import PPG_assess_quality, PPG_assess_perfusion_variability, PPG_assess_stress_prv, PPG_assess_vascular_health, PPG_compute_prv, PPG_detect_afib, PPG_detect_fiducial_points, PPG_detect_peaks, PPG_estimate_bp_proxy, PPG_estimate_exercise_intensity, PPG_estimate_heart_rate, PPG_estimate_respiration_modulation, PPG_estimate_sleep_features, PPG_estimate_spo2, PPG_screen_low_perfusion_shock_risk, PPG_screen_pulse_irregularity
 from biosignal_agent.tools.resp_tools import RESP_assess_quality, RESP_detect_apnea, RESP_detect_breath_peaks, RESP_detect_hypopnea, RESP_estimate_rate, RESP_screen_rate_pattern, RESP_screen_sleep_apnea_ml, RESP_summarize_event_burden
 from biosignal_agent.tools.scg_tools import SCG_assess_quality, SCG_assess_sensor_placement, SCG_compute_cardiac_time_intervals, SCG_detect_fiducial_points, SCG_detect_j_peaks, SCG_estimate_contractility_proxy, SCG_estimate_respiration, SCG_screen_mechanical_abnormality
-from biosignal_agent.tools.spo2_tools import SpO2_assess_hypoxemia_burden, SpO2_assess_quality, SpO2_detect_desaturation, SpO2_extract_oximetry_features, SpO2_screen_sleep_apnea_ml, SpO2_screen_sleep_apnea_oximetry, SpO2_summarize
+from biosignal_agent.tools.spo2_tools import SpO2_assess_hypoxemia_burden, SpO2_assess_quality, SpO2_detect_desaturation, SpO2_detect_peaks_troughs, SpO2_extract_oximetry_features, SpO2_screen_sleep_apnea_ml, SpO2_screen_sleep_apnea_oximetry, SpO2_summarize
 
 TOOLS = {
     "Signal_classify_modality": Signal_classify_modality,
@@ -91,6 +91,7 @@ TOOLS = {
     "RESP_summarize_event_burden": RESP_summarize_event_burden,
     "SpO2_assess_quality": SpO2_assess_quality,
     "SpO2_summarize": SpO2_summarize,
+    "SpO2_detect_peaks_troughs": SpO2_detect_peaks_troughs,
     "SpO2_detect_desaturation": SpO2_detect_desaturation,
     "SpO2_assess_hypoxemia_burden": SpO2_assess_hypoxemia_burden,
     "SpO2_extract_oximetry_features": SpO2_extract_oximetry_features,
@@ -164,7 +165,7 @@ WORKFLOWS = {
     "scg": ["SCG_assess_quality", "Signal_detect_artifacts", "SCG_assess_sensor_placement", "SCG_detect_j_peaks", "SCG_detect_fiducial_points", "SCG_compute_cardiac_time_intervals", "SCG_estimate_contractility_proxy", "SCG_estimate_respiration", "SCG_screen_mechanical_abnormality"],
     "resp": ["RESP_assess_quality", "Signal_detect_artifacts", "RESP_detect_breath_peaks", "RESP_estimate_rate", "RESP_screen_sleep_apnea_ml", "RESP_detect_apnea", "RESP_detect_hypopnea", "RESP_screen_rate_pattern", "RESP_summarize_event_burden"],
     "multimodal": ["Multimodal_estimate_ecg_ppg_pat_bp_proxy", "Multimodal_screen_sleep_apnea_report"],
-    "spo2": ["SpO2_assess_quality", "Signal_detect_artifacts", "SpO2_summarize", "SpO2_detect_desaturation", "SpO2_assess_hypoxemia_burden", "SpO2_extract_oximetry_features", "SpO2_screen_sleep_apnea_oximetry", "SpO2_screen_sleep_apnea_ml"],
+    "spo2": ["SpO2_assess_quality", "Signal_detect_artifacts", "SpO2_detect_peaks_troughs", "SpO2_summarize", "SpO2_detect_desaturation", "SpO2_assess_hypoxemia_burden", "SpO2_extract_oximetry_features", "SpO2_screen_sleep_apnea_oximetry", "SpO2_screen_sleep_apnea_ml"],
     "abp": ["ABP_assess_quality", "Signal_detect_artifacts", "ABP_detect_fiducial_points", "ABP_detect_pulses", "ABP_screen_pressure_events", "ABP_classify_pressure_events", "ABP_detect_acute_hypotensive_episode_proxy", "ABP_compute_hemodynamics"],
     "pcg": ["PCG_assess_quality", "Signal_detect_artifacts", "PCG_detect_heart_sounds", "PCG_estimate_heart_rate", "PCG_segment_s1_s2_proxy", "PCG_assess_rhythm_irregularity", "PCG_detect_s3_s4_proxy", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features", "PCG_screen_valve_disease_proxy", "PCG_screen_congenital_abnormality_proxy", "PCG_monitor_heart_function_proxy"],
     "acc": ["ACC_assess_quality", "Signal_detect_artifacts", "ACC_summarize_activity", "ACC_classify_activity_ml", "ACC_extract_actigraphy_features", "ACC_estimate_sleep_wake", "ACC_detect_activity_bouts", "ACC_detect_fall_proxy", "ACC_detect_fall_ml"],

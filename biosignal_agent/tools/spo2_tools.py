@@ -137,6 +137,73 @@ def SpO2_assess_quality(signal_path: str, sampling_rate: float, column: str | No
     return {"tool": "SpO2_assess_quality", "source": data.source, "quality": quality, "finite_ratio": 1.0, "plausible_ratio": clean_info["valid_fraction"], "dynamic_range": dynamic_range, "jump_fraction": clean_info["jump_fraction"], "artifact_fraction": clean_info["artifact_fraction"], "confidence": confidence}
 
 
+
+def _spo2_event_point(sample_index: int | None, values: np.ndarray, sampling_rate: float) -> dict | None:
+    if sample_index is None:
+        return None
+    idx = int(sample_index)
+    if idx < 0 or idx >= len(values):
+        return None
+    return {
+        "sample_index": idx,
+        "time_s": float(idx / float(sampling_rate)),
+        "amplitude": float(values[idx]),
+        "spo2_percent": float(values[idx]),
+    }
+
+
+def SpO2_detect_peaks_troughs(signal_path: str, sampling_rate: float, column: str | None = None, min_distance_s: float = 5.0) -> dict:
+    data, values = _spo2_values(signal_path, sampling_rate, column)
+    if len(values) == 0:
+        return {"tool": "SpO2_detect_peaks_troughs", "error": "empty signal", "confidence": 0.0}
+    target, clean_info = _clean_spo2(values, sampling_rate)
+    if len(target) == 0:
+        return {"tool": "SpO2_detect_peaks_troughs", "error": "no plausible SpO2 samples", "confidence": 0.0}
+    fs = float(sampling_rate)
+    min_distance = max(1, int(round(float(min_distance_s) * fs)))
+    dynamic_range = float(np.nanpercentile(target, 95) - np.nanpercentile(target, 5)) if len(target) else 0.0
+    prominence = max(0.15, 0.15 * dynamic_range)
+    peaks, _ = scipy_signal.find_peaks(target, distance=min_distance, prominence=prominence)
+    troughs, _ = scipy_signal.find_peaks(-target, distance=min_distance, prominence=prominence)
+    if len(peaks) == 0 and dynamic_range > 0:
+        peaks, _ = scipy_signal.find_peaks(target, distance=min_distance, prominence=max(0.05, 0.05 * dynamic_range))
+    if len(troughs) == 0 and dynamic_range > 0:
+        troughs, _ = scipy_signal.find_peaks(-target, distance=min_distance, prominence=max(0.05, 0.05 * dynamic_range))
+    nadir_points = [_spo2_event_point(int(x), target, fs) for x in troughs[:5000]]
+    peak_points = [_spo2_event_point(int(x), target, fs) for x in peaks[:5000]]
+    cycles = []
+    for i, trough_idx in enumerate(troughs[:5000]):
+        prior_peaks = peaks[peaks < trough_idx]
+        next_peaks = peaks[peaks > trough_idx]
+        cycles.append({
+            "cycle_index": int(i),
+            "pre_trough_peak": _spo2_event_point(int(prior_peaks[-1]), target, fs) if len(prior_peaks) else None,
+            "trough": _spo2_event_point(int(trough_idx), target, fs),
+            "post_trough_peak": _spo2_event_point(int(next_peaks[0]), target, fs) if len(next_peaks) else None,
+        })
+    confidence = 0.8 if clean_info["valid_fraction"] > 0.95 else 0.45
+    if dynamic_range < 0.5:
+        confidence = min(confidence, 0.45)
+    return {
+        "tool": "SpO2_detect_peaks_troughs",
+        "source": data.source,
+        "peak_indices": peaks.tolist(),
+        "trough_indices": troughs.tolist(),
+        "peak_points": peak_points,
+        "trough_points": nadir_points,
+        "nadir_points": nadir_points,
+        "cycles": cycles,
+        "num_peaks": int(len(peaks)),
+        "num_troughs": int(len(troughs)),
+        "min_spo2_percent": float(np.nanmin(target)),
+        "max_spo2_percent": float(np.nanmax(target)),
+        "dynamic_range_percent": dynamic_range,
+        "artifact_fraction": clean_info["artifact_fraction"],
+        "confidence": float(confidence),
+        "method": "cleaned_spo2_local_peak_trough_detection",
+        "limitation": "SpO2 extrema are slow oximetry maxima/nadirs, not cardiac pulse peaks; event interpretation needs desaturation duration and clinical context.",
+    }
+
 def SpO2_summarize(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
     data, values = _spo2_values(signal_path, sampling_rate, column)
     if len(values) == 0:

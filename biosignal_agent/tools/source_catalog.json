@@ -427,6 +427,7 @@
         "RESP_screen_sleep_apnea_ml",
         "RESP_summarize_event_burden",
         "SpO2_screen_sleep_apnea_ml",
+        "SpO2_detect_peaks_troughs",
         "SpO2_detect_desaturation",
         "Multimodal_screen_sleep_apnea_report"
       ],
@@ -462,6 +463,7 @@
       "task": "Desaturation, hypoxemia burden, ODI/oximetry sleep-apnea screening, and SpO2-only respiratory-event ML",
       "current_tools": [
         "SpO2_summarize",
+        "SpO2_detect_peaks_troughs",
         "SpO2_detect_desaturation",
         "SpO2_assess_hypoxemia_burden",
         "SpO2_extract_oximetry_features",
@@ -469,6 +471,7 @@
         "SpO2_screen_sleep_apnea_ml"
       ],
       "existing_work": [
+        "SpO2 local peak/trough and nadir detection with per-event position and amplitude outputs",
         "ODI3/ODI4 overnight oximetry screening",
         "time below saturation thresholds (T90/T88)",
         "hypoxic burden area metrics",

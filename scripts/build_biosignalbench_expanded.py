@@ -125,6 +125,7 @@ def _tool_cases_for_record(record: dict[str, Any], idx: int) -> list[dict[str, A
     elif modality == 'spo2':
         specs.extend([
             ('oxygen', 'Summarize oxygen saturation and desaturation burden from this SpO2 segment.', ['SpO2_assess_quality', 'SpO2_summarize', 'SpO2_detect_desaturation'], {'type': 'spo2_desaturation'}),
+            ('peaks_troughs', 'Detect SpO2 peaks and troughs from this oximetry segment.', ['SpO2_assess_quality', 'SpO2_detect_peaks_troughs'], {'type': 'spo2_peaks_troughs'}),
             ('apnea_support', 'Use this SpO2 segment as supportive evidence for sleep-disordered breathing risk.', ['SpO2_assess_quality', 'SpO2_summarize', 'SpO2_detect_desaturation', 'SpO2_screen_sleep_apnea_oximetry'], {'type': 'spo2_sleep_apnea_support'}),
         ])
     elif modality == 'eeg':

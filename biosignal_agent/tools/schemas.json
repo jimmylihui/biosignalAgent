@@ -1073,6 +1073,46 @@
     ]
   },
   {
+    "name": "SpO2_detect_peaks_troughs",
+    "description": "Detect local SpO2 maxima and trough/nadir points with per-event positions and amplitudes.",
+    "modality": "SpO2",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "min_distance_s": {
+        "type": "number",
+        "default": 5.0
+      }
+    },
+    "returns": [
+      "peak_indices",
+      "trough_indices",
+      "peak_points",
+      "trough_points",
+      "nadir_points",
+      "cycles",
+      "num_peaks",
+      "num_troughs",
+      "min_spo2_percent",
+      "max_spo2_percent",
+      "dynamic_range_percent",
+      "artifact_fraction",
+      "confidence",
+      "method",
+      "limitation"
+    ]
+  },
+  {
     "name": "ABP_assess_quality",
     "description": "Assess arterial blood pressure signal quality from a CSV waveform.",
     "modality": "ABP",

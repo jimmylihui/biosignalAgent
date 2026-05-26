@@ -152,6 +152,12 @@ DEFAULT_PLANNING_CASES = [
         expected_tools=('SpO2_assess_quality', 'SpO2_summarize', 'SpO2_detect_desaturation'),
     ),
     PlanningCase(
+        case_id='spo2_peaks_troughs',
+        question='Detect SpO2 peaks and troughs with their positions and amplitudes',
+        modality='spo2',
+        expected_tools=('SpO2_assess_quality', 'SpO2_detect_peaks_troughs'),
+    ),
+    PlanningCase(
         case_id='abp_quality',
         question='Assess ABP signal quality',
         modality='abp',

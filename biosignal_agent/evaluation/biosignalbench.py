@@ -75,7 +75,7 @@ def tool_hierarchy_metadata(tool_name: str, modality: str, task: str = '', descr
         'detect_r_peaks', 'detect_peaks', 'detect_j_peaks', 'detect_pulses', 'detect_breath_peaks',
         'detect_heart_sounds', 'segment_s1_s2', 'delineate_waves',
         'detect_fiducial_points', 'compute_bandpower', 'detect_bursts',
-        'detect_desaturation', 'detect_apnea', 'detect_hypopnea',
+        'detect_desaturation', 'detect_peaks_troughs', 'detect_apnea', 'detect_hypopnea',
         'digitize_waveform', 'classify_modality', 'detect_artifacts',
         'read_image_text_ocr',
     ]
@@ -191,7 +191,7 @@ def io_semantics_for(tool_name: str, modality: str, level: str) -> tuple[list[st
     produces = []
     if 'quality' in n:
         produces.append('signal_quality')
-    if any(term in n for term in ['r_peaks', 'j_peaks', 'detect_peaks', 'detect_pulses']):
+    if any(term in n for term in ['r_peaks', 'j_peaks', 'detect_peaks', 'detect_pulses']) and not (modality == 'spo2' and 'detect_peaks_troughs' in n):
         produces.append('beat_or_pulse_events')
     if modality == 'abp' and 'fiducial' in n:
         produces.extend(['systolic_onset', 'systolic_peak', 'dicrotic_notch', 'diastolic_peak', 'diastolic_phase_endpoint'])
@@ -213,6 +213,8 @@ def io_semantics_for(tool_name: str, modality: str, level: str) -> tuple[list[st
         produces.extend(['inhale_peak', 'exhale_peak'])
     if 'resp' in n or 'apnea' in n or 'hypopnea' in n:
         produces.append('respiratory_features')
+    if modality == 'spo2' and 'detect_peaks_troughs' in n:
+        produces.extend(['spo2_peak', 'spo2_trough'])
     if 'spo2' in n or 'desaturation' in n or 'oximetry' in n:
         produces.append('oximetry_features')
     if 'bandpower' in n or modality == 'eeg':

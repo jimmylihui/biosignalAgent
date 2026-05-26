@@ -12,7 +12,7 @@ MODALITY_KEYWORDS = {
     "bcg": {"bcg", "ballistocardiogram", "ballistocardiography", "j-peak", "j peak", "bcg respiration", "bcg breathing", "bed-based"},
     "scg": {"scg", "seismocardiogram", "seismocardiography", "mechanical cardiac", "j-peak", "j peak", "fiducial", "mc", "im", "ao", "ac", "mo", "aortic opening", "aortic closure", "mitral closure", "mitral opening", "scg respiration", "scg breathing"},
     "resp": {"resp", "respiration", "respiratory", "breath", "breathing", "breath peak", "breath peaks", "inhale", "exhale", "inspiration", "expiration", "tachypnea", "bradypnea", "periodic breathing"},
-    "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation", "hypoxemia", "hypoxaemia"},
+    "spo2": {"spo2", "oxygen", "saturation", "oximetry", "desaturation", "hypoxemia", "hypoxaemia", "nadir", "trough", "troughs", "peak", "peaks"},
     "abp": {"abp", "arterial blood pressure", "blood pressure", "systolic", "diastolic"},
     "pcg": {"pcg", "phonocardiogram", "heart sound", "heart sounds", "s1", "s2", "s3", "s4", "murmur", "valve", "congenital", "chd", "rhythm", "irregular", "segmentation", "systole", "diastole", "spectrogram", "heart sound classification"},
     "acc": {"acc", "accelerometer", "acceleration", "activity", "motion", "actigraphy", "activity bout", "fall", "impact", "sedentary"},
@@ -109,6 +109,7 @@ TASK_TOOL_RULES = {
         ({"tachypnea", "bradypnea", "periodic breathing", "irregular breathing", "respiratory pattern", "breathing pattern"}, ["RESP_estimate_rate", "RESP_screen_rate_pattern"]),
     ],
     "spo2": [
+        ({"peak", "peaks", "trough", "troughs", "nadir", "nadirs", "local extrema", "maxima", "minima"}, ["SpO2_detect_peaks_troughs"]),
         ({"desaturation", "desat", "odi", "oxygen drop", "below 90", "apnea"}, ["SpO2_summarize", "SpO2_detect_desaturation"]),
         ({"hypoxemia", "hypoxaemia", "oxygen burden", "below 88", "low oxygen burden"}, ["SpO2_summarize", "SpO2_assess_hypoxemia_burden"]),
     ],
@@ -264,7 +265,8 @@ class PlanningBioSignalAgent:
             )
             pcg_specific_sounds = modality == "pcg" and any(term in text for term in ["s1", "s2", "heart sound event", "heart sound events"])
             resp_specific_breath_peaks = modality == "resp" and any(term in text for term in ["inhale", "exhale", "inspiration", "expiration", "breath peak", "breath peaks", "respiratory peak", "respiratory peaks", "breath fiducial", "breath fiducials"])
-            if not respiration_only and not ppg_specific_morphology and not scg_specific_fiducial and not pcg_specific_sounds and not resp_specific_breath_peaks:
+            spo2_specific_extrema = modality == "spo2" and any(term in text for term in ["peak", "peaks", "trough", "troughs", "nadir", "nadirs", "local extrema", "maxima", "minima"])
+            if not respiration_only and not ppg_specific_morphology and not scg_specific_fiducial and not pcg_specific_sounds and not resp_specific_breath_peaks and not spo2_specific_extrema:
                 selected.extend(BASIC_ANALYSIS_TOOLS.get(modality, []))
 
         for terms, tools in TASK_TOOL_RULES.get(modality, []):
