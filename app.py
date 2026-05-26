@@ -37,10 +37,61 @@ BIOSIGNALBENCH_PATH = Path(os.environ.get("BIOSIGNALBENCH_PATH", "/data1/jiahui/
 BENCHMARK_NONE = "No benchmark default"
 
 
+def _public_ucddb_resp_spo2_case() -> tuple[str, dict[str, Any]] | None:
+    manifest_path = Path("/data1/jiahui/biosignal-agent/datasets/processed/psg_sleep_manifest.json")
+    comparison_path = Path("/data1/jiahui/biosignal-agent/outputs/multimodal_public_benchmark_comparison.json")
+    if not manifest_path.exists():
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text())
+        record = next((row for row in manifest.get("records", []) if row.get("respiratory_event_label") == "respiratory_event"), None)
+        if not record:
+            return None
+        comparison_summary = None
+        if comparison_path.exists():
+            comparison = json.loads(comparison_path.read_text())
+            comparison_summary = {
+                "dataset": comparison.get("dataset"),
+                "task": comparison.get("task"),
+                "validation": comparison.get("validation"),
+                "label_counts": comparison.get("label_counts"),
+                "resp_only": (comparison.get("models") or {}).get("resp_only", {}).get("overall"),
+                "spo2_only": (comparison.get("models") or {}).get("spo2_only", {}).get("overall"),
+                "resp_plus_spo2": (comparison.get("models") or {}).get("resp_plus_spo2", {}).get("overall"),
+                "interpretation": comparison.get("interpretation"),
+            }
+        case = {
+            "case_id": "public_ucddb_resp_spo2_respiratory_event_default",
+            "benchmark_task": "multimodal_public_benchmark_comparison",
+            "question": "Screen this UCDDB RESP + SpO2 window for apnea, hypopnea, and desaturation risk, then summarize how RESP+SpO2 fusion compares with single-modality baselines on the public benchmark.",
+            "input_type": "session",
+            "modality": "resp+spo2",
+            "expected_tools": ["RESP_detect_apnea", "RESP_detect_hypopnea", "SpO2_detect_desaturation", "Session_screen_sleep_apnea_multimodal"],
+            "source": str(manifest_path),
+            "ground_truth_metric": {"type": "ucddb_resp_spo2_record_level_groupkfold_comparison"},
+            "expected_key_outputs": ["respiratory_event_risk", "resp_only_metrics", "spo2_only_metrics", "resp_spo2_fusion_metrics"],
+            "signals": [
+                {"label": f"{record.get('record')}_{int(record.get('window_start_s', 0)):05d}_resp", "modality": "resp", "path": record.get("resp_path"), "sampling_rate": record.get("resp_sampling_rate"), "column": None},
+                {"label": f"{record.get('record')}_{int(record.get('window_start_s', 0)):05d}_spo2", "modality": "spo2", "path": record.get("spo2_path"), "sampling_rate": record.get("spo2_sampling_rate"), "column": None},
+            ],
+            "reference_label": record.get("respiratory_event_label"),
+            "reference_event_types": record.get("event_types", []),
+            "comparison_summary": comparison_summary,
+        }
+        label = "RESP+SPO2 | UCDDB respiratory-event public benchmark comparison"
+        return label, case
+    except Exception:
+        return None
+
+
 def _load_multimodal_benchmark_cases(limit: int = 8) -> dict[str, dict[str, Any]]:
-    if not BIOSIGNALBENCH_PATH.exists():
-        return {}
     cases: dict[str, dict[str, Any]] = {}
+    public_case = _public_ucddb_resp_spo2_case()
+    if public_case:
+        label, case = public_case
+        cases[label] = case
+    if not BIOSIGNALBENCH_PATH.exists():
+        return cases
     try:
         with BIOSIGNALBENCH_PATH.open() as handle:
             for line in handle:
@@ -63,7 +114,7 @@ def _load_multimodal_benchmark_cases(limit: int = 8) -> dict[str, dict[str, Any]
                 if len(cases) >= limit:
                     break
     except Exception:
-        return {}
+        return cases
     return cases
 
 
@@ -966,7 +1017,15 @@ def _session_compact_measurements(trace: dict[str, Any]) -> dict[str, Any]:
             if key in result and result.get(key) is not None:
                 row[key] = result.get(key)
         session_tools.append(row)
-    return {"per_signal": per_signal, "session_tools": session_tools}
+    out = {"per_signal": per_signal, "session_tools": session_tools}
+    comparison_summary = (trace.get("benchmark_case") or {}).get("comparison_summary")
+    if comparison_summary:
+        out["public_benchmark_comparison"] = comparison_summary
+    reference_label = (trace.get("benchmark_case") or {}).get("reference_label")
+    if reference_label:
+        out["reference_label_for_loaded_window"] = reference_label
+        out["reference_event_types_for_loaded_window"] = (trace.get("benchmark_case") or {}).get("reference_event_types")
+    return out
 
 
 def _fallback_session_human_report(question: str, measurements: dict[str, Any]) -> str:
