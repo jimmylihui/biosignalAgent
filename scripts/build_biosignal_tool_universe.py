@@ -14,6 +14,7 @@ def write_summary_markdown(universe: dict, validation: dict, path: str | Path) -
     rows = [[k, v] for k, v in universe['summary']['tool_count_by_modality'].items()]
     evidence = [[k, v] for k, v in universe['summary']['tool_count_by_evidence_level'].items()]
     kinds = [[k, v] for k, v in universe['summary']['tool_count_by_kind'].items()]
+    levels = [[k, v] for k, v in universe['summary'].get('tool_count_by_level', {}).items()]
     text = [
         '# BioSignalToolUniverse v1 Summary',
         '',
@@ -26,6 +27,8 @@ def write_summary_markdown(universe: dict, validation: dict, path: str | Path) -
         markdown_table(['Evidence level', 'Tools'], evidence),
         '## Tool Count By Tool Kind',
         markdown_table(['Tool kind', 'Tools'], kinds),
+        '## Tool Count By Hierarchy Level',
+        markdown_table(['Tool level', 'Tools'], levels),
         '## Missing Source Metadata',
         '\n'.join(f"- `{name}`" for name in universe['summary'].get('tools_missing_source_metadata', [])) or 'None',
         '',

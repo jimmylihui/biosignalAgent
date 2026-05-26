@@ -4,7 +4,7 @@ This draft is generated from frozen paper artifacts. It is a writing scaffold, n
 
 ## Abstract-Style Result Summary
 
-BioSignalAgent instantiates a TxAgent-style tool-use agent for biosignals with BioSignalToolUniverse v1 (131 frozen tools) and BioSignalBench v1 (238 cases). On the clean held-out split (48 cases), the selected live SFT planner/controller reaches planning accuracy 0.875, Tool F1 0.960, execution success 1.000, report factuality 0.946, and overall H-mean 0.943. On the expanded held-out stress split (92 cases), raw live SFT reaches planning 0.489 and Tool F1 0.804; the timeout/metadata-guarded controller reaches planning 1.000, Tool F1 1.000, and overall 0.989.
+BioSignalAgent instantiates a TxAgent-style tool-use agent for biosignals with BioSignalToolUniverse v1 (132 frozen tools) and BioSignalBench v1 (238 cases). On the clean held-out split (48 cases), the selected live SFT planner/controller reaches planning accuracy 0.875, Tool F1 0.960, execution success 1.000, report factuality 0.946, and overall H-mean 0.943. On the expanded held-out stress split (92 cases), raw live SFT reaches planning 0.489 and Tool F1 0.804; the timeout/metadata-guarded controller reaches planning 1.000, Tool F1 1.000, and overall 0.989.
 
 ## Methods Draft
 
@@ -105,3 +105,8 @@ The main empirical pattern is that BioSignalAgent has strong retrieval coverage 
 We increased BioSignalBench v1-expanded from the prior 461-case stress manifest to a 1,279-case stress/scale manifest while preserving the frozen clean v1 split. The new manifest contains 603 tool-execution cases, 268 multimodal-session cases, 217 report-factuality cases, 66 tool-planning cases, 63 image digitization cases, and 62 scale/OCR cases. Inputs include 885 CSV waveform cases, 268 session cases, 125 image cases, and one text negative case. Validation passes with 0 errors.
 
 Lightweight expanded-baseline results: rule planner + TF-IDF retrieval obtains retrieval 1.000, exact planning 0.034, and Tool F1 0.536; TF-IDF ToolRAG-as-planner obtains retrieval 1.000, exact planning 0.000, and Tool F1 0.526; oracle tools remain 1.000. This confirms that the expanded benchmark is substantially harder than the clean split and should be reported as a stress benchmark rather than the primary headline score until the live SFT controller is retrained/evaluated on the larger task distribution.
+
+
+## Hierarchical ToolUniverse Update - 2026-05-26
+
+BioSignalToolUniverse now includes generated hierarchy metadata for every tool: `tool_level`, `depends_on`, `consumes`, and `produces`. The three levels are primitive signal-operation tools, representation/physiological-feature tools, and screening/task-level tools. Current counts are 23 primitive tools, 42 representation tools, and 67 screening tools. Validation requires all four hierarchy fields for every frozen tool.

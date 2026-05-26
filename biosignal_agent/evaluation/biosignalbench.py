@@ -60,6 +60,158 @@ def write_csv(path: str | Path, rows: list[dict[str, Any]]) -> None:
             writer.writerow({key: json.dumps(value) if isinstance(value, (list, dict)) else value for key, value in row.items()})
 
 
+
+def tool_hierarchy_metadata(tool_name: str, modality: str, task: str = '', description: str = '') -> dict[str, Any]:
+    """Infer the physiological computation layer and dependencies for a tool.
+
+    Level 1 tools operate directly on raw signal/image data. Level 2 tools build
+    physiological representations from primitive events/features. Level 3 tools
+    perform task-level screening, classification, or report-level reasoning.
+    """
+    name = tool_name.lower()
+    modality_l = str(modality or '').lower()
+    text = f'{name} {task} {description}'.lower()
+    primitive_terms = [
+        'detect_r_peaks', 'detect_peaks', 'detect_j_peaks', 'detect_pulses',
+        'detect_heart_sounds', 'segment_s1_s2', 'delineate_waves',
+        'detect_fiducial_points', 'compute_bandpower', 'detect_bursts',
+        'detect_desaturation', 'estimate_rate', 'detect_apnea',
+        'detect_hypopnea', 'digitize_waveform', 'classify_modality',
+        'estimate_image_scale', 'predict_image_scale', 'extract_spectrogram',
+        'render_spectrogram', 'detect_artifacts', 'read_image_text_ocr',
+    ]
+    representation_terms = [
+        'compute_hrv', 'compute_prv', 'estimate_heart_rate', 'estimate_respiration',
+        'compute_cardiac_time_intervals', 'compute_hemodynamics',
+        'extract_tonic_phasic_features', 'extract_oximetry_features',
+        'extract_actigraphy_features', 'summarize_activity', 'summarize_activation',
+        'summarize_event_burden', 'summarize', 'assess_quality',
+        'assess_perfusion_variability', 'assess_hypoxemia_burden',
+        'assess_bed_presence_motion', 'assess_sensor_placement',
+        'estimate_sleep_features', 'estimate_sleep_stage_features',
+        'extract_murmur_features', 'measure_morphology_intervals',
+        'analyze_qt_interval',
+    ]
+    screening_terms = [
+        'screen_', 'classify_', 'detect_afib', 'classify_rhythm',
+        'classify_beats', 'estimate_sleep_wake', 'estimate_drowsiness',
+        'estimate_fatigue', 'predict_movement_intent', 'monitor_',
+        'route_task_recommendation', 'estimate_bp_proxy', 'estimate_spo2',
+        'estimate_exercise_intensity', 'assess_stress', 'assess_vascular_health',
+    ]
+    if tool_name.startswith('Multimodal_'):
+        level = 'screening'
+    elif any(term in name for term in screening_terms):
+        level = 'screening'
+    elif any(term in name for term in representation_terms):
+        level = 'representation'
+    elif any(term in name for term in primitive_terms):
+        level = 'primitive'
+    else:
+        level = 'representation' if any(term in text for term in ['feature', 'quality', 'summary']) else 'screening'
+    deps = dependency_tools_for(tool_name, modality_l, level)
+    consumes, produces = io_semantics_for(tool_name, modality_l, level)
+    return {'tool_level': level, 'depends_on': deps, 'consumes': consumes, 'produces': produces}
+
+
+def dependency_tools_for(tool_name: str, modality: str, level: str) -> list[str]:
+    n = tool_name.lower()
+    deps: list[str] = []
+    if level == 'primitive':
+        return deps
+    if modality == 'ecg':
+        if any(term in n for term in ['compute_hrv', 'estimate_heart_rate', 'screen_arrhythmia', 'detect_afib', 'screen_sleep_apnea', 'classify_rhythm', 'classify_beats']):
+            deps.append('ECG_detect_r_peaks')
+        if any(term in n for term in ['screen_arrhythmia', 'detect_afib', 'screen_sleep_apnea']):
+            deps.append('ECG_compute_hrv')
+        if any(term in n for term in ['morphology', 'qt', 'conduction', 'ischemia', 'st']):
+            deps.append('ECG_delineate_waves_dl')
+    elif modality == 'ppg':
+        if any(term in n for term in ['compute_prv', 'estimate_heart_rate', 'screen_pulse_irregularity', 'detect_afib', 'respiration_modulation']):
+            deps.append('PPG_detect_peaks')
+        if any(term in n for term in ['compute_prv', 'screen_pulse_irregularity', 'detect_afib', 'assess_stress']):
+            deps.append('PPG_compute_prv')
+        if 'fiducial' in n or 'vascular' in n or 'bp_proxy' in n:
+            deps.append('PPG_detect_fiducial_points')
+    elif modality == 'bcg':
+        if any(term in n for term in ['compute_hrv', 'screen_arrhythmia', 'estimate_bp_proxy']):
+            deps.append('BCG_detect_j_peaks')
+        if 'estimate_respiration' in n or 'sleep' in n:
+            deps.append('BCG_assess_bed_presence_motion')
+    elif modality == 'scg':
+        if any(term in n for term in ['cardiac_time', 'contractility', 'mechanical_abnormality']):
+            deps.append('SCG_detect_fiducial_points')
+        if 'j_peak' in n or 'j_peaks' in n:
+            deps.append('SCG_detect_j_peaks')
+    elif modality == 'resp':
+        if any(term in n for term in ['detect_apnea', 'detect_hypopnea', 'sleep_apnea', 'event_burden', 'rate_pattern']):
+            deps.append('RESP_estimate_rate')
+    elif modality == 'spo2':
+        if any(term in n for term in ['summarize', 'sleep_apnea', 'hypoxemia', 'oximetry']):
+            deps.append('SpO2_detect_desaturation')
+    elif modality == 'pcg':
+        if any(term in n for term in ['estimate_heart_rate', 'rhythm_irregularity', 'murmur', 'valve', 'congenital', 's3_s4', 'heart_function']):
+            deps.append('PCG_detect_heart_sounds')
+        if any(term in n for term in ['murmur', 'valve', 'congenital']):
+            deps.append('PCG_extract_murmur_features')
+    elif modality == 'eda':
+        if any(term in n for term in ['stress', 'affective', 'arousal', 'summarize']):
+            deps.append('EDA_extract_tonic_phasic_features')
+    elif modality == 'eeg':
+        if any(term in n for term in ['sleep', 'drowsiness', 'seizure', 'artifact']):
+            deps.append('EEG_compute_bandpower')
+    elif modality == 'emg':
+        if any(term in n for term in ['activation', 'fatigue', 'gesture', 'action', 'gait', 'rehab', 'neuromuscular', 'intent']):
+            deps.append('EMG_detect_bursts')
+    elif modality == 'abp':
+        if any(term in n for term in ['hemodynamics', 'pressure', 'hypotensive', 'shock']):
+            deps.append('ABP_detect_pulses')
+        if any(term in n for term in ['pressure', 'hypotensive', 'shock']):
+            deps.append('ABP_compute_hemodynamics')
+    elif modality == 'acc':
+        if any(term in n for term in ['activity', 'fall', 'sleep_wake']):
+            deps.append('ACC_extract_actigraphy_features')
+    if tool_name.startswith('Multimodal_'):
+        if 'sleep_apnea' in n:
+            deps.extend(['RESP_detect_apnea', 'RESP_detect_hypopnea', 'SpO2_detect_desaturation'])
+        if 'ecg_ppg' in n or 'pat' in n:
+            deps.extend(['ECG_detect_r_peaks', 'PPG_detect_peaks'])
+    return list(dict.fromkeys(dep for dep in deps if dep != tool_name))
+
+
+def io_semantics_for(tool_name: str, modality: str, level: str) -> tuple[list[str], list[str]]:
+    n = tool_name.lower()
+    consumes = ['raw_signal'] if level == 'primitive' else ['primitive_events_or_features']
+    produces = []
+    if 'quality' in n:
+        produces.append('signal_quality')
+    if any(term in n for term in ['r_peaks', 'j_peaks', 'detect_peaks', 'detect_pulses']):
+        produces.append('beat_or_pulse_events')
+    if 'hrv' in n:
+        produces.extend(['rr_intervals', 'hrv_features'])
+    if 'prv' in n:
+        produces.extend(['pulse_intervals', 'prv_features'])
+    if 'heart_rate' in n or 'estimate_heart_rate' in n:
+        produces.append('heart_rate_bpm')
+    if 'resp' in n or 'apnea' in n or 'hypopnea' in n:
+        produces.append('respiratory_features')
+    if 'spo2' in n or 'desaturation' in n or 'oximetry' in n:
+        produces.append('oximetry_features')
+    if 'bandpower' in n or modality == 'eeg':
+        produces.append('eeg_spectral_features')
+    if 'stress' in n or modality == 'eda':
+        produces.append('autonomic_features')
+    if 'murmur' in n or modality == 'pcg':
+        produces.append('heart_sound_features')
+    if 'digitize' in n or 'image' in n:
+        consumes = ['waveform_image']
+        produces.append('digitized_signal_or_image_metadata')
+    if level == 'screening':
+        produces.append('screening_or_task_label')
+    if not produces:
+        produces.append(f'{modality}_features' if modality else 'features')
+    return list(dict.fromkeys(consumes)), list(dict.fromkeys(produces))
+
 def tool_kind(tool_name: str, description: str = '') -> str:
     text = f'{tool_name} {description}'.lower()
     if any(term in text for term in ['_dl', '_cnn', '_ml', 'deep', 'model', 'classifier', 'classify']):
@@ -128,16 +280,22 @@ def build_tool_universe(schema_path: str | Path, source_catalog_path: str | Path
         datasets = sorted({dataset for entry in entries for dataset in entry.get('candidate_datasets', [])})
         urls = sorted({url for entry in entries for url in entry.get('source_urls', [])})
         metrics = extract_metric_snippets(entries)
+        task = primary.get('task') if primary else infer_task_from_schema(schema)
+        hierarchy = tool_hierarchy_metadata(name, str(schema.get('modality', '')), task, schema.get('description', ''))
         tools.append({
             'name': name,
             'version': version,
             'frozen': True,
             'modality': schema.get('modality'),
-            'task': primary.get('task') if primary else infer_task_from_schema(schema),
+            'task': task,
             'description': schema.get('description', ''),
             'parameters': schema.get('parameters', {}),
             'returns': schema.get('returns', []),
             'tool_kind': kind,
+            'tool_level': hierarchy['tool_level'],
+            'depends_on': hierarchy['depends_on'],
+            'consumes': hierarchy['consumes'],
+            'produces': hierarchy['produces'],
             'evidence_level': ev,
             'datasets': datasets,
             'metrics': metrics,
@@ -149,6 +307,7 @@ def build_tool_universe(schema_path: str | Path, source_catalog_path: str | Path
     modality_counts = Counter(tool['modality'] for tool in tools)
     evidence_counts = Counter(tool['evidence_level'] for tool in tools)
     kind_counts = Counter(tool['tool_kind'] for tool in tools)
+    level_counts = Counter(tool['tool_level'] for tool in tools)
     return {
         'artifact': 'BioSignalToolUniverse',
         'version': version,
@@ -160,6 +319,7 @@ def build_tool_universe(schema_path: str | Path, source_catalog_path: str | Path
             'tool_count_by_modality': dict(sorted(modality_counts.items(), key=lambda x: str(x[0]))),
             'tool_count_by_evidence_level': dict(sorted(evidence_counts.items())),
             'tool_count_by_kind': dict(sorted(kind_counts.items())),
+            'tool_count_by_level': dict(sorted(level_counts.items())),
             'tools_missing_source_metadata': sorted([tool['name'] for tool in tools if not tool['source_catalog_tasks']]),
         },
         'tools': tools,
@@ -185,7 +345,7 @@ def extract_metric_snippets(entries: list[dict[str, Any]]) -> list[str]:
 def validate_tool_universe(universe: dict[str, Any]) -> dict[str, Any]:
     errors = []
     names = set()
-    required = {'name', 'version', 'frozen', 'modality', 'task', 'parameters', 'returns', 'evidence_level', 'failure_modes', 'clinical_limitation'}
+    required = {'name', 'version', 'frozen', 'modality', 'task', 'parameters', 'returns', 'tool_level', 'depends_on', 'consumes', 'produces', 'evidence_level', 'failure_modes', 'clinical_limitation'}
     for idx, tool in enumerate(universe.get('tools', [])):
         missing = sorted(required - set(tool))
         if missing:
@@ -199,6 +359,14 @@ def validate_tool_universe(universe: dict[str, Any]) -> dict[str, Any]:
             errors.append({'index': idx, 'tool': tool.get('name'), 'error': 'missing clinical limitation'})
         if not tool.get('failure_modes'):
             errors.append({'index': idx, 'tool': tool.get('name'), 'error': 'missing failure modes'})
+        if tool.get('tool_level') not in {'primitive', 'representation', 'screening'}:
+            errors.append({'index': idx, 'tool': tool.get('name'), 'error': 'invalid tool_level'})
+        if not isinstance(tool.get('depends_on'), list):
+            errors.append({'index': idx, 'tool': tool.get('name'), 'error': 'depends_on must be list'})
+        if not isinstance(tool.get('consumes'), list) or not tool.get('consumes'):
+            errors.append({'index': idx, 'tool': tool.get('name'), 'error': 'consumes must be non-empty list'})
+        if not isinstance(tool.get('produces'), list) or not tool.get('produces'):
+            errors.append({'index': idx, 'tool': tool.get('name'), 'error': 'produces must be non-empty list'})
     return {
         'artifact': universe.get('artifact'),
         'version': universe.get('version'),

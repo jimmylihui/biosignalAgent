@@ -31,7 +31,7 @@ python scripts/build_biosignal_paper_tables.py
 
 ## Current Snapshot
 
-- BioSignalToolUniverse v1 has 130 frozen tools and passes strict source-metadata validation.
+- BioSignalToolUniverse v1 has 132 frozen tools and passes strict source-metadata validation.
 - BioSignalBench v1 has 233 cases across tool planning, image digitization, scale/OCR extraction, report factuality, and multimodal session reasoning.
 - Standardized SFT data currently has 191 planner examples and 68 planner/report examples after deduplication and negative-example injection.
 - The first rule+TFIDF baseline is intentionally broad and exposes gaps on image/session/report cases; it is a baseline for learned ToolRAG/SFT rather than the expected final system.
@@ -138,7 +138,7 @@ New tool:
 - keeps single-lead ECG conduction/ST tools as fallback for single-lead pipeline compatibility
 
 Updated artifacts:
-- ToolUniverse: 131 tools, 57 benchmarked, 35 deep/ML tools
+- ToolUniverse: 132 tools, 58 benchmarked, 36 deep/ML tools
 - BioSignalBench: 238 cases, including 5 PTB-XL 12-lead tool-execution smoke cases
 - Paper table: `/data1/jiahui/biosignal-agent/outputs/paper_tables/table6_ptbxl_12lead_ecg.md`
 
@@ -567,3 +567,8 @@ Updated artifacts:
 - Baseline comparison: `/data1/jiahui/biosignal-agent/outputs/paper_tables/table32_expanded1279_baseline_comparison.md`
 
 Baseline results on 1,279 cases: rule planner planning 0.034 / Tool F1 0.536; TF-IDF ToolRAG planning 0.000 / Tool F1 0.526; oracle planning and Tool F1 1.000.
+
+
+## Hierarchical ToolUniverse Update - 2026-05-26
+
+BioSignalToolUniverse now includes generated hierarchy metadata for every tool: `tool_level`, `depends_on`, `consumes`, and `produces`. The three levels are primitive signal-operation tools, representation/physiological-feature tools, and screening/task-level tools. Current counts are 23 primitive tools, 42 representation tools, and 67 screening tools. Validation requires all four hierarchy fields for every frozen tool.
