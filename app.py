@@ -63,13 +63,13 @@ def _public_ucddb_resp_spo2_case() -> tuple[str, dict[str, Any]] | None:
         case = {
             "case_id": "public_ucddb_resp_spo2_respiratory_event_default",
             "benchmark_task": "multimodal_public_benchmark_comparison",
-            "question": "Screen this UCDDB RESP + SpO2 window for apnea, hypopnea, and desaturation risk, then summarize how RESP+SpO2 fusion compares with single-modality baselines on the public benchmark.",
+            "question": "Please review this overnight breathing and oxygen segment. Is there evidence of apnea, hypopnea, or oxygen desaturation, and how reliable is this short-window assessment?",
             "input_type": "session",
             "modality": "resp+spo2",
             "expected_tools": ["RESP_detect_apnea", "RESP_detect_hypopnea", "SpO2_detect_desaturation", "Session_screen_sleep_apnea_multimodal"],
             "source": str(manifest_path),
             "ground_truth_metric": {"type": "ucddb_resp_spo2_record_level_groupkfold_comparison"},
-            "expected_key_outputs": ["respiratory_event_risk", "resp_only_metrics", "spo2_only_metrics", "resp_spo2_fusion_metrics"],
+            "expected_key_outputs": ["respiratory_event_risk", "apnea_hypopnea_desaturation_evidence", "confidence", "limitations"],
             "signals": [
                 {"label": f"{record.get('record')}_{int(record.get('window_start_s', 0)):05d}_resp", "modality": "resp", "path": record.get("resp_path"), "sampling_rate": record.get("resp_sampling_rate"), "column": None},
                 {"label": f"{record.get('record')}_{int(record.get('window_start_s', 0)):05d}_spo2", "modality": "spo2", "path": record.get("spo2_path"), "sampling_rate": record.get("spo2_sampling_rate"), "column": None},
@@ -1003,7 +1003,7 @@ def _session_compact_measurements(trace: dict[str, Any]) -> dict[str, Any]:
         for call in run.get("tool_results", [])[:8]:
             result = call.get("result") or {}
             tool_summary = {"tool": call.get("tool")}
-            for key in ["heart_rate_bpm", "respiratory_rate_bpm", "mean_spo2", "rmssd_ms", "quality_label", "confidence", "error"]:
+            for key in ["heart_rate_bpm", "respiratory_rate_bpm", "mean_spo2", "mean_spo2_percent", "min_spo2_percent", "rmssd_ms", "quality_label", "apnea_event_count", "hypopnea_event_count", "desaturation_event_count", "time_below_90_fraction", "confidence", "error"]:
                 if key in result and result.get(key) is not None:
                     tool_summary[key] = result.get(key)
             if len(tool_summary) > 1:
@@ -1018,9 +1018,6 @@ def _session_compact_measurements(trace: dict[str, Any]) -> dict[str, Any]:
                 row[key] = result.get(key)
         session_tools.append(row)
     out = {"per_signal": per_signal, "session_tools": session_tools}
-    comparison_summary = (trace.get("benchmark_case") or {}).get("comparison_summary")
-    if comparison_summary:
-        out["public_benchmark_comparison"] = comparison_summary
     reference_label = (trace.get("benchmark_case") or {}).get("reference_label")
     if reference_label:
         out["reference_label_for_loaded_window"] = reference_label
@@ -1076,7 +1073,8 @@ def _llm_session_human_report(question: str, measurements: dict[str, Any]) -> di
         "You are BioSignalAgent writing a concise human-readable biosignal report. "
         "Use only the provided tool measurements. Do not invent diagnoses. Do not list raw key=value dumps. "
         "Write 2 short paragraphs plus, if useful, 2-4 bullets. Mention agreement/disagreement across modalities, confidence, and limitations. "
-        "Avoid saying 'not a clinical diagnosis' more than once.\n\n"
+        "If a reference_label_for_loaded_window is present, treat it as benchmark ground truth/caveat and explicitly mention when tool outputs miss or disagree with it. "
+        "Avoid benchmark performance metrics in the main answer. Avoid saying 'not a clinical diagnosis' more than once.\n\n"
         f"User question: {question}\n"
         f"Measurements JSON: {json.dumps(_jsonable(measurements), ensure_ascii=True)[:5000]}"
     )
