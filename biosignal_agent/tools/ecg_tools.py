@@ -2131,6 +2131,39 @@ def _segments_from_mask(mask: np.ndarray, sampling_rate: float) -> dict:
     return out
 
 
+
+def _ecg_wave_peak_fiducials(values: np.ndarray, segments: dict, sampling_rate: float) -> dict:
+    x = np.asarray(values, dtype=float).ravel()
+    out: dict[str, list[dict]] = {}
+    peak_mode = {'p_wave': 'local_extreme', 'qrs_complex': 'max_abs', 't_wave': 'local_extreme'}
+    for wave_name, mode in peak_mode.items():
+        peaks = []
+        for idx, seg in enumerate(segments.get(f'{wave_name}_segments', []) or []):
+            start = int(seg.get('start_sample', 0))
+            stop = int(seg.get('stop_sample', start))
+            start = max(0, min(len(x) - 1, start)) if len(x) else 0
+            stop = max(start + 1, min(len(x), stop)) if len(x) else start
+            chunk = x[start:stop]
+            if len(chunk) == 0:
+                continue
+            if mode == 'max_abs':
+                rel = int(np.nanargmax(np.abs(chunk - np.nanmedian(chunk))))
+            else:
+                centered = chunk - float(np.nanmedian(chunk))
+                rel = int(np.nanargmax(np.abs(centered)))
+            sample = int(start + rel)
+            peaks.append({
+                'wave_index': int(idx),
+                'sample_index': sample,
+                'time_s': float(sample / float(sampling_rate)),
+                'amplitude': float(x[sample]),
+                'segment_start_sample': start,
+                'segment_stop_sample': int(stop),
+            })
+        out[f'{wave_name}_peaks'] = peaks[:500]
+        out[f'{wave_name}_peak_count'] = int(len(peaks))
+    return out
+
 def ECG_delineate_waves_dl(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
     data = load_csv_signal(signal_path, sampling_rate, column)
     if not (200 <= data.sampling_rate <= 300):
@@ -2186,4 +2219,5 @@ def ECG_delineate_waves_dl(signal_path: str, sampling_rate: float, column: str |
             delineation_quality_flags.append('weak_t_wave_event_validation')
         if macro_f1 is not None and macro_f1 < 0.50:
             delineation_quality_flags.append('low_macro_event_validation')
-    return {'tool': 'ECG_delineate_waves_dl', 'model_source': str(ECG_DELINEATION_MODEL_PATH), 'training_source': 'QTDB q1c/q2c cached 90-record manual delineation subset', 'class_labels': {'0': 'background', '1': 'p_wave', '2': 'qrs_complex', '3': 't_wave'}, **segments, 'wave_pixel_fraction': wave_fraction, 'event_validation_metrics': event_metrics, 'delineation_quality_flags': delineation_quality_flags, 'confidence': confidence, 'method': 'qtdb_cached90_unet_p_qrs_t_segmentation_experimental', 'disclaimer': 'Experimental QTDB model; event-level validation is weak for T waves, so use as optional morphology evidence only until stronger LUDB/full-QTDB validation.'}
+    peak_fiducials = _ecg_wave_peak_fiducials(data.values, segments, data.sampling_rate)
+    return {'tool': 'ECG_delineate_waves_dl', 'model_source': str(ECG_DELINEATION_MODEL_PATH), 'training_source': 'QTDB q1c/q2c cached 90-record manual delineation subset', 'class_labels': {'0': 'background', '1': 'p_wave', '2': 'qrs_complex', '3': 't_wave'}, **segments, **peak_fiducials, 'wave_pixel_fraction': wave_fraction, 'event_validation_metrics': event_metrics, 'delineation_quality_flags': delineation_quality_flags, 'confidence': confidence, 'method': 'qtdb_cached90_unet_p_qrs_t_segmentation_experimental', 'disclaimer': 'Experimental QTDB model; event-level validation is weak for T waves, so use as optional morphology evidence only until stronger LUDB/full-QTDB validation.'}

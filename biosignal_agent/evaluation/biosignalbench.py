@@ -75,10 +75,9 @@ def tool_hierarchy_metadata(tool_name: str, modality: str, task: str = '', descr
         'detect_r_peaks', 'detect_peaks', 'detect_j_peaks', 'detect_pulses',
         'detect_heart_sounds', 'segment_s1_s2', 'delineate_waves',
         'detect_fiducial_points', 'compute_bandpower', 'detect_bursts',
-        'detect_desaturation', 'estimate_rate', 'detect_apnea',
-        'detect_hypopnea', 'digitize_waveform', 'classify_modality',
-        'estimate_image_scale', 'predict_image_scale', 'extract_spectrogram',
-        'render_spectrogram', 'detect_artifacts', 'read_image_text_ocr',
+        'detect_desaturation', 'detect_apnea', 'detect_hypopnea',
+        'digitize_waveform', 'classify_modality', 'detect_artifacts',
+        'read_image_text_ocr',
     ]
     representation_terms = [
         'compute_hrv', 'compute_prv', 'estimate_heart_rate', 'estimate_respiration',
@@ -90,7 +89,8 @@ def tool_hierarchy_metadata(tool_name: str, modality: str, task: str = '', descr
         'assess_bed_presence_motion', 'assess_sensor_placement',
         'estimate_sleep_features', 'estimate_sleep_stage_features',
         'extract_murmur_features', 'measure_morphology_intervals',
-        'analyze_qt_interval',
+        'analyze_qt_interval', 'estimate_rate', 'estimate_image_scale',
+        'predict_image_scale', 'extract_spectrogram', 'render_spectrogram',
     ]
     screening_terms = [
         'screen_', 'classify_', 'detect_afib', 'classify_rhythm',
@@ -99,7 +99,9 @@ def tool_hierarchy_metadata(tool_name: str, modality: str, task: str = '', descr
         'route_task_recommendation', 'estimate_bp_proxy', 'estimate_spo2',
         'estimate_exercise_intensity', 'assess_stress', 'assess_vascular_health',
     ]
-    if tool_name.startswith('Multimodal_'):
+    if tool_name == 'ABP_detect_pulses':
+        level = 'representation'
+    elif tool_name.startswith('Multimodal_'):
         level = 'screening'
     elif any(term in name for term in screening_terms):
         level = 'screening'
@@ -119,6 +121,8 @@ def dependency_tools_for(tool_name: str, modality: str, level: str) -> list[str]
     deps: list[str] = []
     if level == 'primitive':
         return deps
+    if tool_name == 'ABP_detect_pulses':
+        return ['ABP_detect_fiducial_points']
     if modality == 'ecg':
         if any(term in n for term in ['compute_hrv', 'estimate_heart_rate', 'screen_arrhythmia', 'detect_afib', 'screen_sleep_apnea', 'classify_rhythm', 'classify_beats']):
             deps.append('ECG_detect_r_peaks')
@@ -165,7 +169,7 @@ def dependency_tools_for(tool_name: str, modality: str, level: str) -> list[str]
             deps.append('EMG_detect_bursts')
     elif modality == 'abp':
         if any(term in n for term in ['hemodynamics', 'pressure', 'hypotensive', 'shock']):
-            deps.append('ABP_detect_pulses')
+            deps.append('ABP_detect_fiducial_points')
         if any(term in n for term in ['pressure', 'hypotensive', 'shock']):
             deps.append('ABP_compute_hemodynamics')
     elif modality == 'acc':
@@ -187,6 +191,12 @@ def io_semantics_for(tool_name: str, modality: str, level: str) -> tuple[list[st
         produces.append('signal_quality')
     if any(term in n for term in ['r_peaks', 'j_peaks', 'detect_peaks', 'detect_pulses']):
         produces.append('beat_or_pulse_events')
+    if modality == 'abp' and 'fiducial' in n:
+        produces.extend(['systolic_onset', 'systolic_peak', 'dicrotic_notch', 'diastolic_peak', 'diastolic_phase_endpoint'])
+    if modality == 'ppg' and 'fiducial' in n:
+        produces.extend(['pulse_onset', 'systolic_peak', 'dicrotic_notch', 'diastolic_peak'])
+    if modality == 'ecg' and ('delineate' in n or 'fiducial' in n):
+        produces.extend(['p_wave_peak', 'qrs_complex_peak', 't_wave_peak'])
     if 'hrv' in n:
         produces.extend(['rr_intervals', 'hrv_features'])
     if 'prv' in n:
@@ -564,7 +574,7 @@ def session_prior_tools(modality: str, question: str) -> list[str]:
         'scg': ['SCG_assess_quality', 'SCG_detect_j_peaks'],
         'resp': ['RESP_assess_quality', 'RESP_estimate_rate'],
         'spo2': ['SpO2_assess_quality', 'SpO2_summarize'],
-        'abp': ['ABP_assess_quality', 'ABP_detect_pulses'],
+        'abp': ['ABP_assess_quality', 'ABP_detect_fiducial_points'],
         'pcg': ['PCG_assess_quality', 'PCG_detect_heart_sounds'],
         'acc': ['ACC_assess_quality', 'ACC_summarize_activity'],
         'eda': ['EDA_assess_quality', 'EDA_summarize'],

@@ -7,7 +7,7 @@ from biosignal_agent.tools.image_cnn_tools import Signal_classify_modality_from_
 from biosignal_agent.tools.modality_tools import Signal_classify_modality
 from biosignal_agent.tools.multimodal_tools import Multimodal_estimate_ecg_ppg_pat_bp_proxy, Multimodal_screen_sleep_apnea_report
 from biosignal_agent.tools.spectrogram_tools import Signal_extract_spectrogram_features, Signal_render_spectrogram_image
-from biosignal_agent.tools.abp_tools import ABP_assess_quality, ABP_classify_pressure_events, ABP_compute_hemodynamics, ABP_detect_acute_hypotensive_episode_proxy, ABP_detect_pulses, ABP_screen_pressure_events
+from biosignal_agent.tools.abp_tools import ABP_assess_quality, ABP_classify_pressure_events, ABP_compute_hemodynamics, ABP_detect_acute_hypotensive_episode_proxy, ABP_detect_fiducial_points, ABP_detect_pulses, ABP_screen_pressure_events
 from biosignal_agent.tools.acc_tools import ACC_assess_quality, ACC_classify_activity_ml, ACC_detect_activity_bouts, ACC_detect_fall_ml, ACC_detect_fall_proxy, ACC_estimate_sleep_wake, ACC_extract_actigraphy_features, ACC_summarize_activity
 from biosignal_agent.tools.bcg_tools import BCG_assess_bed_presence_motion, BCG_assess_quality, BCG_compute_hrv, BCG_detect_j_peaks, BCG_estimate_bp_proxy, BCG_estimate_respiration, BCG_estimate_sleep_features, BCG_route_task_recommendation, BCG_screen_arrhythmia
 from biosignal_agent.tools.ecg_tools import ECG_classify_12lead_ptbxl_superclasses, ECG_delineate_waves_dl, ECG_analyze_qt_interval, ECG_assess_quality, ECG_assess_stress_fatigue_hrv, ECG_classify_beats, ECG_classify_rhythm_segment, ECG_compute_hrv, ECG_detect_afib, ECG_detect_r_peaks, ECG_estimate_heart_rate, ECG_measure_morphology_intervals, ECG_screen_arrhythmia, ECG_screen_conduction_block, ECG_screen_ischemia_st, ECG_screen_sleep_apnea
@@ -96,6 +96,7 @@ TOOLS = {
     "SpO2_screen_sleep_apnea_oximetry": SpO2_screen_sleep_apnea_oximetry,
     "SpO2_screen_sleep_apnea_ml": SpO2_screen_sleep_apnea_ml,
     "ABP_assess_quality": ABP_assess_quality,
+    "ABP_detect_fiducial_points": ABP_detect_fiducial_points,
     "ABP_detect_pulses": ABP_detect_pulses,
     "ABP_screen_pressure_events": ABP_screen_pressure_events,
     "ABP_classify_pressure_events": ABP_classify_pressure_events,
@@ -163,7 +164,7 @@ WORKFLOWS = {
     "resp": ["RESP_assess_quality", "Signal_detect_artifacts", "RESP_estimate_rate", "RESP_screen_sleep_apnea_ml", "RESP_detect_apnea", "RESP_detect_hypopnea", "RESP_screen_rate_pattern", "RESP_summarize_event_burden"],
     "multimodal": ["Multimodal_estimate_ecg_ppg_pat_bp_proxy", "Multimodal_screen_sleep_apnea_report"],
     "spo2": ["SpO2_assess_quality", "Signal_detect_artifacts", "SpO2_summarize", "SpO2_detect_desaturation", "SpO2_assess_hypoxemia_burden", "SpO2_extract_oximetry_features", "SpO2_screen_sleep_apnea_oximetry", "SpO2_screen_sleep_apnea_ml"],
-    "abp": ["ABP_assess_quality", "Signal_detect_artifacts", "ABP_detect_pulses", "ABP_screen_pressure_events", "ABP_classify_pressure_events", "ABP_detect_acute_hypotensive_episode_proxy", "ABP_compute_hemodynamics"],
+    "abp": ["ABP_assess_quality", "Signal_detect_artifacts", "ABP_detect_fiducial_points", "ABP_detect_pulses", "ABP_screen_pressure_events", "ABP_classify_pressure_events", "ABP_detect_acute_hypotensive_episode_proxy", "ABP_compute_hemodynamics"],
     "pcg": ["PCG_assess_quality", "Signal_detect_artifacts", "PCG_detect_heart_sounds", "PCG_estimate_heart_rate", "PCG_segment_s1_s2_proxy", "PCG_assess_rhythm_irregularity", "PCG_detect_s3_s4_proxy", "PCG_screen_murmur_proxy", "PCG_screen_murmur_patient_multisite", "PCG_extract_murmur_features", "PCG_screen_valve_disease_proxy", "PCG_screen_congenital_abnormality_proxy", "PCG_monitor_heart_function_proxy"],
     "acc": ["ACC_assess_quality", "Signal_detect_artifacts", "ACC_summarize_activity", "ACC_classify_activity_ml", "ACC_extract_actigraphy_features", "ACC_estimate_sleep_wake", "ACC_detect_activity_bouts", "ACC_detect_fall_proxy", "ACC_detect_fall_ml"],
     "eda": ["EDA_assess_quality", "Signal_detect_artifacts", "EDA_summarize", "EDA_extract_tonic_phasic_features", "EDA_detect_arousal_events", "EDA_screen_stress_ml", "EDA_classify_affective_state_ml", "EDA_route_task_recommendation", "EDA_screen_stress_proxy"],

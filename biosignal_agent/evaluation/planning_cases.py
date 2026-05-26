@@ -50,6 +50,12 @@ DEFAULT_PLANNING_CASES = [
         expected_tools=('PPG_assess_quality', 'PPG_detect_peaks'),
     ),
     PlanningCase(
+        case_id='ppg_fiducials',
+        question='Detect PPG pulse onset, systolic peak, dicrotic notch, and diastolic peak fiducials',
+        modality='ppg',
+        expected_tools=('PPG_assess_quality', 'PPG_detect_fiducial_points'),
+    ),
+    PlanningCase(
         case_id='ppg_hr',
         question='Estimate heart rate from this photoplethysmography pulse signal',
         modality='ppg',
@@ -143,7 +149,7 @@ DEFAULT_PLANNING_CASES = [
         case_id='abp_pulses',
         question='Detect arterial blood pressure pulses and estimate heart rate',
         modality='abp',
-        expected_tools=('ABP_assess_quality', 'ABP_detect_pulses'),
+        expected_tools=('ABP_assess_quality', 'ABP_detect_fiducial_points'),
     ),
     PlanningCase(
         case_id='pcg_quality',
@@ -270,7 +276,7 @@ DEFAULT_PLANNING_CASES = [
         case_id='abp_pressure_events',
         question='Screen ABP for hypotension or hypertension pressure events',
         modality='abp',
-        expected_tools=('ABP_assess_quality', 'ABP_detect_pulses', 'ABP_screen_pressure_events'),
+        expected_tools=('ABP_assess_quality', 'ABP_detect_fiducial_points', 'ABP_screen_pressure_events'),
     ),
     PlanningCase(
         case_id='pcg_murmur_proxy',
@@ -331,7 +337,7 @@ DEFAULT_PLANNING_CASES = [
         case_id='abp_hemodynamics',
         question='Compute ABP mean arterial pressure MAP and pulse pressure hemodynamic features',
         modality='abp',
-        expected_tools=('ABP_assess_quality', 'ABP_detect_pulses', 'ABP_compute_hemodynamics'),
+        expected_tools=('ABP_assess_quality', 'ABP_detect_fiducial_points', 'ABP_compute_hemodynamics'),
     ),
     PlanningCase(
         case_id='resp_rate_pattern',

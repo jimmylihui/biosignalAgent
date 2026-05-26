@@ -24,7 +24,7 @@ CORE_TOOLS = {
     'ppg': ['PPG_detect_peaks'],
     'resp': ['RESP_estimate_rate'],
     'spo2': ['SpO2_summarize'],
-    'abp': ['ABP_detect_pulses'],
+    'abp': ['ABP_detect_fiducial_points'],
     'pcg': ['PCG_detect_heart_sounds'],
     'acc': ['ACC_summarize_activity'],
     'eda': ['EDA_summarize'],

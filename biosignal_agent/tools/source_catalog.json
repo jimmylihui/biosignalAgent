@@ -943,8 +943,9 @@
     },
     {
       "modality": "ABP",
-      "task": "ABP pulse/hemodynamics and pressure-event screening",
+      "task": "ABP fiducial detection, pulse/hemodynamics, and pressure-event screening",
       "current_tools": [
+        "ABP_detect_fiducial_points",
         "ABP_detect_pulses",
         "ABP_screen_pressure_events",
         "ABP_compute_hemodynamics",
@@ -952,6 +953,7 @@
         "ABP_detect_acute_hypotensive_episode_proxy"
       ],
       "existing_work": [
+        "ABP fiducial-point detection: systolic onset, systolic peak, dicrotic notch, diastolic peak, and diastolic phase endpoint.",
         "ABP pulse/valley detection",
         "Beat-level MAP/SBP/DBP/pulse-pressure event burden",
         "PhysioNet/CinC 2009 acute hypotensive episode prediction",

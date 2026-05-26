@@ -1595,10 +1595,89 @@ def PPG_compute_prv(signal_path: str, sampling_rate: float, column: str | None =
 
 
 
+
+def _ppg_fiducial_point(sample_index: int | None, values: np.ndarray, sampling_rate: float) -> dict | None:
+    if sample_index is None:
+        return None
+    idx = int(sample_index)
+    if idx < 0 or idx >= len(values):
+        return None
+    amp = _safe_float(values[idx])
+    return {
+        "sample_index": idx,
+        "time_s": float(idx / float(sampling_rate)),
+        "amplitude": amp,
+    }
+
+
+def _nearest_before(candidates: list[int], anchor: int, lower_bound: int = 0) -> int | None:
+    vals = [int(x) for x in candidates if lower_bound <= int(x) <= int(anchor)]
+    return vals[-1] if vals else None
+
+
+def _first_after(candidates: list[int], anchor: int, upper_bound: int) -> int | None:
+    vals = [int(x) for x in candidates if int(anchor) <= int(x) <= int(upper_bound)]
+    return vals[0] if vals else None
+
+
+def _fallback_diastolic_peaks(values: np.ndarray, peaks: list[int], notches: list[int], sampling_rate: float) -> list[int]:
+    diastolic: list[int] = []
+    for i, peak in enumerate(peaks):
+        next_peak = peaks[i + 1] if i + 1 < len(peaks) else min(len(values) - 1, int(peak + 0.8 * sampling_rate))
+        notch = _first_after(notches, peak, next_peak)
+        if notch is None:
+            continue
+        start = min(len(values) - 1, int(notch + 0.03 * sampling_rate))
+        stop = min(len(values), max(start + 1, min(next_peak, int(notch + 0.45 * sampling_rate))))
+        segment = values[start:stop]
+        if len(segment) and np.any(np.isfinite(segment)):
+            local_peaks, _ = scipy_signal.find_peaks(segment, distance=max(1, int(0.05 * sampling_rate)))
+            idx = int(start + (local_peaks[0] if len(local_peaks) else int(np.nanargmax(segment))))
+            diastolic.append(idx)
+    return diastolic[:5000]
+
+
+def _assemble_ppg_fiducials(values: np.ndarray, sampling_rate: float, onsets: list[int], peaks: list[int], notches: list[int], diastolic: list[int]) -> dict:
+    clean_on = sorted({int(x) for x in onsets if 0 <= int(x) < len(values)})
+    clean_sp = sorted({int(x) for x in peaks if 0 <= int(x) < len(values)})
+    clean_dn = sorted({int(x) for x in notches if 0 <= int(x) < len(values)})
+    clean_dp = sorted({int(x) for x in diastolic if 0 <= int(x) < len(values)})
+    beats = []
+    missing = {"pulse_onset": 0, "systolic_peak": 0, "dicrotic_notch": 0, "diastolic_peak": 0}
+    for beat_index, sp in enumerate(clean_sp[:5000]):
+        prev_sp = clean_sp[beat_index - 1] if beat_index > 0 else max(0, int(sp - 0.8 * sampling_rate))
+        next_sp = clean_sp[beat_index + 1] if beat_index + 1 < len(clean_sp) else min(len(values) - 1, int(sp + 0.8 * sampling_rate))
+        on = _nearest_before(clean_on, sp, prev_sp)
+        dn = _first_after(clean_dn, sp, next_sp)
+        dp = _first_after(clean_dp, dn if dn is not None else sp, next_sp)
+        row = {
+            "beat_index": int(beat_index),
+            "pulse_onset": _ppg_fiducial_point(on, values, sampling_rate),
+            "systolic_peak": _ppg_fiducial_point(sp, values, sampling_rate),
+            "dicrotic_notch": _ppg_fiducial_point(dn, values, sampling_rate),
+            "diastolic_peak": _ppg_fiducial_point(dp, values, sampling_rate),
+        }
+        for key in missing:
+            if row[key] is None:
+                missing[key] += 1
+        beats.append(row)
+    denom = max(1, len(beats))
+    return {
+        "fiducials": beats,
+        "pulse_onset_points": [_ppg_fiducial_point(x, values, sampling_rate) for x in clean_on[:5000]],
+        "systolic_peak_points": [_ppg_fiducial_point(x, values, sampling_rate) for x in clean_sp[:5000]],
+        "dicrotic_notch_points": [_ppg_fiducial_point(x, values, sampling_rate) for x in clean_dn[:5000]],
+        "diastolic_peak_points": [_ppg_fiducial_point(x, values, sampling_rate) for x in clean_dp[:5000]],
+        "pulse_onset_indices": clean_on[:5000],
+        "systolic_peak_indices": clean_sp[:5000],
+        "dicrotic_notch_indices": clean_dn[:5000],
+        "diastolic_peak_indices": clean_dp[:5000],
+        "num_beats": int(len(beats)),
+        "missing_fiducial_fraction": {k: float(v / denom) for k, v in missing.items()},
+    }
+
 def _pyppg_fiducial_backend(values: np.ndarray, sampling_rate: float) -> dict | None:
     try:
-        import warnings
-        import pandas as _pd
         from dotmap import DotMap
         import pyPPG as _pyPPG
         from pyPPG.preproc import Preprocess
@@ -1606,9 +1685,14 @@ def _pyppg_fiducial_backend(values: np.ndarray, sampling_rate: float) -> dict | 
         if not hasattr(np, "NaN"):
             np.NaN = np.nan
         x = np.asarray(values, dtype=float)
-        x = x[np.isfinite(x)]
+        finite = np.isfinite(x)
+        if not np.any(finite):
+            return {"pyppg_backend_status": "skipped_no_finite_signal"}
+        fill = float(np.nanmedian(x[finite]))
+        x = np.where(finite, x, fill)
         if len(x) < max(16, int(8 * sampling_rate)):
             return {"pyppg_backend_status": "skipped_signal_too_short"}
+
         sig = DotMap()
         sig.v = x
         sig.fs = float(sampling_rate)
@@ -1620,51 +1704,51 @@ def _pyppg_fiducial_backend(values: np.ndarray, sampling_rate: float) -> dict | 
         prep = Preprocess(fL=0.5, fH=min(12.0, sampling_rate * 0.45), order=4)
         sig.ppg, sig.vpg, sig.apg, sig.jpg = prep.get_signals(sig)
         ppg_obj = _pyPPG.PPG(sig, check_ppg_len=False)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            frame = FpCollection(ppg_obj).get_fiducials(ppg_obj)
-        def clean(col: str) -> list[int]:
-            if col not in frame:
-                return []
-            vals = _pd.to_numeric(frame[col], errors="coerce").dropna().to_numpy(dtype=int)
-            vals = vals[(vals >= 0) & (vals < len(x))]
-            return [int(v) for v in vals[:5000]]
-        onsets = clean("on")
-        peaks = clean("sp")
-        notches = clean("dn")
-        diastolic = clean("dp")
-        if len(peaks) < 3 or len(onsets) < 3:
+        collector = FpCollection(ppg_obj)
+
+        peaks_raw, onsets_raw = collector.get_peak_onset('PPGdet')
+        if len(peaks_raw) < 3 or len(onsets_raw) < 3:
             return {
                 "pyppg_backend_status": "empty_or_incompatible_output",
-                "pyppg_num_systolic_peaks": int(len(peaks)),
-                "pyppg_num_onsets": int(len(onsets)),
-                "pyppg_note": "pyPPG 1.0.73 is installed without pinned legacy pandas/numpy; pandas>=3 copy-on-write can leave fiducial frames empty.",
+                "pyppg_num_systolic_peaks": int(len(peaks_raw)),
+                "pyppg_num_onsets": int(len(onsets_raw)),
+                "pyppg_note": "pyPPG peak/onset detector returned too few pulse pairs for this waveform.",
             }
+        notches_raw = collector.get_dicrotic_notch(peaks_raw, onsets_raw)
+        apg_fp = collector.get_apg_fiducials(onsets_raw, peaks_raw)
+        diastolic_raw = collector.get_diastolic_peak(onsets_raw, notches_raw, apg_fp.e)
+
+        peaks = [int(v) for v in peaks_raw if np.isfinite(v) and 0 <= int(v) < len(x)]
+        onsets = [int(v) for v in onsets_raw if np.isfinite(v) and 0 <= int(v) < len(x)]
+        notches = [int(v) for v in notches_raw if np.isfinite(v) and 0 <= int(v) < len(x)]
+        diastolic = [int(v) for v in diastolic_raw if np.isfinite(v) and 0 <= int(v) < len(x)]
         return {
             "pyppg_backend_status": "ok",
-            "pyppg_systolic_peak_indices": peaks,
-            "pyppg_pulse_onset_indices": onsets,
-            "pyppg_dicrotic_notch_indices": notches,
-            "pyppg_diastolic_peak_indices": diastolic,
+            "pyppg_systolic_peak_indices": peaks[:5000],
+            "pyppg_pulse_onset_indices": onsets[:5000],
+            "pyppg_dicrotic_notch_indices": notches[:5000],
+            "pyppg_diastolic_peak_indices": diastolic[:5000],
             "pyppg_num_systolic_peaks": int(len(peaks)),
             "pyppg_num_onsets": int(len(onsets)),
             "pyppg_num_dicrotic_notches": int(len(notches)),
+            "pyppg_num_diastolic_peaks": int(len(diastolic)),
         }
     except Exception as exc:
         return {"pyppg_backend_status": "error", "pyppg_backend_error": f"{type(exc).__name__}: {exc}"}
 
 def PPG_detect_fiducial_points(signal_path: str, sampling_rate: float, column: str | None = None) -> dict:
     data = load_csv_signal(signal_path, sampling_rate, column)
+    values = data.values
     peaks_result = PPG_detect_peaks(signal_path, sampling_rate, column)
     peaks = np.asarray(peaks_result.get("peak_indices", []), dtype=int)
-    peaks = peaks[(peaks > 1) & (peaks < len(data.values) - 2)]
+    peaks = peaks[(peaks > 1) & (peaks < len(values) - 2)]
     if len(peaks) < 3:
         return {"tool": "PPG_detect_fiducial_points", "error": "not enough pulse peaks", "confidence": 0.1}
-    values = data.values
-    onsets = []
-    notches = []
-    radius_left = max(2, int(round(0.65 * sampling_rate)))
-    radius_right = max(2, int(round(0.55 * sampling_rate)))
+
+    onsets: list[int] = []
+    notches: list[int] = []
+    radius_left = max(2, int(round(0.65 * data.sampling_rate)))
+    radius_right = max(2, int(round(0.55 * data.sampling_rate)))
     for i, peak in enumerate(peaks):
         left = int(peaks[i - 1]) if i > 0 else max(0, int(peak) - radius_left)
         right = int(peaks[i + 1]) if i + 1 < len(peaks) else min(len(values) - 1, int(peak) + radius_right)
@@ -1673,42 +1757,43 @@ def PPG_detect_fiducial_points(signal_path: str, sampling_rate: float, column: s
         pre = values[left:int(peak) + 1]
         post = values[int(peak):right + 1]
         if len(pre) >= 3 and np.any(np.isfinite(pre)):
-            onsets.append(left + int(np.nanargmin(pre)))
+            onsets.append(int(left + int(np.nanargmin(pre))))
         if len(post) >= 5 and np.any(np.isfinite(post)):
             deriv = np.gradient(post)
             candidates = np.where((deriv[:-1] < 0) & (deriv[1:] >= 0))[0]
-            if len(candidates):
-                notch = int(peak) + int(candidates[0] + 1)
-            else:
-                notch = int(peak) + int(np.nanargmin(post))
-            notches.append(notch)
+            notch = int(peak) + int(candidates[0] + 1) if len(candidates) else int(peak) + int(np.nanargmin(post))
+            notches.append(int(notch))
+
     morphology = _ppg_pulse_morphology_features(values, data.sampling_rate, peaks)
     pyppg_backend = _pyppg_fiducial_backend(values, data.sampling_rate)
     use_pyppg = bool(pyppg_backend and pyppg_backend.get("pyppg_backend_status") == "ok")
     if use_pyppg:
-        out_peaks = pyppg_backend.get("pyppg_systolic_peak_indices", peaks.tolist())
-        out_onsets = pyppg_backend.get("pyppg_pulse_onset_indices", [int(x) for x in onsets[:5000]])
-        out_notches = pyppg_backend.get("pyppg_dicrotic_notch_indices", [int(x) for x in notches[:5000]])
-        method = "pyppg_fiducial_backend_with_local_morphology_features"
-        confidence = min(0.78, float(max(0.05, peaks_result.get("confidence", 0.5))) + 0.05)
+        out_peaks = [int(x) for x in pyppg_backend.get("pyppg_systolic_peak_indices", peaks.tolist())]
+        out_onsets = [int(x) for x in pyppg_backend.get("pyppg_pulse_onset_indices", onsets)]
+        out_notches = [int(x) for x in pyppg_backend.get("pyppg_dicrotic_notch_indices", notches)]
+        out_diastolic = [int(x) for x in pyppg_backend.get("pyppg_diastolic_peak_indices", [])]
+        if not out_diastolic:
+            out_diastolic = _fallback_diastolic_peaks(values, out_peaks, out_notches, data.sampling_rate)
+        method = "pyppg_on_sp_dn_dp_fiducial_detection"
+        confidence = min(0.82, float(max(0.05, peaks_result.get("confidence", 0.5))) + 0.08)
     else:
-        out_peaks = peaks.tolist()
+        out_peaks = [int(x) for x in peaks.tolist()]
         out_onsets = [int(x) for x in onsets[:5000]]
         out_notches = [int(x) for x in notches[:5000]]
-        method = "ppg_peak_trough_derivative_fiducial_proxy"
+        out_diastolic = _fallback_diastolic_peaks(values, out_peaks, out_notches, data.sampling_rate)
+        method = "ppg_local_peak_trough_derivative_on_sp_dn_dp_fallback"
         confidence = float(max(0.05, min(0.7, peaks_result.get("confidence", 0.5)))) if morphology.get("num_morphology_pulses", 0) >= 3 else 0.25
+
+    fiducial_payload = _assemble_ppg_fiducials(values, data.sampling_rate, out_onsets, out_peaks, out_notches, out_diastolic)
     return {
         "tool": "PPG_detect_fiducial_points",
-        "systolic_peak_indices": out_peaks,
-        "pulse_onset_indices": out_onsets,
-        "dicrotic_notch_indices_proxy": out_notches,
+        **fiducial_payload,
         **morphology,
         "pyppg_backend": pyppg_backend,
         "confidence": confidence,
         "method": method,
-        "disclaimer": "Onsets and dicrotic notches are proxy fiducials from a single PPG channel; validated vascular analysis needs calibrated waveform and annotation-specific benchmarking.",
+        "disclaimer": "PPG fiducials are waveform-analysis outputs, not standalone vascular diagnoses; pyPPG is preferred when available, with local fallback marked by method/backend status.",
     }
-
 
 def PPG_estimate_spo2(signal_path: str, sampling_rate: float, red_column: str = "red", infrared_column: str = "ir", column: str | None = None) -> dict:
     frame = pd.read_csv(signal_path)

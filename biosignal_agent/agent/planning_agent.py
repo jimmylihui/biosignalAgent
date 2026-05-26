@@ -28,7 +28,7 @@ BASIC_ANALYSIS_TOOLS = {
     "scg": ["SCG_detect_j_peaks"],
     "resp": ["RESP_estimate_rate"],
     "spo2": ["SpO2_summarize"],
-    "abp": ["ABP_detect_pulses"],
+    "abp": ["ABP_detect_fiducial_points"],
     "pcg": ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate"],
     "acc": ["ACC_summarize_activity"],
     "eda": ["EDA_summarize"],
@@ -44,17 +44,17 @@ TASK_TOOL_RULES = {
     "ppg": [
         ({"heart rate", "hr", "bpm", "pulse rate"}, ["PPG_detect_peaks"]),
         ({"prv", "pulse rate variability", "hrv", "pulse variability", "rmssd", "sdnn"}, ["PPG_detect_peaks", "PPG_compute_prv"]),
-        ({"fiducial", "onset", "dicrotic", "notch", "systolic peak", "pulse morphology"}, ["PPG_detect_peaks", "PPG_detect_fiducial_points"]),
+        ({"fiducial", "onset", "dicrotic", "notch", "systolic peak", "diastolic peak", "pulse morphology"}, ["PPG_detect_fiducial_points"]),
         ({"spo2", "oxygen saturation", "blood oxygen", "red infrared", "red/ir"}, ["PPG_estimate_spo2"]),
-        ({"blood pressure", "bp", "cuffless", "pat", "ptt"}, ["PPG_detect_peaks", "PPG_detect_fiducial_points", "PPG_estimate_bp_proxy"]),
-        ({"perfusion", "low perfusion", "pulse amplitude"}, ["PPG_detect_peaks", "PPG_assess_perfusion_variability"]),
-        ({"shock", "low-perfusion", "low perfusion shock", "hypoperfusion"}, ["PPG_detect_peaks", "PPG_assess_perfusion_variability", "PPG_screen_low_perfusion_shock_risk"]),
+        ({"blood pressure", "bp", "cuffless", "pat", "ptt"}, ["PPG_detect_fiducial_points", "PPG_estimate_bp_proxy"]),
+        ({"perfusion", "low perfusion", "pulse amplitude"}, ["PPG_assess_perfusion_variability"]),
+        ({"shock", "low-perfusion", "low perfusion shock", "hypoperfusion"}, ["PPG_screen_low_perfusion_shock_risk"]),
         ({"irregular pulse", "pulse irregularity", "af", "afib", "atrial fibrillation"}, ["PPG_detect_peaks", "PPG_screen_pulse_irregularity", "PPG_detect_afib"]),
         ({"respiration", "respiratory modulation", "ppg respiration", "breathing", "respiratory rate"}, ["PPG_detect_peaks", "PPG_estimate_respiration_modulation"]),
         ({"sleep", "sleep monitoring", "sleep state", "recovery"}, ["PPG_detect_peaks", "PPG_compute_prv", "PPG_estimate_respiration_modulation", "PPG_estimate_sleep_features"]),
         ({"stress", "emotion", "mental workload", "strain"}, ["PPG_detect_peaks", "PPG_compute_prv", "PPG_assess_stress_prv"]),
         ({"exercise", "activity intensity", "workout", "sport", "fitness"}, ["PPG_detect_peaks", "PPG_estimate_heart_rate", "PPG_estimate_exercise_intensity"]),
-        ({"vascular", "arterial stiffness", "vascular health", "vascular aging", "pulse wave"}, ["PPG_detect_peaks", "PPG_detect_fiducial_points", "PPG_assess_vascular_health"]),
+        ({"vascular", "arterial stiffness", "vascular health", "vascular aging", "pulse wave"}, ["PPG_detect_fiducial_points", "PPG_assess_vascular_health"]),
     ],
 
     "bcg": [
@@ -64,8 +64,8 @@ TASK_TOOL_RULES = {
         ({"respiration", "respiratory", "breathing", "breath"}, ["SCG_estimate_respiration"]),
     ],
     "abp": [
-        ({"hypotension", "hypertension", "pressure event", "shock", "high blood pressure", "low blood pressure"}, ["ABP_detect_pulses", "ABP_screen_pressure_events"]),
-        ({"map", "mean arterial pressure", "pulse pressure", "hemodynamic", "haemodynamic", "perfusion pressure"}, ["ABP_detect_pulses", "ABP_compute_hemodynamics"]),
+        ({"hypotension", "hypertension", "pressure event", "shock", "high blood pressure", "low blood pressure"}, ["ABP_detect_fiducial_points", "ABP_screen_pressure_events"]),
+        ({"map", "mean arterial pressure", "pulse pressure", "hemodynamic", "haemodynamic", "perfusion pressure"}, ["ABP_detect_fiducial_points", "ABP_compute_hemodynamics"]),
     ],
     "pcg": [
         ({"heart rate", "hr", "bpm"}, ["PCG_detect_heart_sounds", "PCG_estimate_heart_rate"]),
@@ -223,7 +223,26 @@ class PlanningBioSignalAgent:
                 selected.append("ECG_compute_hrv")
         elif wants_analysis and not wants_artifact:
             respiration_only = modality in {"bcg", "scg"} and any(term in text for term in ["respiration", "respiratory", "breathing", "breath"])
-            if not respiration_only:
+            ppg_specific_morphology = modality == "ppg" and any(
+                term in text
+                for term in [
+                    "fiducial",
+                    "onset",
+                    "dicrotic",
+                    "notch",
+                    "systolic peak",
+                    "diastolic peak",
+                    "pulse morphology",
+                    "vascular",
+                    "arterial stiffness",
+                    "pulse wave",
+                    "blood pressure",
+                    "cuffless",
+                    "perfusion",
+                    "shock",
+                ]
+            )
+            if not respiration_only and not ppg_specific_morphology:
                 selected.extend(BASIC_ANALYSIS_TOOLS.get(modality, []))
 
         for terms, tools in TASK_TOOL_RULES.get(modality, []):
@@ -295,7 +314,7 @@ class PlanningBioSignalAgent:
             if call["tool"] == "PPG_compute_prv" and "sdnn_ms" in result:
                 findings.append(f"PPG PRV: SDNN {result['sdnn_ms']:.1f} ms, RMSSD {result.get('rmssd_ms')} ms.")
             if call["tool"] == "PPG_detect_fiducial_points" and "num_morphology_pulses" in result:
-                findings.append(f"PPG fiducials: {result.get('num_morphology_pulses')} morphology pulses with proxy onsets/notches.")
+                findings.append(f"PPG fiducials: {result.get('num_beats') or result.get('num_morphology_pulses')} pulses with onset, systolic peak, dicrotic notch, and diastolic peak points.")
             if call["tool"] == "PPG_estimate_spo2":
                 if "spo2_percent_proxy" in result:
                     findings.append(f"PPG SpO2 proxy: {result['spo2_percent_proxy']:.1f}% from red/IR ratio-of-ratios.")

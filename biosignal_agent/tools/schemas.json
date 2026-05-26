@@ -1053,7 +1053,7 @@
   },
   {
     "name": "ABP_detect_pulses",
-    "description": "Detect ABP pulse peaks and estimate heart rate and approximate pressure values.",
+    "description": "Legacy/coarse ABP pulse detector wrapper returning systolic peak indices and beat summary values from ABP fiducial detection.",
     "modality": "ABP",
     "parameters": {
       "signal_path": {
@@ -1075,9 +1075,49 @@
       "heart_rate_bpm",
       "median_systolic_value",
       "approx_diastolic_value",
+      "median_map_value",
+      "median_pulse_pressure",
       "confidence",
       "interval_cv",
-      "regularity_confidence"
+      "regularity_confidence",
+      "method",
+      "error"
+    ]
+  },
+  {
+    "name": "ABP_detect_fiducial_points",
+    "description": "Detect beat-level ABP fiducial points: systolic onset, systolic peak, dicrotic notch, diastolic peak, and diastolic phase endpoint. Each fiducial includes position and amplitude.",
+    "modality": "ABP",
+    "parameters": {
+      "signal_path": {
+        "type": "string"
+      },
+      "sampling_rate": {
+        "type": "number"
+      },
+      "column": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "returns": [
+      "fiducials",
+      "num_beats",
+      "systolic_onset_indices",
+      "systolic_peak_indices",
+      "dicrotic_notch_indices",
+      "diastolic_peak_indices",
+      "diastolic_phase_endpoint_indices",
+      "heart_rate_bpm",
+      "median_systolic_value",
+      "approx_diastolic_value",
+      "missing_fiducial_fraction",
+      "confidence",
+      "method",
+      "limitations",
+      "error"
     ]
   },
   {
@@ -2369,7 +2409,7 @@
   },
   {
     "name": "ABP_compute_hemodynamics",
-    "description": "Compute ABP hemodynamic proxy features including MAP and pulse pressure.",
+    "description": "Compute ABP hemodynamic proxy features from ABP fiducial points, including MAP and pulse pressure.",
     "modality": "ABP",
     "parameters": {
       "signal_path": {
@@ -2394,6 +2434,7 @@
       "hemodynamic_flags",
       "hemodynamic_risk",
       "confidence",
+      "fiducial_summary",
       "method",
       "disclaimer"
     ]
@@ -4231,7 +4272,7 @@
   },
   {
     "name": "PPG_detect_fiducial_points",
-    "description": "Detect PPG systolic peaks plus proxy pulse onsets and dicrotic notches.",
+    "description": "Detect PPG fiducial points using pyPPG when available: Pulse Onset (on), Systolic Peak (sp), Dicrotic Notch (dn), and Diastolic Peak (dp), with sample/time/amplitude for each point.",
     "modality": "PPG",
     "parameters": {
       "signal_path": {
@@ -4248,15 +4289,24 @@
       }
     },
     "returns": [
-      "systolic_peak_indices",
+      "fiducials",
+      "pulse_onset_points",
+      "systolic_peak_points",
+      "dicrotic_notch_points",
+      "diastolic_peak_points",
       "pulse_onset_indices",
-      "dicrotic_notch_indices_proxy",
+      "systolic_peak_indices",
+      "dicrotic_notch_indices",
+      "diastolic_peak_indices",
+      "num_beats",
+      "missing_fiducial_fraction",
       "median_rise_time_s",
       "median_decay_time_s",
       "median_pulse_width_half_height_s",
       "median_pulse_area",
       "median_upstroke_slope",
       "num_morphology_pulses",
+      "pyppg_backend",
       "confidence",
       "method",
       "disclaimer"
@@ -4517,7 +4567,7 @@
   },
   {
     "name": "ECG_delineate_waves_dl",
-    "description": "Experimental QTDB-trained P/QRS/T ECG wave segmentation backend for morphology evidence near 250 Hz.",
+    "description": "Experimental QTDB-trained P/QRS/T ECG wave segmentation and fiducial peak backend for morphology evidence near 250 Hz.",
     "modality": "ECG",
     "parameters": {
       "signal_path": {
@@ -4545,7 +4595,13 @@
       "method",
       "model_source",
       "disclaimer",
-      "error"
+      "error",
+      "p_wave_peaks",
+      "qrs_complex_peaks",
+      "t_wave_peaks",
+      "p_wave_peak_count",
+      "qrs_complex_peak_count",
+      "t_wave_peak_count"
     ]
   },
   {

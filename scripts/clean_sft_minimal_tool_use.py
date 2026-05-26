@@ -40,7 +40,7 @@ MEASUREMENT_KEEPERS = {
     "bcg": {"hr": {"BCG_detect_j_peaks"}},
     "scg": {"hr": {"SCG_detect_j_peaks"}},
     "pcg": {"hr": {"PCG_detect_heart_sounds", "PCG_estimate_heart_rate"}},
-    "abp": {"hr": {"ABP_detect_pulses"}},
+    "abp": {"hr": {"ABP_detect_fiducial_points"}},
     "resp": {"rate": {"RESP_estimate_rate"}},
 }
 
@@ -127,6 +127,23 @@ def should_drop_tool(tool: str, question: str) -> bool:
     return False
 
 
+LEGACY_TOOL_REPLACEMENTS = {
+    "ABP_detect_pulses": "ABP_detect_fiducial_points",
+}
+
+
+def normalize_tool_call_name(call: dict[str, Any]) -> str:
+    name = str(call.get("name") or call.get("tool"))
+    replacement = LEGACY_TOOL_REPLACEMENTS.get(name)
+    if replacement:
+        if "name" in call:
+            call["name"] = replacement
+        if "tool" in call:
+            call["tool"] = replacement
+        return replacement
+    return name
+
+
 def minimalize_tool_calls(calls: list[dict[str, Any]], question: str) -> tuple[list[dict[str, Any]], list[str]]:
     removed: list[str] = []
     kept: list[dict[str, Any]] = []
@@ -136,7 +153,7 @@ def minimalize_tool_calls(calls: list[dict[str, Any]], question: str) -> tuple[l
         if not isinstance(call, dict):
             kept.append(call)
             continue
-        name = call.get("name") or call.get("tool")
+        name = normalize_tool_call_name(call)
         if should_drop_tool(str(name), question):
             removed.append(str(name))
             continue

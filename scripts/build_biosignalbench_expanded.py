@@ -113,6 +113,7 @@ def _tool_cases_for_record(record: dict[str, Any], idx: int) -> list[dict[str, A
     elif modality == 'ppg':
         specs.extend([
             ('pulse', 'Estimate pulse rate from this PPG segment.', ['PPG_assess_quality', 'PPG_detect_peaks'], {'type': 'ppg_pulse_rate'}),
+            ('fiducials', 'Detect PPG pulse onset, systolic peak, dicrotic notch, and diastolic peak fiducials.', ['PPG_assess_quality', 'PPG_detect_fiducial_points'], {'type': 'ppg_on_sp_dn_dp_fiducials'}),
             ('prv', 'Compute pulse-rate variability and pulse irregularity from this PPG segment.', ['PPG_assess_quality', 'PPG_detect_peaks', 'PPG_compute_prv', 'PPG_screen_pulse_irregularity'], {'type': 'ppg_prv_irregularity'}),
         ])
     elif modality == 'resp':
@@ -142,8 +143,8 @@ def _tool_cases_for_record(record: dict[str, Any], idx: int) -> list[dict[str, A
         ])
     elif modality == 'abp':
         specs.extend([
-            ('hemo', 'Compute arterial pressure pulses and hemodynamic summary from this ABP segment.', ['ABP_assess_quality', 'ABP_detect_pulses', 'ABP_compute_hemodynamics'], {'type': 'abp_hemodynamics'}),
-            ('hypotension', 'Screen this ABP segment for hypotension or pressure-event concern.', ['ABP_assess_quality', 'ABP_detect_pulses', 'ABP_classify_pressure_events'], {'type': 'abp_pressure_event'}),
+            ('hemo', 'Compute arterial pressure pulses and hemodynamic summary from this ABP segment.', ['ABP_assess_quality', 'ABP_detect_fiducial_points', 'ABP_compute_hemodynamics'], {'type': 'abp_hemodynamics'}),
+            ('hypotension', 'Screen this ABP segment for hypotension or pressure-event concern.', ['ABP_assess_quality', 'ABP_detect_fiducial_points', 'ABP_classify_pressure_events'], {'type': 'abp_pressure_event'}),
         ])
     elif modality == 'pcg':
         specs.extend([

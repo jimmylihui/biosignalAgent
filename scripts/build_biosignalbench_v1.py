@@ -15,6 +15,15 @@ from biosignal_agent.evaluation.biosignalbench import validate_bench_cases, writ
 OUTPUT_ROOT = Path('/data1/jiahui/biosignal-agent/outputs')
 DATA_ROOT = Path('/data1/jiahui/biosignal-agent/datasets/processed')
 
+LEGACY_EXPECTED_TOOL_REPLACEMENTS = {
+    'ABP_detect_pulses': 'ABP_detect_fiducial_points',
+}
+
+
+def normalize_expected_tools(tools: list[str]) -> list[str]:
+    normalized = [LEGACY_EXPECTED_TOOL_REPLACEMENTS.get(str(tool), str(tool)) for tool in tools]
+    return list(dict.fromkeys(normalized))
+
 
 def case(case_id: str, task: str, question: str, input_type: str, modality: str, expected_tools: list[str], source: str, **extra: Any) -> dict[str, Any]:
     return {
@@ -23,7 +32,7 @@ def case(case_id: str, task: str, question: str, input_type: str, modality: str,
         'question': question,
         'input_type': input_type,
         'modality': modality,
-        'expected_tools': list(dict.fromkeys(expected_tools)),
+        'expected_tools': normalize_expected_tools(expected_tools),
         'expected_key_outputs': extra.pop('expected_key_outputs', []),
         'ground_truth_metric': extra.pop('ground_truth_metric', {'type': 'tool_set_exact_or_contains'}),
         'source': source,
